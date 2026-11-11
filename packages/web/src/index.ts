@@ -243,7 +243,10 @@ const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
     frame.className = "live-frame";
     frame.title = `${stream.name} live`;
     frame.loading = "lazy";
-    frame.src = `${location.protocol}//${location.hostname}:${sources.go2rtcPort}/stream.html?src=${stream.sub}&mode=mse`;
+    frame.src = new URL(
+      `${sources.path}stream.html?src=${encodeURIComponent(stream.sub)}&mode=mse`,
+      location.origin,
+    ).href;
     card.append(frame);
 
     return card;

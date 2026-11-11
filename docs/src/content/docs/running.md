@@ -39,18 +39,21 @@ It logs in to the recorder as it starts, and logs in again, waiting longer
 each time, whenever the connection drops. `mise run serve:server:logs` follows
 its log.
 
-The server listens on `127.0.0.1:7380`, and go2rtc on `127.0.0.1:1984`. Set
-`DVR_REVIVAL_HOST` to listen on another address, such as your machine's
-address on your network to use it from a phone, and `PORT` and `GO2RTC_PORT`
-for other ports. Neither asks for a login, so only listen where everyone who
-can reach it should see the cameras.
+The server listens on `127.0.0.1:7380`. go2rtc only listens on `127.0.0.1:1984`,
+and the server passes it through under `/go2rtc/`. Set `DVR_REVIVAL_HOST` to
+listen on another address, such as your machine's address on your network to
+use it from a phone, and `PORT` and `GO2RTC_PORT` for other ports. The server
+doesn't ask for a login, so only listen where everyone who can reach it should
+see the cameras.
+
+After changing the server, restart it with `mise run serve:server:restart`.
 
 ## Settings
 
-| Variable           | Default             | What it sets                          |
-| ------------------ | ------------------- | ------------------------------------- |
-| `DVR_REVIVAL_HOST` | `127.0.0.1`         | The address the server and go2rtc use |
-| `PORT`             | `7380`              | The server's port                     |
-| `GO2RTC_PORT`      | `1984`              | go2rtc's port                         |
-| `GO2RTC_BIN`       | `go2rtc`            | The go2rtc binary                     |
-| `DVR_REVIVAL_WEB`  | `packages/web/dist` | The built web client                  |
+| Variable           | Default             | What it sets                      |
+| ------------------ | ------------------- | --------------------------------- |
+| `DVR_REVIVAL_HOST` | `127.0.0.1`         | The address the server listens on |
+| `PORT`             | `7380`              | The server's port                 |
+| `GO2RTC_PORT`      | `1984`              | go2rtc's port                     |
+| `GO2RTC_BIN`       | `go2rtc`            | The go2rtc binary                 |
+| `DVR_REVIVAL_WEB`  | `packages/web/dist` | The built web client              |

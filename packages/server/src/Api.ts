@@ -61,9 +61,9 @@ export const LiveStream = Schema.Struct({
 
 export interface LiveStream extends Schema.Schema.Type<typeof LiveStream> {}
 
-/** Where go2rtc listens, on the server's own host, and the streams it has. */
+/** The path the server serves go2rtc under, and the streams it has. */
 export const VideoSources = Schema.Struct({
-  go2rtcPort: Schema.Number,
+  path: Schema.String,
   streams: Schema.Array(LiveStream),
 });
 

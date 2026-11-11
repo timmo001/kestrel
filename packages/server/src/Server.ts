@@ -8,6 +8,7 @@ import { Effect, FileSystem, Layer, Path } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Api } from "./Api.ts";
+import * as Go2rtc from "./Go2rtc.ts";
 import { Recorder } from "./Recorder.ts";
 import { Video } from "./Video.ts";
 
@@ -118,8 +119,17 @@ export interface ServeOptions {
 }
 
 /** Serves the API and the web client over plain HTTP, with the recorder session behind it. */
+/** go2rtc under `/go2rtc/`, at the port the `Video` service runs it on. */
+const go2rtc = Layer.unwrap(
+  Effect.gen(function* () {
+    const video = yield* Video;
+
+    return Go2rtc.routes(video.port);
+  }),
+);
+
 export const layer = (options: ServeOptions) =>
-  HttpRouter.serve(Layer.merge(routes, webClient(options.web))).pipe(
+  HttpRouter.serve(Layer.mergeAll(routes, go2rtc, webClient(options.web))).pipe(
     Layer.provide(
       BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
     ),
