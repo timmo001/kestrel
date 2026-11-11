@@ -1,2 +1,7 @@
 .opencode/
 node_modules/
+dist/
+.dev/
+.env
+.env.*
+!.env.example
