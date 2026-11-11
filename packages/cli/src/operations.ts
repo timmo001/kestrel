@@ -29,7 +29,7 @@ export const operations: ReadonlyArray<Operation> = [
   {
     name: "status",
     description:
-      "The recorder's connection, clock, disks and each channel's state",
+      "What needs you, and the recorder's connection, clock, disks and each channel's state",
     access: "read",
   },
   {

@@ -152,6 +152,26 @@ const showConnection = async () => {
   return connected;
 };
 
+// What needs you, from the server's attention list: alerts first, then
+// passive notes
+const attentionStack = find("gw-stack", "attention");
+
+const showAttention = async () => {
+  const items = await call((api) => api.recorder.attention()).catch(() => []);
+
+  attentionStack?.replaceChildren(
+    ...[...items]
+      .sort((a, b) => (a.level === b.level ? 0 : a.level === "alert" ? -1 : 1))
+      .map((item) => {
+        const alert = element("gw-alert", item.message);
+
+        alert.setAttribute("tone", item.level === "alert" ? "warning" : "info");
+
+        return alert;
+      }),
+  );
+};
+
 // Recorder: device facts, disks and each channel's state
 const deviceCard = find("gw-card", "device");
 const disksCard = find("gw-card", "disks");
@@ -421,6 +441,7 @@ const start = async () => {
   }
 
   await Promise.all([
+    showAttention(),
     showLive(channels),
     pickDay(today),
     showEvents(),
@@ -428,6 +449,7 @@ const start = async () => {
   ]);
 
   setInterval(() => {
+    void showAttention();
     void showConnection().then((connected) =>
       connected ? showRecorder() : undefined,
     );

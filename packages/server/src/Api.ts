@@ -51,6 +51,18 @@ export const Connection = Schema.Struct({
 
 export interface Connection extends Schema.Schema.Type<typeof Connection> {}
 
+/**
+ * Something about the recorder that needs you. An alert is counted wherever
+ * the status shows, such as a bar; a passive one is only listed.
+ */
+export const Attention = Schema.Struct({
+  level: Schema.Literals(["alert", "passive"]),
+  kind: Schema.Literals(["connection", "disk", "signal"]),
+  message: Schema.String,
+});
+
+export interface Attention extends Schema.Schema.Type<typeof Attention> {}
+
 /** A live stream the web client can play through go2rtc. */
 export const LiveStream = Schema.Struct({
   channel: Schema.Number,
@@ -72,6 +84,10 @@ export interface VideoSources extends Schema.Schema.Type<typeof VideoSources> {}
 export class RecorderGroup extends HttpApiGroup.make("recorder")
   .add(
     HttpApiEndpoint.get("connection", "/connection", { success: Connection }),
+    /** What needs you: the status source the CLI, the page and any bar read. */
+    HttpApiEndpoint.get("attention", "/attention", {
+      success: Schema.Array(Attention),
+    }),
     HttpApiEndpoint.get("device", "/device", {
       success: DeviceInfo,
       error: RecorderUnavailable,

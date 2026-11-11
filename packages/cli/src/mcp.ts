@@ -13,6 +13,7 @@ import {
   Recording,
 } from "@timmo001/dvr-revival-rsnet/domain";
 import {
+  Attention,
   Connection,
   LocalMonth,
   ReceivedEvent,
@@ -27,6 +28,8 @@ const Status = Tool.make("status", {
     "The recorder's connection, clock, disks and each channel's state",
   success: Schema.Struct({
     connection: Connection,
+    alerts: Schema.Number,
+    attention: Schema.Array(Attention),
     status: Schema.NullOr(RecorderStatus),
   }),
   failure: RecorderError,
@@ -87,11 +90,15 @@ const handlers = Effect.gen(function* () {
         api.recorder.connection(),
       );
 
-      if (!connection.connected) return { connection, status: null };
+      const attention = yield* recorder.call((api) => api.recorder.attention());
 
       return {
         connection,
-        status: yield* recorder.call((api) => api.recorder.status()),
+        alerts: attention.filter((item) => item.level === "alert").length,
+        attention,
+        status: connection.connected
+          ? yield* recorder.call((api) => api.recorder.status())
+          : null,
       };
     }),
     device: () => recorder.call((api) => api.recorder.device()),

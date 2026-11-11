@@ -8,6 +8,7 @@ import { Effect, FileSystem, Layer, Path } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";
 import { Api } from "./Api.ts";
+import { Attention } from "./Attention.ts";
 import * as Go2rtc from "./Go2rtc.ts";
 import { Recorder } from "./Recorder.ts";
 import { Video } from "./Video.ts";
@@ -17,9 +18,11 @@ const RecorderHandlers = HttpApiBuilder.group(
   "recorder",
   Effect.fn(function* (handlers) {
     const recorder = yield* Recorder;
+    const attention = yield* Attention;
 
     return handlers
       .handle("connection", () => recorder.connection)
+      .handle("attention", () => attention.list)
       .handle("device", () => recorder.device)
       .handle("status", () => recorder.status)
       .handle("recordings", ({ query }) =>
@@ -133,7 +136,7 @@ export const layer = (options: ServeOptions) =>
     Layer.provide(
       BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
     ),
-    Layer.provide(Video.layer),
+    Layer.provide([Video.layer, Attention.layer]),
     // Last, so the routes and the video share one recorder session.
     Layer.provide(Recorder.layer),
   );

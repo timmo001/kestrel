@@ -14,6 +14,7 @@ import type {
   Recording,
 } from "@timmo001/dvr-revival-rsnet/domain";
 import type {
+  Attention,
   Connection,
   ReceivedEvent,
   VideoSources,
@@ -32,6 +33,9 @@ const json = Flag.Boolean("json").pipe(
 type Output =
   | {
       readonly connection: Connection;
+      /** How many items need you: the count a bar shows. */
+      readonly alerts: number;
+      readonly attention: ReadonlyArray<Attention>;
       readonly status: RecorderStatus | null;
     }
   | DeviceInfo
@@ -69,18 +73,30 @@ const status = Command.make(
   Effect.fn("status")(function* ({ json }) {
     const recorder = yield* Recorder;
     const connection = yield* recorder.call((api) => api.recorder.connection());
+    const attention = yield* recorder.call((api) => api.recorder.attention());
 
-    if (!connection.connected) {
-      return yield* json
-        ? printJson({ connection, status: null })
-        : Console.log(
-            `Not connected to the recorder${connection.error === null ? "" : `: ${connection.error}`}`,
-          );
+    const alerts = attention.filter((item) => item.level === "alert").length;
+
+    const current = connection.connected
+      ? yield* recorder.call((api) => api.recorder.status())
+      : null;
+
+    if (json) {
+      return yield* printJson({
+        connection,
+        alerts,
+        attention,
+        status: current,
+      });
     }
 
-    const current = yield* recorder.call((api) => api.recorder.status());
+    for (const item of attention) {
+      yield* Console.log(
+        `${item.level === "alert" ? "●" : "○"} ${item.message}`,
+      );
+    }
 
-    if (json) return yield* printJson({ connection, status: current });
+    if (current === null) return;
 
     yield* Console.log(
       `Clock  ${current.time?.replace("T", " ") ?? "unknown"}`,
