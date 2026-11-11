@@ -18,7 +18,12 @@ import type {
   LiveStream,
   ReceivedEvent,
 } from "@timmo001/dvr-revival-server/api";
-import { connectPwa } from "@timmo001/groundwork-pwa/view";
+import {
+  connectPwa,
+  pushState,
+  subscribePush,
+  type PushState,
+} from "@timmo001/groundwork-pwa/view";
 import { coreThemeChoices, pageTheme } from "@timmo001/groundwork-tokens/page";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
@@ -33,7 +38,7 @@ pageTheme({
   themes: coreThemeChoices.filter(({ id }) => id === themeOptions.defaultTheme),
 });
 
-connectPwa(config);
+const pwa = connectPwa(config);
 
 const find = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -419,6 +424,35 @@ const showClips = async () => {
     )
     .map(recordingRow);
 };
+
+// Notifications: a button in the bar subscribes this browser to the server's
+// pushes, shown only while it can and hasn't yet
+const notify = find("gw-button", "notify");
+const clientKey = "dvr-revival:push-client";
+const clientId = localStorage.getItem(clientKey) ?? crypto.randomUUID();
+
+localStorage.setItem(clientKey, clientId);
+
+const pushService = {
+  service: new URL("./", location.href).href,
+  client: {
+    id: clientId,
+    name: navigator.platform || "Browser",
+    platform: "web" as const,
+  },
+};
+
+const showNotify = (state: PushState) => {
+  if (notify !== null) notify.hidden = state !== "default";
+};
+
+void pwa.worker.then(async (registration) => {
+  showNotify(await pushState(registration));
+
+  notify?.addEventListener("click", async () => {
+    showNotify(await subscribePush(registration, pushService));
+  });
+});
 
 // Start once the recorder is reachable, then keep the health fresh
 const start = async () => {

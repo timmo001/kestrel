@@ -1,7 +1,7 @@
 /**
  * What needs you about the recorder, worked out from its connection and a
  * status read every minute: the one status source the CLI, the page and any
- * bar read. Only a camera that had a signal while the server ran counts when
+ * bar read. Each alert is pushed to subscribed phones once, when it starts. Only a camera that had a signal while the server ran counts when
  * its signal goes, so empty channels don't.
  *
  * @module
@@ -9,6 +9,7 @@
 import type { RecorderStatus } from "@timmo001/dvr-revival-rsnet/domain";
 import { Context, Duration, Effect, Layer, Ref, Schedule } from "effect";
 import type { Attention as AttentionItem, Connection } from "./Api.ts";
+import { Push } from "./Push.ts";
 import { Recorder } from "./Recorder.ts";
 
 const pollEvery = Duration.minutes(1);
@@ -76,8 +77,34 @@ export class Attention extends Context.Service<
     Attention,
     Effect.gen(function* () {
       const recorder = yield* Recorder;
+      const push = yield* Push;
       const latest = yield* Ref.make<RecorderStatus | null>(null);
       const hadSignal = new Set<number>();
+      // The alerts already pushed, so each is pushed once when it starts
+      let pushed = new Set<string>();
+
+      const pushNewAlerts = Effect.gen(function* () {
+        const alerts = attentionFor(
+          yield* recorder.connection,
+          yield* Ref.get(latest),
+          hadSignal,
+        ).filter((item) => item.level === "alert");
+
+        for (const alert of alerts) {
+          if (pushed.has(alert.message)) continue;
+
+          yield* push.send({
+            title: "DVR Revival",
+            body: alert.message,
+            tone: "warning",
+            level: "alert",
+            tag: alert.kind,
+            link: "./",
+          });
+        }
+
+        pushed = new Set(alerts.map((alert) => alert.message));
+      });
 
       // Retried within the minute, so the first read doesn't miss the login
       // that's still under way as the server starts
@@ -99,6 +126,7 @@ export class Attention extends Context.Service<
       );
 
       yield* read.pipe(
+        Effect.andThen(pushNewAlerts),
         Effect.repeat(Schedule.spaced(pollEvery)),
         Effect.forkScoped,
       );

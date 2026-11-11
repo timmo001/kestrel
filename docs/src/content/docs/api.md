@@ -37,3 +37,19 @@ video plays from the same address as the page, through a proxy or over HTTPS.
 `/api/video/sources` names two streams for each channel: `chNN` for the main
 stream and `chNN_sub` for the sub stream. Play one with
 `/go2rtc/stream.html?src=ch01_sub`.
+
+## Push
+
+The server pushes each alert from `/api/attention` once, when it starts, to
+every browser that subscribed. It follows Groundwork's push contract, outside
+`/api`:
+
+| Endpoint                     | Does                                                       |
+| ---------------------------- | ---------------------------------------------------------- |
+| `GET /push/vapid-key`        | The VAPID public key, as `{ publicKey }`                   |
+| `POST /push/subscriptions`   | Keeps a subscription, replacing the client's last one; 204 |
+| `DELETE /push/subscriptions` | Drops the subscription with `{ endpoint }`; 204            |
+
+The page's Notify me button subscribes. The keys and subscriptions are kept in
+`push.json`, readable only by you, under `DVR_REVIVAL_STATE`, else
+`$XDG_STATE_HOME/dvr-revival`, else `~/.local/state/dvr-revival`.

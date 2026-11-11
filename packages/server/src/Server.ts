@@ -10,6 +10,7 @@ import { HttpApiBuilder } from "effect/http-api";
 import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import * as Go2rtc from "./Go2rtc.ts";
+import { Push } from "./Push.ts";
 import { Recorder } from "./Recorder.ts";
 import { Video } from "./Video.ts";
 
@@ -131,12 +132,22 @@ const go2rtc = Layer.unwrap(
   }),
 );
 
+/** The push contract's routes, from the `Push` service. */
+const push = Layer.unwrap(
+  Effect.gen(function* () {
+    return (yield* Push).routes;
+  }),
+);
+
 export const layer = (options: ServeOptions) =>
-  HttpRouter.serve(Layer.mergeAll(routes, go2rtc, webClient(options.web))).pipe(
+  HttpRouter.serve(
+    Layer.mergeAll(routes, go2rtc, push, webClient(options.web)),
+  ).pipe(
     Layer.provide(
       BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
     ),
     Layer.provide([Video.layer, Attention.layer]),
+    Layer.provide(Push.layer),
     // Last, so the routes and the video share one recorder session.
     Layer.provide(Recorder.layer),
   );
