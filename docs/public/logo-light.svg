@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The placeholder camera for light pages (timmo001/dvr-revival#7). -->
+  <rect x="6" y="18" width="36" height="28" rx="6" fill="#2b2f36"/>
+  <path d="M44 28 L58 20 V44 L44 36 Z" fill="#2b2f36"/>
+</svg>

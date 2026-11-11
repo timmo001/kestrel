@@ -1,0 +1,27 @@
+{
+  "name": "dvr-revival-docs",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "blume dev",
+    "start": "blume dev",
+    "build": "blume build --strict",
+    "check": "blume check --strict --isolated",
+    "validate": "blume validate --strict",
+    "preview": "blume preview",
+    "brand": "bun scripts/brand-images.ts"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "14.4.7",
+    "@fontsource-variable/geist-mono": "5.3.0",
+    "@fontsource-variable/mona-sans": "5.3.0",
+    "@timmo001/docs-kit": "0.23.0",
+    "@timmo001/groundwork-tokens": "0.23.0",
+    "blume": "2.2.7",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "astro": "7.4.10"
+  }
+}

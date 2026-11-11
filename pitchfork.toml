@@ -10,3 +10,11 @@ port = { expect = [7380], bump = 10 }
 ready_cmd = 'curl -fsS "http://127.0.0.1:$PORT/api/health"'
 health_cmd = 'curl -fsS "http://127.0.0.1:$PORT/api/health"'
 retry = true
+
+# The docs site's dev server, at https://docs.dvr-revival.localhost.
+[daemons.docs]
+run = 'exec mise run docs:dev --host 127.0.0.1 --port "$PORT"'
+port = { expect = [7360], bump = 10 }
+ready_cmd = 'curl -fsS "http://127.0.0.1:$PORT/"'
+health_cmd = 'curl -fsS "http://127.0.0.1:$PORT/"'
+retry = true

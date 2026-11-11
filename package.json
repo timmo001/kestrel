@@ -4,7 +4,8 @@
   "type": "module",
   "packageManager": "bun@1.4.4",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "docs"
   ],
   "scripts": {
     "format": "prettier --write .",
@@ -17,6 +18,8 @@
     "effect": "4.1.4"
   },
   "trustedDependencies": [
-    "sharp"
+    "esbuild",
+    "sharp",
+    "workerd"
   ]
 }

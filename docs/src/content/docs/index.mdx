@@ -1,0 +1,46 @@
+---
+title: Overview
+description: A web client and bridge for Raysharp-made recorders, such as the Swann DVR8-4575.
+---
+
+DVR Revival brings an old recorder back into use from a browser. Raysharp makes
+recorders for Swann, Lorex, Night Owl and others, and their own apps and
+plugins have stopped working in modern browsers. This talks to the recorder
+directly instead.
+
+A small server sits between the recorder and the page. Browsers can't open the
+recorder's control port or play its RTSP streams, so the server holds one
+logged-in session, passes on what it reports, and runs go2rtc for live video.
+
+The plan is tracked in
+[timmo001/dvr-revival#1](https://github.com/timmo001/dvr-revival/issues/1). See
+[Running it](/running) to set it up.
+
+## What it does
+
+- **Recorder health:** the recorder's clock, its disks, and each channel's
+  signal, recording mode and motion.
+- **Recordings:** which days have recordings, and each day's clips on a
+  channel, with why they were recorded (motion, PIR, alarm or normal) and
+  their size.
+- **Events:** motion, PIR, video loss and disk reports as the recorder sends
+  them, and today's motion and PIR clips found by search.
+- **Live view:** each channel's sub stream through go2rtc.
+
+## Parts
+
+| Part              | What it is                                                   |
+| ----------------- | ------------------------------------------------------------ |
+| `packages/rsnet`  | The recorder's control protocol, in TypeScript with Effect   |
+| `packages/server` | The server: the recorder session, go2rtc and the [API](/api) |
+| `packages/web`    | The web client, installable on a phone                       |
+| `docs`            | This site                                                    |
+
+## Machine-readable docs
+
+| URL                                         | Use                                      |
+| ------------------------------------------- | ---------------------------------------- |
+| https://dvr-revival.timmo.dev/llms.txt      | Compact page index                       |
+| https://dvr-revival.timmo.dev/llms-full.txt | Full docs bundle                         |
+| https://dvr-revival.timmo.dev/mcp           | Hosted MCP (search, page and navigation) |
+| `/{route}.md`                               | One page as Markdown                     |
