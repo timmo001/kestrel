@@ -1,3 +1,4 @@
+/** Checks the scrambling and frame splitting, which fail silently when wrong. */
 import { expect, test } from "bun:test";
 import { encodeFrame, frameDecoder, permute } from "./Codec.ts";
 
