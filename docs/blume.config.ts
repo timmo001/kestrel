@@ -10,7 +10,7 @@ export default defineConfig(
     site: "dvr-revival.timmo.dev",
     github: { owner: "timmo001", repo: "dvr-revival" },
     navigation: {
-      sidebar: ["/", "/running", "/api", "/protocol"],
+      sidebar: ["/", "/running", "/api", "/agents", "/protocol"],
     },
   }),
 );

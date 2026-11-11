@@ -21,7 +21,9 @@ and work that depends on one waits for it.
 - Recorder credentials are never printed, logged or passed on a command line.
 - Each part is a private Bun workspace package under `packages/<name>/`:
   `rsnet` is the protocol library, `server` holds the recorder session, `web`
-  is the app.
+  is the app and `cli` is the `dvr-revival` CLI with its Code Mode and MCP
+  surface. Its skill is `skills/dvr-revival/SKILL.md`; keep it in step with
+  the CLI's operations.
 - Use mise-pinned tools and Bun. Pin dependencies to exact versions
   (`bun add -E`) and keep `bun.lock` in sync.
 - Open each hand-written source file with a short `/** */` header saying what

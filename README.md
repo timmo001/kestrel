@@ -30,6 +30,8 @@ the settings, the API and the protocol.
 - [`packages/server`](packages/server): the server, with the recorder session,
   go2rtc and the API
 - [`packages/web`](packages/web): the web client, installable on a phone
+- [`packages/cli`](packages/cli): the `dvr-revival` CLI, with Code Mode and
+  MCP for agents, and its [skill](skills/dvr-revival/SKILL.md)
 - [`docs`](docs): the docs site
 
 ## Developing

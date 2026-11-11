@@ -1,0 +1,14 @@
+{
+  "name": "dvr-revival",
+  "description": "Agent Skills for DVR Revival",
+  "owner": { "name": "Aidan Timson", "url": "https://github.com/timmo001" },
+  "plugins": [
+    {
+      "name": "dvr-revival",
+      "description": "Read a recorder's status, recordings and events through DVR Revival's Code Mode tools, MCP server or CLI",
+      "license": "Apache-2.0",
+      "source": "./skills",
+      "skills": "./"
+    }
+  ]
+}
