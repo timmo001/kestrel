@@ -48,13 +48,21 @@ export class LoginRefused extends Schema.TaggedError<LoginRefused>()(
     ack: Schema.Number,
     reason: Schema.String,
   },
-) {}
+) {
+  override get message() {
+    return `The recorder refused the login: ${this.reason}`;
+  }
+}
 
 /** Whatever answered isn't a Raysharp recorder. */
 export class NotRaysharp extends Schema.TaggedError<NotRaysharp>()(
   "NotRaysharp",
   {},
-) {}
+) {
+  override get message() {
+    return "That address isn't a Raysharp recorder";
+  }
+}
 
 /** The recorder sent something this client can't read. */
 export class ProtocolError extends Schema.TaggedError<ProtocolError>()(
@@ -71,7 +79,11 @@ export class RequestTimedOut extends Schema.TaggedError<RequestTimedOut>()(
     type: Schema.Number,
     subtype: Schema.Number,
   },
-) {}
+) {
+  override get message() {
+    return `The recorder didn't answer message ${this.type}/${this.subtype}`;
+  }
+}
 
 /** The connection couldn't open, or closed. */
 export class ConnectionClosed extends Schema.TaggedError<ConnectionClosed>()(
