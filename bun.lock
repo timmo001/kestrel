@@ -25,8 +25,28 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/server": {
+      "name": "@timmo001/dvr-revival-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@effect/platform-bun": "4.1.4",
+        "@timmo001/dvr-revival-rsnet": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
   },
   "packages": {
+    "@effect/platform-bun": ["@effect/platform-bun@4.1.4", "", { "dependencies": { "@effect/platform-node-shared": "4.1.4" }, "peerDependencies": { "effect": "^4.1.4" } }, "sha512-Vdq82GOrD5HVF43aXVwHeX+4uIOrgAnjju9MEyizzFZ3yt3A6x9prtmHej1q/zAOaeNddtkpPr2ExHEvZ13S6Q=="],
+
     "@effect/platform-node-shared": ["@effect/platform-node-shared@4.1.4", "", { "dependencies": { "@types/ws": "^8.18.2", "ws": "^8.22.1" }, "peerDependencies": { "effect": "^4.1.4" } }, "sha512-DWdfphHGOFJNj/mYadgpT3jIm8aRXDcPrQiGXFBH4p2H4XmA7iYMrPsI8NxVgZ7kNX0q1+FGJZJama0tINHRAg=="],
 
     "@effect/tsgo": ["@effect/tsgo@0.68.0", "", { "optionalDependencies": { "@effect/tsgo-darwin-arm64": "0.68.0", "@effect/tsgo-darwin-x64": "0.68.0", "@effect/tsgo-linux-arm": "0.68.0", "@effect/tsgo-linux-arm64": "0.68.0", "@effect/tsgo-linux-x64": "0.68.0", "@effect/tsgo-win32-arm64": "0.68.0", "@effect/tsgo-win32-x64": "0.68.0" }, "bin": { "effect-tsgo": "dist/effect-tsgo.cjs" } }, "sha512-bEavhzNBDdmVFIHVXsd7DC9qr7Bgxq4xrdEHE1NcfJqv8i6dXsafdyJU3gjvb79YJ1sd409H3ray70fD+QY3DA=="],
@@ -98,6 +118,8 @@
     "@oxlint/plugins": ["@oxlint/plugins@1.93.0", "", {}, "sha512-bKWQI1g9jn8bWUZsvhbOLfgva576Fbp1KwoTNSUCMdT9tlTAvQS2JkifX1UrhPPdyN4GHvM20HhvIMqqU1yotQ=="],
 
     "@timmo001/dvr-revival-rsnet": ["@timmo001/dvr-revival-rsnet@workspace:packages/rsnet"],
+
+    "@timmo001/dvr-revival-server": ["@timmo001/dvr-revival-server@workspace:packages/server"],
 
     "@timmo001/oxlint-rules": ["@timmo001/oxlint-rules@0.6.5", "", { "peerDependencies": { "@oxlint/plugins": "^1.91.0", "oxlint": "^1.91.0" }, "bin": { "oxlint-rules": "dist/cli.js" } }, "sha512-BFDZ+yFyzT0jQA3A5Cgb533e5BwJBS4wWG4Z7JNQ+yjyZJspzssMLRRdoFk1bx7g1mWWvSFgl920vmtTXJJGZQ=="],
 

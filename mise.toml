@@ -7,6 +7,9 @@ min_version = "2025.1.0"
 [tools]
 node = "26.13.0"
 bun = "1.4.4"
+# Turns the recorder's RTSP streams into ones browsers can play. The server
+# starts it.
+"github:AlexxIT/go2rtc" = "1.9.15"
 # The linters the shared hk pre-push hook runs.
 uv = "0.13.7"
 # yamllint's PyYAML has no wheels for Python 3.15 yet, which mise lock needs.
@@ -20,6 +23,27 @@ shellcheck = "0.11.0"
 description = "Install dependencies"
 run = "bun install --frozen-lockfile"
 sources = ["package.json", "packages/*/package.json", "bun.lock"]
+
+[tasks."serve:server"]
+description = "Start the server in watch mode in the background through Pitchfork"
+depends = ["install"]
+run = "pitchfork start server"
+
+[tasks."serve:server:status"]
+description = "Show the background server's status"
+run = "pitchfork status server"
+
+[tasks."serve:server:logs"]
+description = "Follow the background server's logs"
+run = "pitchfork logs -t server"
+
+[tasks."serve:server:restart"]
+description = "Restart the background server"
+run = "pitchfork restart server"
+
+[tasks."serve:server:stop"]
+description = "Stop the background server"
+run = "pitchfork stop server"
 
 [tasks.test]
 description = "Run every package's tests"

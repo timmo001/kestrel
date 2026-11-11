@@ -36,6 +36,12 @@ and work that depends on one waits for it.
   guessing. Changes that touch the wire format need a check against a real
   recorder, since there's no simulator.
 
+## Running it
+
+- Start the server only through `mise run serve:server`, never in the
+  foreground. It reads the recorder's address and login from `.env.local`
+  (see `.env.example`) through `op run`, and starts go2rtc beside it.
+
 ## Checks and rollout
 
 - `mise run check` runs lint, types and formatting; `mise run test` runs the
