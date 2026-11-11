@@ -52,7 +52,16 @@ type Output =
 const printJson = (value: Output) =>
   Console.log(JSON.stringify(value, null, 2));
 
-const today = () => new Date().toISOString().slice(0, 10);
+/** Today in this machine's time zone, which the recorder's clock is kept in. */
+const today = () => {
+  const now = new Date();
+
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
 
 const status = Command.make(
   "status",
