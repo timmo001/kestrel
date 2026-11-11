@@ -24,6 +24,28 @@
         "astro": "7.4.10",
       },
     },
+    "packages/cli": {
+      "name": "@timmo001/dvr-revival-cli",
+      "version": "0.0.0",
+      "bin": {
+        "dvr-revival": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@effect/platform-bun": "4.1.4",
+        "@timmo001/dvr-revival-rsnet": "workspace:*",
+        "@timmo001/dvr-revival-server": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
     "packages/rsnet": {
       "name": "@timmo001/dvr-revival-rsnet",
       "version": "0.0.0",
@@ -707,6 +729,8 @@
     "@tanstack/virtual-core": ["@tanstack/virtual-core@3.19.11", "", {}, "sha512-/5iHb0RHBvj8Di59FDs4ESNm45jls33aZAi4zccVXZjc/6ZvwQP6nzEYeT6weXjTf9E6/vrp2JhYWRyO+ZP13A=="],
 
     "@timmo001/docs-kit": ["@timmo001/docs-kit@0.23.0", "", { "dependencies": { "@timmo001/groundwork-tokens": "0.23.0", "@timmo001/groundwork-ui": "0.23.0", "sharp": "0.35.5" }, "peerDependencies": { "blume": "^2.2.6" } }, "sha512-6xrSgFd7tq7R9vBLW+iXX0p6TQo4b5KYOp6l6hNATWJk0ksay0t3b/Hh754V+qVw/k19oX0lULHfjT5TV0AuXg=="],
+
+    "@timmo001/dvr-revival-cli": ["@timmo001/dvr-revival-cli@workspace:packages/cli"],
 
     "@timmo001/dvr-revival-rsnet": ["@timmo001/dvr-revival-rsnet@workspace:packages/rsnet"],
 
