@@ -1,0 +1,44 @@
+/* The app's page: the theme's surface and type. */
+html {
+  background: var(--gw-color-surface-default);
+  color: var(--gw-color-text-primary);
+  font-family: var(--gw-font-sans);
+}
+
+body {
+  margin: 0;
+}
+
+.brand {
+  display: inline-flex;
+  gap: var(--gw-space-2);
+  align-items: center;
+  color: var(--gw-color-text-strong);
+  font-weight: 600;
+}
+
+.brand img {
+  border-radius: var(--gw-radius-sm, 4px);
+}
+
+gw-page {
+  padding-block: var(--gw-space-5);
+}
+
+.live-frame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--gw-radius-md, 8px);
+  background: var(--gw-color-surface-sunken, #000);
+}
+
+.recording-filters {
+  align-items: end;
+}
+
+.recorded-days {
+  flex-wrap: wrap;
+  margin-block: var(--gw-space-3);
+}

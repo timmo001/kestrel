@@ -12,5 +12,11 @@
   },
   "devDependencies": {
     "prettier": "3.10.0"
-  }
+  },
+  "overrides": {
+    "effect": "4.1.4"
+  },
+  "trustedDependencies": [
+    "sharp"
+  ]
 }

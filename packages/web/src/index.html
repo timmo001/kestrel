@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- DVR Revival's page: recorder health, live view, recordings and events. -->
+<html lang="en" data-gw-theme="base">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DVR Revival</title>
+    <!-- pwa:head -->
+    <link rel="icon" href="icons/icon-192.png" />
+    <link rel="stylesheet" href="index.css" />
+  </head>
+  <body>
+    <gw-banner class="offline" tone="danger" urgent>
+      <p class="offline-message">Can't reach the recorder. Trying again…</p>
+    </gw-banner>
+    <gw-app-bar size="wide">
+      <span slot="brand" class="brand">
+        <img src="icons/icon-192.png" alt="" width="24" height="24" />
+        DVR Revival
+      </span>
+      <gw-chip slot="actions" class="connection" loading></gw-chip>
+    </gw-app-bar>
+    <gw-page size="wide">
+      <gw-stack>
+        <gw-section heading="Recorder" id="recorder">
+          <gw-grid style="--gw-grid-min: 20rem">
+            <gw-card
+              heading="Device"
+              class="device"
+              loading
+              lines="4"
+            ></gw-card>
+            <gw-card heading="Disks" class="disks" loading lines="1"></gw-card>
+          </gw-grid>
+          <gw-table
+            class="channels"
+            label="Channels"
+            row-key="channel"
+            search="never"
+          ></gw-table>
+        </gw-section>
+
+        <gw-section heading="Live" id="live">
+          <gw-grid class="live" style="--gw-grid-min: 20rem"></gw-grid>
+        </gw-section>
+
+        <gw-section heading="Recordings" id="recordings">
+          <gw-row class="recording-filters">
+            <gw-input class="day" label="Day" type="date"></gw-input>
+            <gw-select class="channel" label="Channel" value="1"></gw-select>
+          </gw-row>
+          <gw-row class="recorded-days"></gw-row>
+          <gw-table
+            class="recordings"
+            label="Recordings"
+            row-key="begin"
+            sort="begin"
+            descending
+            contained
+          ></gw-table>
+        </gw-section>
+
+        <gw-section heading="Events" id="events">
+          <gw-table
+            class="events"
+            label="Alarm reports"
+            row-key="receivedAt"
+            sort="receivedAt"
+            descending
+            empty-label="No alarm reports since the server started"
+          ></gw-table>
+          <gw-table
+            class="clips"
+            label="Motion and PIR clips today"
+            row-key="key"
+            sort="begin"
+            descending
+            empty-label="No motion or PIR clips today"
+          ></gw-table>
+        </gw-section>
+      </gw-stack>
+    </gw-page>
+    <script type="module" src="index.js"></script>
+  </body>
+</html>

@@ -11,7 +11,7 @@ import {
   RecordedDay,
   RecorderStatus,
   Recording,
-} from "@timmo001/dvr-revival-rsnet";
+} from "@timmo001/dvr-revival-rsnet/domain";
 import { Schema } from "effect";
 import {
   HttpApi,
