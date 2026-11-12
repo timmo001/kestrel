@@ -27,8 +27,9 @@ const bitAt = (bytes: Uint8Array, bit: number) =>
   ((bytes[bit >> 3] ?? 0) & (0x80 >> (bit & 7))) !== 0;
 
 /**
- * The protocol's keyless bit permutation: a Josephus count of 3 over the
- * buffer's bits, most significant bit first. `decode` runs it backwards.
+ * The protocol's keyless bit permutation, worked out by reverse engineering: a
+ * Josephus count of 3 over the buffer's bits, most significant bit first.
+ * `decode` runs it backwards.
  */
 export const permute = (input: Uint8Array, decode = false): Uint8Array => {
   const result = new Uint8Array(input.length);

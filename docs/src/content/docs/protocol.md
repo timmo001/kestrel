@@ -6,7 +6,9 @@ description: What the recorder's control protocol looks like, as packages/protoc
 Raysharp recorders take control messages on TCP port 9000.
 `packages/protocol-raysharp` follows the message numbers and layouts in the
 vendor SDK's protocol header, and the notes here say where firmware SRV7.1.0
-differs.
+differs. The mode 2 scrambling and the recorded video's frame header were
+worked out by reverse engineering, and everything is checked against a real
+recorder.
 
 ## Framing
 

@@ -40,7 +40,8 @@ and work that depends on one waits for it.
 
 - `packages/protocol-raysharp` follows the vendor SDK's protocol header for
   message numbers and layouts. Firmware SRV7.1.0 differs in places, and the
-  comments beside the parsers say where.
+  comments beside the parsers say where. The mode 2 scrambling and the
+  recorded video's frame header came from reverse engineering.
 - Prefer layouts from the SDK header or existing open-source clients over
   guessing. Changes that touch the wire format need a check against a real
   recorder, since there's no simulator.

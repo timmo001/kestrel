@@ -2,7 +2,8 @@
  * Recorded video as a download sends it: after the reply to the request, a
  * run of packs (PackHead in the SDK) that each carry a piece of a frame, and
  * a pack that marks the end of the file. Each frame opens with a 40-byte
- * header the SDK doesn't describe, read here from what the recorder sends.
+ * header the SDK doesn't describe, worked out by reverse engineering and
+ * checked against what the recorder sends.
  *
  * @module
  */
