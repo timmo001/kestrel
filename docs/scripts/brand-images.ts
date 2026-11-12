@@ -9,12 +9,11 @@ import { writeBrandImages } from "@timmo001/docs-kit";
 const written = await writeBrandImages({
   logo: "src/assets/logo.svg",
   title: "Kestrel",
-  tagline: ["A web client and bridge for", "Raysharp-made recorders."],
+  tagline: ["Your cameras and recorders,", "watched over in one app."],
   site: "kestrel.timmo.dev",
-  // Groundwork's Base theme, the app's default (timmo001/kestrel#7)
-  // (timmo001/kestrel#7)
-  background: "#1c1e22",
-  accent: "#e7e9ee",
+  // From the logo: a step darker than its tile, with the kestrel's yellow
+  background: "#22252a",
+  accent: "#f2b31d",
   outputs: {
     socialPreview: "../.github/social-preview.png",
     logo: "public/logo.png",
