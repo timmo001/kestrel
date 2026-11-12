@@ -16,6 +16,61 @@ export const typingTargets =
 /** Controls that move between their own parts with the arrow keys. */
 const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
 
+/** How far a picture zooms in, a step at a time, on Live and Recordings. */
+export const pictureZooms = [1, 1.5, 2, 3, 4, 6, 8];
+
+/**
+ * Wires a page's keys popover to its button, both opening it when it's shut
+ * and shutting it when it's open. Returns the toggle, for the `?` key.
+ */
+export const helpToggle = (
+  popover: HTMLElementTagNameMap["gw-popover"] | null,
+  button: HTMLElementTagNameMap["gw-button"] | null,
+) => {
+  let open = false;
+  /** Whether it was open as the button was pressed, before that press shut it. */
+  let openOnPress = false;
+
+  popover?.addEventListener("close", () => {
+    open = false;
+  });
+
+  // Ahead of the popover's own listener, which shuts it on a press outside
+  window.addEventListener(
+    "pointerdown",
+    (event) => {
+      openOnPress =
+        open && button !== null && event.composedPath().includes(button);
+    },
+    true,
+  );
+
+  const toggle = () => {
+    if (popover === null || button === null) return;
+
+    if (open) {
+      popover.close();
+
+      return;
+    }
+
+    open = true;
+    popover.show(button);
+  };
+
+  button?.addEventListener("click", () => {
+    if (openOnPress) {
+      openOnPress = false;
+
+      return;
+    }
+
+    toggle();
+  });
+
+  return toggle;
+};
+
 /**
  * The key a page's keyboard controls act on, such as `k`, `F` lowered to
  * `f`, or `Shift+ArrowLeft`; or undefined where it belongs to what has the

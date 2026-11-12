@@ -57,8 +57,10 @@ import {
   dayFormat,
   element,
   find,
+  helpToggle,
   isoDay,
   localDate,
+  pictureZooms,
   reasonChips,
   reasonTones,
   recordingRow,
@@ -128,9 +130,6 @@ const timelineZooms = [
   { value: "3600", label: "1 h" },
   { value: "600", label: "10 min" },
 ];
-
-/** How far the picture zooms in, a step at a time. */
-const pictureZooms = [1, 1.5, 2, 3, 4, 6, 8];
 
 /** The main stream's frame rate, for a step of one frame. */
 const frameSeconds = 1 / 15;
@@ -1391,13 +1390,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     requestAnimationFrame(focusPlayer);
   });
 
-  // The help button opens the keys, by the button
-  const shortcutsPopover = find("gw-popover", "shortcuts");
-
+  // The help button, or ?, opens the keys by the button and shuts them again
   setIcon(helpButton, phQuestion);
-  helpButton?.addEventListener("click", () =>
-    shortcutsPopover?.show(helpButton),
-  );
+  helpToggle(find("gw-popover", "shortcuts"), helpButton);
 
   // The last frame, held over the picture while the next clip loads, then
   // faded out once the next one draws, rather than a flash of black. With

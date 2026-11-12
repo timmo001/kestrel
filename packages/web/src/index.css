@@ -147,6 +147,22 @@ gw-page {
   grid-row: span 2;
 }
 
+/* Five is two larger over three, each row's pictures 16:9 */
+.camera-grid[data-layout="5"] {
+  --live-ratio: calc(96 / 45);
+
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+.camera-grid[data-layout="5"] > * {
+  grid-column: span 2;
+}
+
+.camera-grid[data-layout="5"] > :nth-child(-n + 2) {
+  grid-column: span 3;
+}
+
 .camera-grid[data-layout="6"] {
   --live-columns: 3;
   --live-rows: 2;
@@ -195,6 +211,10 @@ gw-page {
     grid-row: auto;
   }
 
+  .live-grid[data-layout="5"] > * {
+    grid-column: auto;
+  }
+
   .live-tile {
     aspect-ratio: 16 / 9;
   }
@@ -216,6 +236,15 @@ gw-page {
   box-shadow: inset 0 0 0 2px var(--gw-color-accent, #4c8dff);
   pointer-events: none;
   content: "";
+}
+
+/* Zoomed in, a drag moves around the picture */
+.live-tile[data-zoomed] {
+  cursor: grab;
+}
+
+.live-tile[data-zoomed]:active {
+  cursor: grabbing;
 }
 
 .live-tile dvr-live {
@@ -624,13 +653,9 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-/* Which page of cameras Live shows, after Next */
-.live-page-count {
-  padding-inline: var(--gw-space-1);
-  color: var(--gw-color-text-secondary);
-  font-size: var(--gw-font-size-s);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+/* Which page of cameras Live shows, after Next, and a pick of the others */
+.live-page {
+  min-width: 9rem;
 }
 
 /* Full screen: the picture takes the screen, with the controls under it */

@@ -1,8 +1,10 @@
 /**
  * The Live page: every camera with a signal at once, or a layout's worth at a
- * time (1, 2, 3 or 4, and 6, 9 or 16 where there are more cameras), paged
- * with Previous and Next, under one set of controls: pause, fit or fill, a
- * still of the picked camera, full screen and keys. The layout, page, picked
+ * time (any count from one to one fewer than there are), paged with
+ * Previous and Next or picked from the page list, under one set of controls:
+ * pause, zoom, fit or fill, a still of the picked camera, full screen and
+ * keys. The arrow keys move the pick, on to the next page past the edge. The
+ * layout, page, picked
  * camera, fit or fill and how many cameras there were are kept in this
  * browser, so the placeholders take the cameras' places before they're
  * known. The players only run while the page shows, so a hidden page
@@ -23,11 +25,20 @@ import {
   phCaretRight,
   phCornersIn,
   phCornersOut,
+  phMagnifyingGlassMinus,
+  phMagnifyingGlassPlus,
   phPause,
   phPlay,
   phQuestion,
 } from "./icons.ts";
-import { controlKey, element, find, typingTargets } from "./shared.ts";
+import {
+  controlKey,
+  element,
+  find,
+  helpToggle,
+  pictureZooms,
+  typingTargets,
+} from "./shared.ts";
 
 /** go2rtc's player element, as far as the page uses it. */
 interface LivePlayer extends HTMLElement {
@@ -68,18 +79,21 @@ const definePlayer = async (path: string) => {
   }
 };
 
-/** How many cameras each paged layout shows. */
-const layouts = [1, 2, 3, 4, 6, 9, 16];
+/** The counts with a grid of their own in the styles, such as three's one large and two beside it. */
+const styledLayouts = [1, 2, 3, 4, 5, 6, 9, 16];
+
+/** The most cameras a digit key picks at once. */
+const keyedLayouts = 9;
 
 /** A layout: how many cameras at once, or all of them. */
 type Layout = number | "all";
 
 /**
- * The layouts worth offering for this many cameras: the paged ones that
- * show fewer than there are, then All, so five cameras offer 1 to 4 and All.
+ * The layouts worth offering for this many cameras: every count from one up
+ * to one fewer than there are, then All, so seven cameras offer 1 to 6 and All.
  */
 const layoutsFor = (cameras: number): Array<Layout> => [
-  ...layouts.filter((size) => size < cameras),
+  ...Array.from({ length: Math.max(cameras - 1, 0) }, (_, index) => index + 1),
   "all",
 ];
 
@@ -91,14 +105,12 @@ const layoutHint = (layout: Layout) => {
 };
 
 /**
- * The grid for `count` cameras at once: the smallest paged layout's grid
- * that holds them, else columns and rows as near square as they go.
+ * The grid for `count` cameras at once: its own shape where it has one, else
+ * columns and rows as near square as they go.
  */
 const gridFor = (count: number) => {
-  const fits = layouts.find((size) => size >= count);
-
-  if (fits !== undefined) {
-    return { layout: String(fits), columns: null, rows: null };
+  if (styledLayouts.includes(count)) {
+    return { layout: String(count), columns: null, rows: null };
   }
 
   const columns = Math.ceil(Math.sqrt(count));
@@ -155,8 +167,10 @@ const kept = () => {
   const layout = Number(values?.["layout"]);
   const page = Number(values?.["page"]);
   const count = Number(values?.["count"]);
+
   /** All until a paged one's picked, so every camera shows at first. */
-  const keptLayout: Layout = layouts.includes(layout) ? layout : "all";
+  const keptLayout: Layout =
+    Number.isInteger(layout) && layout >= 1 ? layout : "all";
 
   return {
     layout: keptLayout,
@@ -209,7 +223,10 @@ export const livePage = (): LivePage => {
   const previousButton = find("gw-button", "live-previous");
   const playButton = find("gw-button", "live-play");
   const nextButton = find("gw-button", "live-next");
-  const pageCount = find("span", "live-page-count");
+  const pageSelect = find("gw-select", "live-page");
+  const zoomOutButton = find("gw-button", "live-zoom-out");
+  const zoomFitButton = find("gw-button", "live-zoom-fit");
+  const zoomInButton = find("gw-button", "live-zoom-in");
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const helpButton = find("gw-button", "live-help");
@@ -229,6 +246,9 @@ export const livePage = (): LivePage => {
   let tiles: ReadonlyArray<Tile> = [];
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
+  /** The picked camera's zoom, and how far its picture's moved from the middle. */
+  let zoom = 1;
+  let pan = { x: 0, y: 0 };
 
   const shown = () => section?.hidden === false;
 
@@ -242,10 +262,7 @@ export const livePage = (): LivePage => {
 
   /** Lays the grid out for a page's worth of cameras. */
   const arrangeGrid = (target: HTMLElement) => {
-    const arrangement =
-      layout === "all"
-        ? gridFor(size())
-        : { layout: String(layout), columns: null, rows: null };
+    const arrangement = gridFor(size());
 
     target.dataset.layout = arrangement.layout;
     target.toggleAttribute("data-fill", fill);
@@ -312,13 +329,18 @@ export const livePage = (): LivePage => {
     }
   };
 
-  setIcon(previousButton, phCaretLeft, "Previous cameras (←)");
-  setIcon(nextButton, phCaretRight, "Next cameras (→)");
+  setIcon(previousButton, phCaretLeft, "Previous cameras (Page Up)");
+  setIcon(nextButton, phCaretRight, "Next cameras (Page Down)");
+  setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
+  setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
   setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
-  previousButton?.setAttribute("aria-keyshortcuts", "ArrowLeft");
-  nextButton?.setAttribute("aria-keyshortcuts", "ArrowRight");
+  previousButton?.setAttribute("aria-keyshortcuts", "PageUp");
+  nextButton?.setAttribute("aria-keyshortcuts", "PageDown");
+  zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
+  zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
+  zoomInButton?.setAttribute("aria-keyshortcuts", "+");
   fitToggle?.setAttribute("aria-keyshortcuts", "z");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
   helpButton?.setAttribute("aria-keyshortcuts", "?");
@@ -331,9 +353,10 @@ export const livePage = (): LivePage => {
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
     if (layoutToggle !== null) {
+      // The last is every camera, so it shows how many that is
       layoutToggle.options = layoutsFor(count()).map((each) => ({
         value: String(each),
-        label: each === "all" ? "All" : String(each),
+        label: each === "all" ? `${count()}/All` : String(each),
         hint: layoutHint(each),
       }));
       layoutToggle.value = String(layout);
@@ -345,11 +368,29 @@ export const livePage = (): LivePage => {
 
     if (nextButton !== null) nextButton.disabled = single;
 
-    // Which page shows, when there's more than one
-    if (pageCount !== null) {
-      pageCount.hidden = single;
-      pageCount.textContent = `${page + 1} of ${pages()}`;
-      pageCount.title = `Page ${page + 1} of ${pages()}`;
+    // Which page shows, when there's more than one, and the others to pick:
+    // the cameras by name with one at a time, else each page's cameras
+    if (pageSelect !== null) {
+      pageSelect.hidden = single;
+      pageSelect.label = size() === 1 ? "Camera" : "Page";
+      pageSelect.options = Array.from({ length: pages() }, (_, index) => {
+        const onPage = streams
+          .slice(index * size(), index * size() + size())
+          .map((stream) => cameraLabel(stream.id));
+
+        return size() === 1
+          ? {
+              value: String(index),
+              label: onPage[0] ?? `Camera ${index + 1}`,
+              description: `${index + 1} of ${pages()}`,
+            }
+          : {
+              value: String(index),
+              label: `Page ${index + 1} of ${pages()}`,
+              description: onPage.join(", "),
+            };
+      });
+      pageSelect.value = String(page);
     }
 
     if (fitToggle !== null) {
@@ -383,8 +424,27 @@ export const livePage = (): LivePage => {
 
   const showPicked = () => {
     for (const tile of tiles) {
-      tile.figure.toggleAttribute("data-picked", tile.stream.id === picked);
+      const isPicked = tile.stream.id === picked;
+
+      tile.figure.toggleAttribute("data-picked", isPicked);
+
+      if (isPicked) tile.figure.setAttribute("aria-current", "true");
+      else tile.figure.removeAttribute("aria-current");
     }
+
+    showZoom();
+  };
+
+  /** Picks a camera on the page; another camera's picture starts whole. */
+  const pick = (id: Camera["id"]) => {
+    if (id !== picked) {
+      zoom = 1;
+      pan = { x: 0, y: 0 };
+    }
+
+    picked = id;
+    keepPlace();
+    showPicked();
   };
 
   const connect = (tile: Tile) => {
@@ -475,19 +535,24 @@ export const livePage = (): LivePage => {
 
         figure.append(hold, element("figcaption", cameraLabel(stream.id)));
 
-        figure.addEventListener("click", () => {
-          picked = stream.id;
-          keepPlace();
-          showPicked();
-        });
+        figure.addEventListener("click", () => pick(stream.id));
 
         figure.addEventListener("dblclick", () => {
-          picked = stream.id;
+          pick(stream.id);
           toggleSolo();
         });
 
         return { stream, figure, player, picture, hold, ratio };
       });
+
+    // A new page starts with every picture whole, and the pick on it
+    zoom = 1;
+    pan = { x: 0, y: 0 };
+
+    if (!tiles.some((tile) => tile.stream.id === picked)) {
+      picked = tiles[0]?.stream.id ?? picked;
+      keepPlace();
+    }
 
     if (streams.length === 0) {
       grid.replaceChildren(element("p", "No cameras have a signal"));
@@ -511,20 +576,41 @@ export const livePage = (): LivePage => {
   };
 
   const setLayout = (next: Layout) => {
-    if (next === layout || !layoutsFor(count()).includes(next)) return;
+    // A count of every camera there is, by its digit, is All
+    const wanted = next !== "all" && next >= count() ? "all" : next;
+
+    if (wanted === layout || !layoutsFor(count()).includes(wanted)) return;
 
     // The first camera shown stays in view
-    page = next === "all" ? 0 : Math.floor((page * size()) / next);
-    layout = next;
+    page = wanted === "all" ? 0 : Math.floor((page * size()) / wanted);
+    layout = wanted;
     solo = undefined;
     keepPlace();
     render();
   };
 
-  const step = (by: -1 | 1) => {
-    if (pages() <= 1) return;
+  /** Shows a page, by its number from the first. */
+  const goTo = (next: number) => {
+    if (next === page || next < 0 || next >= pages()) return;
 
-    page = (page + by + pages()) % pages();
+    page = next;
+    keepPlace();
+    render();
+  };
+
+  const step = (by: -1 | 1) => {
+    if (pages() > 1) goTo((page + by + pages()) % pages());
+  };
+
+  /** Back from one camera alone to the layout it came from, at the page with the camera now picked. */
+  const leaveSolo = () => {
+    if (solo === undefined) return;
+
+    const index = streams.findIndex((stream) => stream.id === picked);
+
+    layout = solo.layout;
+    page =
+      index === -1 || layout === "all" ? solo.page : Math.floor(index / layout);
     solo = undefined;
     keepPlace();
     render();
@@ -533,23 +619,88 @@ export const livePage = (): LivePage => {
   /** The picked camera alone, or back to the layout it came from. */
   const toggleSolo = () => {
     if (solo !== undefined) {
-      ({ layout, page } = solo);
-      solo = undefined;
-    } else {
-      const index = streams.findIndex((stream) => stream.id === picked);
-      const at = index === -1 ? page * size() : index;
-      const camera = streams[at];
+      leaveSolo();
 
-      if (camera === undefined) return;
-
-      solo = { layout, page };
-      picked = camera.id;
-      layout = 1;
-      page = at;
+      return;
     }
 
+    const index = streams.findIndex((stream) => stream.id === picked);
+    const at = index === -1 ? page * size() : index;
+    const camera = streams[at];
+
+    if (camera === undefined) return;
+
+    solo = { layout, page };
+    picked = camera.id;
+    layout = 1;
+    page = at;
     keepPlace();
     render();
+  };
+
+  /**
+   * Moves the pick to the nearest camera that way on the page; past the
+   * left or right edge, onto the previous or next page.
+   */
+  const move = (key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown") => {
+    const current = tiles.find((tile) => tile.stream.id === picked);
+
+    if (current === undefined) {
+      if (tiles[0] !== undefined) pick(tiles[0].stream.id);
+
+      return;
+    }
+
+    const way = {
+      ArrowLeft: { x: -1, y: 0 },
+      ArrowRight: { x: 1, y: 0 },
+      ArrowUp: { x: 0, y: -1 },
+      ArrowDown: { x: 0, y: 1 },
+    }[key];
+
+    const middle = (tile: Tile) => {
+      const box = tile.figure.getBoundingClientRect();
+
+      return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    };
+
+    const from = middle(current);
+
+    // Ahead that way, and as little off to the side as can be
+    const nearest = tiles
+      .map((tile) => {
+        const to = middle(tile);
+        const ahead = (to.x - from.x) * way.x + (to.y - from.y) * way.y;
+
+        const aside = Math.abs(
+          (to.x - from.x) * way.y + (to.y - from.y) * way.x,
+        );
+
+        return { tile, ahead, score: ahead + aside * 2 };
+      })
+      .reduce<{ tile: Tile; score: number } | undefined>(
+        (best, each) =>
+          each.ahead > 1 && (best === undefined || each.score < best.score)
+            ? each
+            : best,
+        undefined,
+      );
+
+    if (nearest !== undefined) {
+      pick(nearest.tile.stream.id);
+
+      return;
+    }
+
+    if (way.x === 0 || pages() <= 1) return;
+
+    const next = (page + way.x + pages()) % pages();
+    const onNext = streams.slice(next * size(), next * size() + size());
+    const camera = way.x < 0 ? onNext.at(-1) : onNext[0];
+
+    if (camera !== undefined) picked = camera.id;
+
+    goTo(next);
   };
 
   const togglePause = () => {
@@ -667,9 +818,7 @@ export const livePage = (): LivePage => {
     );
   });
 
-  helpButton?.addEventListener("click", () =>
-    shortcutsPopover?.show(helpButton),
-  );
+  helpToggle(shortcutsPopover, helpButton);
 
   /** Fit whole pictures, or fill the tiles with them. */
   const setFill = (next: boolean) => {
@@ -683,19 +832,175 @@ export const livePage = (): LivePage => {
     on(fitToggle, "change", () => setFill(fitToggle.value === "fill"));
   }
 
+  if (pageSelect !== null) {
+    on(pageSelect, "change", () => {
+      goTo(Number(pageSelect.value));
+      requestAnimationFrame(() => stage?.focus({ preventScroll: true }));
+    });
+  }
+
+  // Zoom, on the picked camera's picture: in steps from the buttons and
+  // keys, or at the pointer with Ctrl and the wheel or a pinch, and moved
+  // around by dragging it, as on the Recordings page
+  const zoomed = () => tiles.find((tile) => tile.stream.id === picked);
+
+  const showZoom = () => {
+    const tile = zoomed();
+    const box = tile?.figure.getBoundingClientRect();
+    const reachX = ((zoom - 1) * (box?.width ?? 0)) / 2;
+    const reachY = ((zoom - 1) * (box?.height ?? 0)) / 2;
+
+    pan = {
+      x: Math.min(Math.max(pan.x, -reachX), reachX),
+      y: Math.min(Math.max(pan.y, -reachY), reachY),
+    };
+
+    for (const each of tiles) {
+      const transform =
+        each === tile && zoom > 1
+          ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+          : "";
+
+      for (const part of [each.player, each.picture, each.hold]) {
+        if (part !== null) part.style.transform = transform;
+      }
+
+      each.figure.toggleAttribute("data-zoomed", each === tile && zoom > 1);
+    }
+
+    if (zoomFitButton !== null) {
+      zoomFitButton.textContent = `${Math.round(zoom * 100)}%`;
+      zoomFitButton.disabled = zoom === 1;
+    }
+
+    if (zoomOutButton !== null) zoomOutButton.disabled = zoom === 1;
+
+    if (zoomInButton !== null) {
+      zoomInButton.disabled =
+        zoom === pictureZooms.at(-1) || tile === undefined;
+    }
+  };
+
+  /** Zooms to `next`, keeping the point at `at` (from the picture's middle) where it is. */
+  const zoomTo = (next: number, at = { x: 0, y: 0 }) => {
+    pan = {
+      x: at.x - ((at.x - pan.x) / zoom) * next,
+      y: at.y - ((at.y - pan.y) / zoom) * next,
+    };
+    zoom = next;
+    showZoom();
+  };
+
+  const zoomStep = (by: -1 | 1, at?: { x: number; y: number }) => {
+    const index = pictureZooms.indexOf(zoom) + by;
+
+    const next =
+      pictureZooms[Math.min(Math.max(index, 0), pictureZooms.length - 1)];
+
+    if (next !== undefined && next !== zoom) zoomTo(next, at);
+  };
+
+  zoomInButton?.addEventListener("click", () => zoomStep(1));
+  zoomOutButton?.addEventListener("click", () => zoomStep(-1));
+  zoomFitButton?.addEventListener("click", () => zoomTo(1));
+
+  /** The tile a pointer event is on. */
+  const tileAt = (event: Event) =>
+    tiles.find((tile) => event.composedPath().includes(tile.figure));
+
+  /** A pointer's place from the middle of the picked camera's tile. */
+  const fromMiddle = (event: MouseEvent) => {
+    const box = zoomed()?.figure.getBoundingClientRect();
+
+    return {
+      x: event.clientX - ((box?.left ?? 0) + (box?.width ?? 0) / 2),
+      y: event.clientY - ((box?.top ?? 0) + (box?.height ?? 0) / 2),
+    };
+  };
+
+  // Only Ctrl with the wheel, or a trackpad pinch, which browsers send as
+  // that, zooms; a plain scroll scrolls the page. The small events of a
+  // notch or a pinch add up to a step at a time
+  const wheelStep = 50;
+  let wheeled = 0;
+
+  grid?.addEventListener(
+    "wheel",
+    (event) => {
+      const tile = tileAt(event);
+
+      if (!event.ctrlKey || tile === undefined) return;
+
+      event.preventDefault();
+      pick(tile.stream.id);
+      wheeled += event.deltaY;
+
+      if (Math.abs(wheeled) < wheelStep) return;
+
+      zoomStep(wheeled < 0 ? 1 : -1, fromMiddle(event));
+      wheeled = 0;
+    },
+    { passive: false },
+  );
+
+  // A drag on the zoomed picture moves it around
+  let drag: { x: number; y: number; pan: typeof pan } | undefined;
+
+  grid?.addEventListener("pointerdown", (event) => {
+    const tile = tileAt(event);
+
+    if (zoom === 1 || tile === undefined || tile !== zoomed()) return;
+
+    drag = { x: event.clientX, y: event.clientY, pan };
+    grid.setPointerCapture(event.pointerId);
+  });
+
+  grid?.addEventListener("pointermove", (event) => {
+    if (drag === undefined) return;
+
+    pan = {
+      x: drag.pan.x + event.clientX - drag.x,
+      y: drag.pan.y + event.clientY - drag.y,
+    };
+    showZoom();
+  });
+
+  for (const type of ["pointerup", "pointercancel"]) {
+    grid?.addEventListener(type, () => {
+      drag = undefined;
+    });
+  }
+
+  // The tiles' size changed, so the picture's reach did too
+  window.addEventListener("resize", () => showZoom());
+
   const keys = new Map<string, () => void>([
     [" ", togglePause],
     ["k", togglePause],
-    ["ArrowLeft", () => step(-1)],
-    ["ArrowRight", () => step(1)],
+    ["ArrowLeft", () => move("ArrowLeft")],
+    ["ArrowRight", () => move("ArrowRight")],
+    ["ArrowUp", () => move("ArrowUp")],
+    ["ArrowDown", () => move("ArrowDown")],
+    ["PageUp", () => step(-1)],
+    ["PageDown", () => step(1)],
     ["Enter", toggleSolo],
+    ["Escape", leaveSolo],
+    ["Backspace", leaveSolo],
+    ["+", () => zoomStep(1)],
+    ["=", () => zoomStep(1)],
+    ["-", () => zoomStep(-1)],
+    ["0", () => zoomTo(1)],
     ["s", capture],
     ["z", () => setFill(!fill)],
     ["f", () => fullscreenButton?.click()],
     ["?", () => helpButton?.click()],
-    // A digit key for each layout up to 9, and A for All
-    ...layouts.flatMap((each): Array<[string, () => void]> =>
-      each < 10 ? [[String(each), () => setLayout(each)]] : [],
+    // A digit key for each count up to 9, and A for All
+    ...Array.from(
+      { length: keyedLayouts },
+      (_, index): [string, () => void] => [
+        String(index + 1),
+        () => setLayout(index + 1),
+      ],
     ),
     ["a", () => setLayout("all")],
   ]);
