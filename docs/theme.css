@@ -1,7 +1,7 @@
 /*
  * The docs site's styles: docs-kit's Blume theme with Groundwork's Base by
  * default and every other theme to pick, as the app offers
- * (timmo001/dvr-revival#7), with each theme's fonts. A browser only
+ * (timmo001/kestrel#7), with each theme's fonts. A browser only
  * downloads the fonts in use.
  */
 @import "@timmo001/docs-kit/blume/theme.css";

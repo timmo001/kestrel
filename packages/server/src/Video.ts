@@ -50,7 +50,7 @@ export class Video extends Context.Service<
     readonly port: number;
     readonly sources: Effect.Effect<VideoSources, RecorderUnavailable>;
   }
->()("@timmo001/dvr-revival-server/Video") {
+>()("@timmo001/kestrel-server/Video") {
   static readonly layer = Layer.effect(
     Video,
     Effect.gen(function* () {
@@ -110,7 +110,7 @@ export class Video extends Context.Service<
           );
 
           const directory = yield* fs.makeTempDirectoryScoped({
-            prefix: "dvr-revival-",
+            prefix: "kestrel-",
           });
 
           const file = path.join(directory, "go2rtc.yaml");

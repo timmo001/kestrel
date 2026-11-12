@@ -88,5 +88,5 @@ every browser that subscribed. It follows Groundwork's push contract, outside
 | `DELETE /push/subscriptions` | Drops the subscription with `{ endpoint }`; 204            |
 
 The page's Notify me button subscribes. The keys and subscriptions are kept in
-`push.json`, readable only by you, under `DVR_REVIVAL_STATE`, else
-`$XDG_STATE_HOME/dvr-revival`, else `~/.local/state/dvr-revival`.
+`push.json`, readable only by you, under `KESTREL_STATE`, else
+`$XDG_STATE_HOME/kestrel`, else `~/.local/state/kestrel`.

@@ -5,11 +5,7 @@
  *
  * @module
  */
-import type {
-  LocalTime,
-  Recorded,
-  Recording,
-} from "@timmo001/dvr-revival-rsnet";
+import type { LocalTime, Recorded, Recording } from "@timmo001/kestrel-rsnet";
 import { Effect, Schema, Stream } from "effect";
 import {
   EncodedPacket,

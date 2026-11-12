@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dvr-revival.timmo.dev/sitemap-index.xml
+Sitemap: https://kestrel.timmo.dev/sitemap-index.xml

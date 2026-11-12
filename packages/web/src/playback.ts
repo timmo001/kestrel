@@ -11,7 +11,7 @@ import {
   LocalDate,
   LocalTime,
   type Recording,
-} from "@timmo001/dvr-revival-rsnet/domain";
+} from "@timmo001/kestrel-rsnet/domain";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { isText, keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
@@ -136,7 +136,7 @@ const daySeconds = 24 * 60 * 60;
 const keepEvery = 2000;
 
 /** Where this page's settings are kept, as Upkeep keeps its pages'. */
-const storageKey = "dvr-revival.recordings";
+const storageKey = "kestrel.recordings";
 
 /** Where it was playing: a recording and the seconds into it. */
 const Position = Schema.Struct({

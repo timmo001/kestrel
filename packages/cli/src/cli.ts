@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * The `dvr-revival` CLI: the recorder's status, recordings and events from
+ * The `kestrel` CLI: the recorder's status, recordings and events from
  * the server, with `--json` for scripts and agents, `agent tools --json` for
  * Code Mode and `mcp` to serve the same operations over MCP.
  *
@@ -13,13 +13,13 @@ import {
   type RecordedDay,
   type RecorderStatus,
   type Recording,
-} from "@timmo001/dvr-revival-rsnet/domain";
+} from "@timmo001/kestrel-rsnet/domain";
 import type {
   Attention,
   Connection,
   ReceivedEvent,
   VideoSources,
-} from "@timmo001/dvr-revival-server/api";
+} from "@timmo001/kestrel-server/api";
 import {
   Console,
   Effect,
@@ -388,12 +388,12 @@ const agentTools = Command.make(
   { json },
   Effect.fn("agentTools")(function* () {
     yield* printJson({
-      tool: "dvr-revival",
+      tool: "kestrel",
       operations: operations.map((operation) => ({
         name: operation.name,
         description: operation.description,
         access: operation.access,
-        command: ["dvr-revival", operation.name],
+        command: ["kestrel", operation.name],
         json: true,
       })),
     });
@@ -409,9 +409,9 @@ const mcp = Command.make("mcp", {}, () => serveMcp).pipe(
   Command.withDescription("Serve the operations over MCP on stdio"),
 );
 
-const cli = Command.make("dvr-revival").pipe(
+const cli = Command.make("kestrel").pipe(
   Command.withDescription(
-    "Read your recorder's status, recordings and events through the DVR Revival server",
+    "Read your recorder's status, recordings and events through the Kestrel server",
   ),
   Command.withSubcommands([
     status,

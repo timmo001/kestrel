@@ -1,4 +1,4 @@
-# DVR Revival
+# Kestrel
 
 A web client and bridge for Raysharp-made recorders, such as the Swann
 DVR8-4575. Their own apps and browser plugins have stopped working, so this
@@ -20,7 +20,7 @@ mise run build
 mise run serve:server
 ```
 
-Open <https://server.dvr-revival.localhost>. The docs in [`docs/`](docs) cover
+Open <https://server.kestrel.localhost>. The docs in [`docs/`](docs) cover
 the settings, the API and the protocol.
 
 ## Parts
@@ -30,8 +30,8 @@ the settings, the API and the protocol.
 - [`packages/server`](packages/server): the server, with the recorder session,
   go2rtc and the API
 - [`packages/web`](packages/web): the web client, installable on a phone
-- [`packages/cli`](packages/cli): the `dvr-revival` CLI, with Code Mode and
-  MCP for agents, and its [skill](skills/dvr-revival/SKILL.md)
+- [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and
+  MCP for agents, and its [skill](skills/kestrel/SKILL.md)
 - [`docs`](docs): the docs site
 
 ## Developing
@@ -42,4 +42,4 @@ mise run test
 ```
 
 The plan and what's left are in
-[timmo001/dvr-revival#1](https://github.com/timmo001/dvr-revival/issues/1).
+[timmo001/kestrel#1](https://github.com/timmo001/kestrel/issues/1).

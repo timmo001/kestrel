@@ -10,13 +10,13 @@ import { Config, Effect, Layer } from "effect";
 import { Server } from "./index.ts";
 
 const main = Effect.gen(function* () {
-  const hostname = yield* Config.String("DVR_REVIVAL_HOST").pipe(
+  const hostname = yield* Config.String("KESTREL_HOST").pipe(
     Config.withDefault("127.0.0.1"),
   );
 
   const port = yield* Config.Int("PORT").pipe(Config.withDefault(7380));
 
-  const web = yield* Config.String("DVR_REVIVAL_WEB").pipe(
+  const web = yield* Config.String("KESTREL_WEB").pipe(
     Config.withDefault(path.resolve(import.meta.dir, "../../web/dist")),
   );
 

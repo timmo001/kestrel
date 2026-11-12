@@ -1,11 +1,11 @@
 {
-  "name": "@timmo001/dvr-revival-cli",
+  "name": "@timmo001/kestrel-cli",
   "version": "0.0.0",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "bin": {
-    "dvr-revival": "./src/cli.ts"
+    "kestrel": "./src/cli.ts"
   },
   "scripts": {
     "start": "bun run src/cli.ts",
@@ -15,8 +15,8 @@
   },
   "dependencies": {
     "@effect/platform-bun": "4.1.4",
-    "@timmo001/dvr-revival-rsnet": "workspace:*",
-    "@timmo001/dvr-revival-server": "workspace:*",
+    "@timmo001/kestrel-rsnet": "workspace:*",
+    "@timmo001/kestrel-server": "workspace:*",
     "effect": "4.1.4"
   },
   "devDependencies": {

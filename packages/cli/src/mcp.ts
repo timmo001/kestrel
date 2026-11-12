@@ -11,14 +11,14 @@ import {
   RecordedDay,
   RecorderStatus,
   Recording,
-} from "@timmo001/dvr-revival-rsnet/domain";
+} from "@timmo001/kestrel-rsnet/domain";
 import {
   Attention,
   Connection,
   LocalMonth,
   ReceivedEvent,
   VideoSources,
-} from "@timmo001/dvr-revival-server/api";
+} from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import { Recorder, RecorderError } from "./operations.ts";
@@ -123,7 +123,7 @@ export const serveMcp = McpServer.toolkit(Tools).pipe(
   Layer.provide(Tools.toLayer(handlers)),
   Layer.provide(
     McpServer.layerStdio({
-      name: "dvr-revival",
+      name: "kestrel",
       version: "0.0.0",
       protocols: [McpProtocol.v2026_07_28, McpProtocol.v2025_11_25],
     }),

@@ -3,12 +3,12 @@
   "permissions": [
     {
       "action": "gh.write *",
-      "resource": "gh_* timmo001/dvr-revival*",
+      "resource": "gh_* timmo001/kestrel*",
       "effect": "allow"
     },
     {
       "action": "gh.write *",
-      "resource": "gh_*delete* timmo001/dvr-revival*",
+      "resource": "gh_*delete* timmo001/kestrel*",
       "effect": "ask"
     }
   ]

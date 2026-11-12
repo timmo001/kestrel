@@ -4,6 +4,8 @@
  * one shown at a time from the address. Live and Recordings have modules of
  * their own. The service worker keeps the shell so the app starts offline.
  */
+// Settings saved under the app's old name, carried over before any are read
+import "./renamed.ts";
 // Every theme's fonts; a browser only downloads the ones in use
 import "@fontsource-variable/mona-sans";
 import "@fontsource-variable/inter";
@@ -13,11 +15,8 @@ import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
-import type { ChannelStatus } from "@timmo001/dvr-revival-rsnet/domain";
-import type {
-  Attention,
-  ReceivedEvent,
-} from "@timmo001/dvr-revival-server/api";
+import type { ChannelStatus } from "@timmo001/kestrel-rsnet/domain";
+import type { Attention, ReceivedEvent } from "@timmo001/kestrel-server/api";
 import {
   connectPwa,
   pushState,
@@ -385,7 +384,7 @@ const showPage = (location: Location) => {
     }
   }
 
-  document.title = `${pageTitles[page]} · DVR Revival`;
+  document.title = `${pageTitles[page]} · Kestrel`;
 
   if (left === "live") live.stop();
 
@@ -474,7 +473,7 @@ const notifyItems: Record<Exclude<PushState, "unsupported">, MenuItem> = {
   },
 };
 
-const clientKey = "dvr-revival:push-client";
+const clientKey = "kestrel:push-client";
 const clientId = localStorage.getItem(clientKey) ?? crypto.randomUUID();
 
 localStorage.setItem(clientKey, clientId);

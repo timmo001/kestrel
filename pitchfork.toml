@@ -1,7 +1,7 @@
-# Keeps DVR Revival's dev processes running in the background, outside the
+# Keeps Kestrel's dev processes running in the background, outside the
 # invoking shell or agent. Manage each with its serve:<daemon> mise tasks.
 
-# The server at https://server.dvr-revival.localhost, with go2rtc beside it on
+# The server at https://server.kestrel.localhost, with go2rtc beside it on
 # 127.0.0.1:1984. The recorder's address and login come from the file
 # `mise run auth:save` writes, when there is one, or else from .env.local
 # through `op run`, so they can be 1Password references. Not in watch mode: a
@@ -9,7 +9,7 @@
 # running, so restart it with serve:server:restart after a change.
 [daemons.server]
 run = '''
-saved="${XDG_CONFIG_HOME:-$HOME/.config}/dvr-revival/recorder.env"
+saved="${XDG_CONFIG_HOME:-$HOME/.config}/kestrel/recorder.env"
 if [ -f "$saved" ]; then
   exec bun --env-file="$saved" run packages/server/src/main.ts
 fi
@@ -20,7 +20,7 @@ ready_cmd = 'curl -fsS "http://127.0.0.1:$PORT/api/health"'
 health_cmd = 'curl -fsS "http://127.0.0.1:$PORT/api/health"'
 retry = true
 
-# The docs site's dev server, at https://docs.dvr-revival.localhost.
+# The docs site's dev server, at https://docs.kestrel.localhost.
 [daemons.docs]
 run = 'exec mise run docs:dev --host 127.0.0.1 --port "$PORT"'
 port = { expect = [7360], bump = 10 }

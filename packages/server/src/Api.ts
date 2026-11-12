@@ -12,7 +12,7 @@ import {
   RecordedDay,
   RecorderStatus,
   Recording,
-} from "@timmo001/dvr-revival-rsnet/domain";
+} from "@timmo001/kestrel-rsnet/domain";
 import { Schema } from "effect";
 import {
   HttpApi,
@@ -189,7 +189,7 @@ export class SystemGroup extends HttpApiGroup.make("system").add(
   HttpApiEndpoint.get("health", "/api/health"),
 ) {}
 
-export class Api extends HttpApi.make("dvr-revival")
+export class Api extends HttpApi.make("kestrel")
   .add(RecorderGroup)
   .add(EventsGroup)
   .add(VideoGroup)

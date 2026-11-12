@@ -6,8 +6,8 @@
  * browser. The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { ChannelStatus } from "@timmo001/dvr-revival-rsnet/domain";
-import type { LiveStream } from "@timmo001/dvr-revival-server/api";
+import type { ChannelStatus } from "@timmo001/kestrel-rsnet/domain";
+import type { LiveStream } from "@timmo001/kestrel-server/api";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { call } from "./api.ts";
@@ -79,7 +79,7 @@ const layoutsFor = (cameras: number) => {
 const streamFor = (stream: LiveStream, layout: number) =>
   layout > 4 ? stream.sub : stream.main;
 
-const storageKey = "dvr-revival.live";
+const storageKey = "kestrel.live";
 
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {

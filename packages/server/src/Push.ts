@@ -50,7 +50,7 @@ export class Push extends Context.Service<
     /** The push contract's routes. */
     readonly routes: Layer.Layer<never, never, HttpRouter.HttpRouter>;
   }
->()("@timmo001/dvr-revival-server/Push") {
+>()("@timmo001/kestrel-server/Push") {
   static readonly layer = Layer.effect(
     Push,
     Effect.gen(function* () {
@@ -59,13 +59,13 @@ export class Push extends Context.Service<
 
       const home = yield* Config.String("HOME").pipe(Config.withDefault("."));
 
-      const directory = yield* Config.String("DVR_REVIVAL_STATE").pipe(
+      const directory = yield* Config.String("KESTREL_STATE").pipe(
         Config.orElse(() =>
           Config.String("XDG_STATE_HOME").pipe(
-            Config.map((state) => path.join(state, "dvr-revival")),
+            Config.map((state) => path.join(state, "kestrel")),
           ),
         ),
-        Config.withDefault(path.join(home, ".local/state/dvr-revival")),
+        Config.withDefault(path.join(home, ".local/state/kestrel")),
       );
 
       const file = path.join(directory, "push.json");
@@ -101,7 +101,7 @@ export class Push extends Context.Service<
       const { vapid } = yield* Ref.get(state);
 
       webPush.setVapidDetails(
-        "https://github.com/timmo001/dvr-revival",
+        "https://github.com/timmo001/kestrel",
         vapid.publicKey,
         vapid.privateKey,
       );

@@ -1,7 +1,7 @@
 /**
  * The page's theme settings, shared by the boot script the build inlines and
  * the page: Base by default, with every Groundwork theme and mode on offer
- * (timmo001/dvr-revival#7).
+ * (timmo001/kestrel#7).
  */
 import {
   coreThemeChoices,
@@ -9,7 +9,7 @@ import {
 } from "@timmo001/groundwork-tokens/page";
 
 export const themeSettings = {
-  key: "dvr-revival:theme",
+  key: "kestrel:theme",
   defaultTheme: "base",
 } as const;
 

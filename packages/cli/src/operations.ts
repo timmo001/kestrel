@@ -1,13 +1,13 @@
 /**
  * The operations the CLI and MCP server share, and the `Recorder` service
- * they run against: the server's API, at `DVR_REVIVAL_SERVER`. Every
+ * they run against: the server's API, at `KESTREL_SERVER`. Every
  * operation only reads from the recorder; `download` also writes a file on
  * this machine, so it's marked as a write. It's CLI-only, as a video file
  * means nothing in an MCP reply.
  *
  * @module
  */
-import { Api } from "@timmo001/dvr-revival-server/api";
+import { Api } from "@timmo001/kestrel-server/api";
 import { Config, Context, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
@@ -69,7 +69,7 @@ export const operations: ReadonlyArray<Operation> = [
 ];
 
 const makeClient = Effect.gen(function* () {
-  const baseUrl = yield* Config.String("DVR_REVIVAL_SERVER").pipe(
+  const baseUrl = yield* Config.String("KESTREL_SERVER").pipe(
     Config.withDefault("http://127.0.0.1:7380"),
   );
 
@@ -86,7 +86,7 @@ export class Recorder extends Context.Service<
       use: (client: Client) => Effect.Effect<A, E>,
     ) => Effect.Effect<A, RecorderError>;
   }
->()("@timmo001/dvr-revival-cli/Recorder") {
+>()("@timmo001/kestrel-cli/Recorder") {
   static readonly layer = Layer.effect(
     Recorder,
     Effect.gen(function* () {

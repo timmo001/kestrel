@@ -14,7 +14,7 @@ import {
   type RecordedDay,
   type RecorderStatus,
   type Recording,
-} from "@timmo001/dvr-revival-rsnet";
+} from "@timmo001/kestrel-rsnet";
 import {
   Config,
   Context,
@@ -105,7 +105,7 @@ export class Recorder extends Context.Service<
     /** Alarm reports as they arrive. */
     readonly events: Stream.Stream<ReceivedEvent>;
   }
->()("@timmo001/dvr-revival-server/Recorder") {
+>()("@timmo001/kestrel-server/Recorder") {
   static readonly layer = Layer.effect(
     Recorder,
     Effect.gen(function* () {

@@ -2,7 +2,7 @@
  * The server's API from the page: a typed client over the same origin, and
  * the live alarm reports as server-sent events.
  */
-import { Api, ReceivedEvent } from "@timmo001/dvr-revival-server/api";
+import { Api, ReceivedEvent } from "@timmo001/kestrel-server/api";
 import { Effect, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";

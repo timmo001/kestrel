@@ -1,5 +1,5 @@
 {
-  "name": "dvr-revival",
+  "name": "kestrel",
   "private": true,
   "type": "module",
   "packageManager": "bun@1.4.4",

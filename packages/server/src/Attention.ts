@@ -7,7 +7,7 @@
  *
  * @module
  */
-import type { RecorderStatus } from "@timmo001/dvr-revival-rsnet/domain";
+import type { RecorderStatus } from "@timmo001/kestrel-rsnet/domain";
 import { Context, Duration, Effect, Layer, Ref, Schedule } from "effect";
 import type { Attention as AttentionItem, Connection } from "./Api.ts";
 import { Push } from "./Push.ts";
@@ -73,7 +73,7 @@ export const attentionFor = (
 export class Attention extends Context.Service<
   Attention,
   { readonly list: Effect.Effect<Array<AttentionItem>> }
->()("@timmo001/dvr-revival-server/Attention") {
+>()("@timmo001/kestrel-server/Attention") {
   static readonly layer = Layer.effect(
     Attention,
     Effect.gen(function* () {
@@ -95,7 +95,7 @@ export class Attention extends Context.Service<
           if (pushed.has(alert.message)) continue;
 
           yield* push.send({
-            title: "DVR Revival",
+            title: "Kestrel",
             body: alert.message,
             tone: "warning",
             level: "alert",

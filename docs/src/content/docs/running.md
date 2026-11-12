@@ -35,7 +35,7 @@ themselves. A field whose name has spaces can be referenced by its ID.
 
 So 1Password doesn't ask each time the server starts, run `mise run auth:save`
 once. It fills in the references and saves the result to
-`~/.config/dvr-revival/recorder.env`, which only you can read, and the server
+`~/.config/kestrel/recorder.env`, which only you can read, and the server
 uses that file while it's there. After changing the login, run it again;
 `mise run auth:forget` removes the file.
 
@@ -46,13 +46,13 @@ mise run serve:server
 ```
 
 It runs in the background through Pitchfork, at
-<https://server.dvr-revival.localhost>, and serves the web client and its API.
+<https://server.kestrel.localhost>, and serves the web client and its API.
 It logs in to the recorder as it starts, and logs in again, waiting longer
 each time, whenever the connection drops. `mise run serve:server:logs` follows
 its log.
 
 The server listens on `127.0.0.1:7380`. go2rtc only listens on `127.0.0.1:1984`,
-and the server passes it through under `/go2rtc/`. Set `DVR_REVIVAL_HOST` to
+and the server passes it through under `/go2rtc/`. Set `KESTREL_HOST` to
 listen on another address, such as your machine's address on your network to
 use it from a phone, and `PORT` and `GO2RTC_PORT` for other ports. The server
 doesn't ask for a login, so only listen where everyone who can reach it should
@@ -64,10 +64,10 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable           | Default             | What it sets                      |
-| ------------------ | ------------------- | --------------------------------- |
-| `DVR_REVIVAL_HOST` | `127.0.0.1`         | The address the server listens on |
-| `PORT`             | `7380`              | The server's port                 |
-| `GO2RTC_PORT`      | `1984`              | go2rtc's port                     |
-| `GO2RTC_BIN`       | `go2rtc`            | The go2rtc binary                 |
-| `DVR_REVIVAL_WEB`  | `packages/web/dist` | The built web client              |
+| Variable       | Default             | What it sets                      |
+| -------------- | ------------------- | --------------------------------- |
+| `KESTREL_HOST` | `127.0.0.1`         | The address the server listens on |
+| `PORT`         | `7380`              | The server's port                 |
+| `GO2RTC_PORT`  | `1984`              | go2rtc's port                     |
+| `GO2RTC_BIN`   | `go2rtc`            | The go2rtc binary                 |
+| `KESTREL_WEB`  | `packages/web/dist` | The built web client              |

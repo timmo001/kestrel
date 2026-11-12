@@ -1,10 +1,10 @@
-# DVR Revival
+# Kestrel
 
 A web client and bridge for Raysharp-made recorders, starting with the Swann
 DVR8-4575: recorder health, recording search and playback, motion and PIR
 events, and live view. Browsers can't reach the recorder's control port or
 play its RTSP streams, so a server sits between them. The plan is tracked in
-timmo001/dvr-revival#1; open decisions are the issues labelled Needs Decision,
+timmo001/kestrel#1; open decisions are the issues labelled Needs Decision,
 and work that depends on one waits for it.
 
 ## Stack
@@ -21,8 +21,8 @@ and work that depends on one waits for it.
 - Recorder credentials are never printed, logged or passed on a command line.
 - Each part is a private Bun workspace package under `packages/<name>/`:
   `rsnet` is the protocol library, `server` holds the recorder session, `web`
-  is the app and `cli` is the `dvr-revival` CLI with its Code Mode and MCP
-  surface. Its skill is `skills/dvr-revival/SKILL.md`; keep it in step with
+  is the app and `cli` is the `kestrel` CLI with its Code Mode and MCP
+  surface. Its skill is `skills/kestrel/SKILL.md`; keep it in step with
   the CLI's operations.
 - Use mise-pinned tools and Bun. Pin dependencies to exact versions
   (`bun add -E`) and keep `bun.lock` in sync.
@@ -42,11 +42,11 @@ and work that depends on one waits for it.
 
 - Start the server only through `mise run serve:server`, never in the
   foreground. It reads the recorder's address and login from the private file
-  `mise run auth:save` writes, `~/.config/dvr-revival/recorder.env`, or else
+  `mise run auth:save` writes, `~/.config/kestrel/recorder.env`, or else
   from `.env.local` (see `.env.example`) through `op run`, and starts go2rtc
   beside it.
 - Scripts that talk to the recorder load the saved file with
-  `bun --env-file="$HOME/.config/dvr-revival/recorder.env"`, so they don't
+  `bun --env-file="$HOME/.config/kestrel/recorder.env"`, so they don't
   ask 1Password each time. Never print or copy what's in it.
 
 ## Checks and rollout

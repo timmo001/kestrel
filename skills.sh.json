@@ -3,8 +3,8 @@
   "groupings": [
     {
       "title": "Use",
-      "description": "Read a recorder's status, recordings and events through DVR Revival.",
-      "skills": ["dvr-revival"]
+      "description": "Read a recorder's status, recordings and events through Kestrel.",
+      "skills": ["kestrel"]
     }
   ]
 }

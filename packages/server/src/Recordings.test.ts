@@ -3,7 +3,7 @@
  * gets wrong silently: a range ending where the next file starts sends that
  * file instead.
  */
-import type { Recording } from "@timmo001/dvr-revival-rsnet/domain";
+import type { Recording } from "@timmo001/kestrel-rsnet/domain";
 import { expect, test } from "bun:test";
 import { stretches } from "./Recordings.ts";
 

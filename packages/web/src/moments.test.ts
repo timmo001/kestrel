@@ -1,5 +1,5 @@
 /** Checks which recording each channel plays at a moment, and where playback runs on to. */
-import type { Recording } from "@timmo001/dvr-revival-rsnet/domain";
+import type { Recording } from "@timmo001/kestrel-rsnet/domain";
 import { expect, test } from "bun:test";
 import { momentAt, nextMoment, recordingAt, type Track } from "./moments.ts";
 import { toSeconds } from "./player.ts";

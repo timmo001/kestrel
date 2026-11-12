@@ -5,7 +5,7 @@
 import {
   RecordingReason,
   type Recording,
-} from "@timmo001/dvr-revival-rsnet/domain";
+} from "@timmo001/kestrel-rsnet/domain";
 import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { phDownloadSimple, phPlay } from "./icons.ts";

@@ -1,4 +1,4 @@
-# DVR Revival's pinned tools and tasks. Each part is a private Bun workspace
+# Kestrel's pinned tools and tasks. Each part is a private Bun workspace
 # package under packages/, with its own lint, typecheck and test scripts; these
 # tasks run them across every package. The hk pre-push hook runs the shared
 # lint steps and every package's lint.
@@ -55,7 +55,7 @@ run = "bun run brand"
 [tasks."auth:save"]
 description = "Save the recorder's login from 1Password to a private file, so starting the server doesn't ask each time"
 run = '''
-dir="${XDG_CONFIG_HOME:-$HOME/.config}/dvr-revival"
+dir="${XDG_CONFIG_HOME:-$HOME/.config}/kestrel"
 mkdir -p "$dir"
 chmod 700 "$dir"
 op inject --in-file .env.local --out-file "$dir/recorder.env" --file-mode 0600 --force
@@ -63,7 +63,7 @@ op inject --in-file .env.local --out-file "$dir/recorder.env" --file-mode 0600 -
 
 [tasks."auth:forget"]
 description = "Remove the saved login, so the server asks 1Password again"
-run = 'rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dvr-revival/recorder.env"'
+run = 'rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/kestrel/recorder.env"'
 
 [tasks."serve:docs"]
 description = "Start the docs dev server in the background through Pitchfork"
