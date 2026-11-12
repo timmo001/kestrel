@@ -93,13 +93,20 @@ export class Go2rtc extends Context.Service<
         Config.withDefault(1984),
       );
 
+      const rtspPort = yield* Config.Int("KESTREL_GO2RTC_RTSP_PORT").pipe(
+        Config.withDefault(port + 1),
+      );
+
       // JSON is valid YAML, which is what go2rtc reads.
       const configFor = (feeds: ReadonlyArray<LiveFeed>) =>
         JSON.stringify({
           log: { level: "error" },
           // Only the server reaches it, under the same path it serves it on
           api: { listen: `127.0.0.1:${port}`, base_path: basePath },
-          rtsp: { listen: "" },
+          // Its ffmpeg and exec sources, such as a stream it transcodes,
+          // hand their output back through its RTSP server, so that stays
+          // on, where only this machine reaches it
+          rtsp: { listen: `127.0.0.1:${rtspPort}` },
           streams: Object.fromEntries(
             feeds.flatMap((feed) => {
               const names = streamNames(feed.camera, feed.sub !== null);
