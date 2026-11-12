@@ -159,6 +159,16 @@ The server writes its own recordings there, and copies each source's in
 beside them, with why each was made, such as motion, in the file's name:
 `<day>/<time>.motion.mp4`.
 
+### Copying from sources
+
+Every 10 minutes the server looks at what each source with recordings of
+its own, such as a recorder, has from within the hours kept, and copies
+what the folder doesn't have yet. It copies one file at a time, at full
+quality: clips first, then continuous footage, newest first. A file is
+written beside its final name and moved into place once whole. Past the
+disk share, a file is only copied when an older one would be cleared out
+to make room for it.
+
 ### Recording cameras
 
 The server can record cameras itself, for those whose source keeps no

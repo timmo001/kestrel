@@ -16,6 +16,7 @@ import { Library } from "./Library.ts";
 import { Push } from "./Push.ts";
 import * as Recording from "./Recording.ts";
 import { Sources } from "./Sources.ts";
+import * as Sync from "./Sync.ts";
 
 /**
  * The built web client from `directory`. A path outside the API that names a
@@ -92,6 +93,7 @@ export const layer = (options: ServeOptions) =>
       BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
     ),
     Layer.merge(Recording.layer),
+    Layer.merge(Sync.layer),
     Layer.provide([Go2rtc.layer, Attention.layer, Library.layer]),
     Layer.provide(Push.layer),
     // Last, so the routes and go2rtc share one connection to each source.

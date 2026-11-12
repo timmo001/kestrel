@@ -13,4 +13,6 @@ export * from "./Recorder.ts";
 
 export * from "./Retention.ts";
 
+export * as Store from "./Store.ts";
+
 export * as Library from "./Library.ts";

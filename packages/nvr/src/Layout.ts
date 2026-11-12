@@ -48,6 +48,17 @@ export const localDate = (millis: number) => {
   ].join("-");
 };
 
+/** The local time of a time, such as `2026-11-12T14:02:33`. */
+export const localTime = (millis: number) => {
+  const date = new Date(millis);
+
+  const clock = [date.getHours(), date.getMinutes(), date.getSeconds()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join(":");
+
+  return `${localDate(millis)}T${clock}`;
+};
+
 /** A file's name from its start time, such as `14:02:33`, and tags, which must be lower-case words. */
 export const fileName = (time: string, tags: ReadonlyArray<string>) => {
   const kept = tags.filter((tag) => tagPattern.test(tag));
