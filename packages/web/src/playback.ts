@@ -189,8 +189,7 @@ export interface PlaybackPage {
 
 /** The Recordings page, wired to its elements. */
 export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
-  const dayButton = find("gw-button", "day");
-  const dayInput = find("input", "day-input");
+  const dayPicker = find("gw-date-picker", "day");
   const previousDay = find("gw-button", "day-previous");
   const nextDay = find("gw-button", "day-next");
   const channelSelect = find("gw-select", "channel");
@@ -951,6 +950,23 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   /** Asks the address for the picked day, on this channel. */
   const pick = (date: string) => options.onPick({ channel, date });
 
+  /** The days with recordings on any channel in a month, such as `2026-11`. */
+  const recordedDaysIn = async (month: string) =>
+    (
+      await call((api) => api.recorder.days({ query: { month } })).catch(
+        () => [],
+      )
+    ).map((recorded) => recorded.date);
+
+  // The calendar's days with recordings, kept as months are browsed
+  const markedDays = new Set<string>();
+
+  const markDays = (days: ReadonlyArray<string>) => {
+    for (const recorded of days) markedDays.add(recorded);
+
+    if (dayPicker !== null) dayPicker.marked = [...markedDays];
+  };
+
   const showDays = (days: ReadonlyArray<string>) => {
     recordedDays?.replaceChildren(
       ...days.map((recorded) => {
@@ -1018,20 +1034,18 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     if (channelSelect !== null) channelSelect.value = String(channel);
 
-    if (dayInput !== null) dayInput.value = day;
-
-    if (dayButton !== null) {
-      dayButton.textContent = dayFormat.format(localDate(day));
+    // Recordings stop at the last day, so there's no day after it to go to
+    if (dayPicker !== null) {
+      dayPicker.value = day;
+      dayPicker.max = lastDay;
     }
 
-    // Recordings stop at the last day, so there's no day after it to go to
     if (nextDay !== null) nextDay.disabled = lastDay !== "" && day >= lastDay;
 
-    const days = await call((api) =>
-      api.recorder.days({ query: { month: day.slice(0, 7) } }),
-    ).catch(() => []);
+    const days = await recordedDaysIn(day.slice(0, 7));
 
-    showDays(days.map((recorded) => recorded.date));
+    showDays(days);
+    markDays(days);
     void findRecordedChannels(day);
     await showRecordings();
   };
@@ -1045,22 +1059,20 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     return isoDay(date);
   };
 
-  dayButton?.addEventListener("click", () => {
-    if (dayInput === null) return;
+  if (dayPicker !== null) {
+    // In the browser's own language, as the page's other dates are, rather
+    // than the page's plain "en", which reads as US English
+    dayPicker.locale = navigator.languages[0] ?? "";
 
-    if (lastDay !== "") dayInput.max = lastDay;
+    on(dayPicker, "change", () => {
+      if (dayPicker.value !== "") pick(dayPicker.value);
+    });
 
-    // The calendar opens from the click; where a browser can't, focus the input
-    try {
-      dayInput.showPicker();
-    } catch {
-      dayInput.focus();
-    }
-  });
-
-  dayInput?.addEventListener("change", () => {
-    if (dayInput.value !== "") pick(dayInput.value);
-  });
+    // Another month in the calendar marks its days with recordings too
+    on(dayPicker, "month", (event) => {
+      void recordedDaysIn(event.detail.month).then(markDays);
+    });
+  }
 
   previousDay?.addEventListener("click", () => {
     if (day !== "") pick(shiftDay(-1));

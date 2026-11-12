@@ -291,19 +291,6 @@ gw-page {
   gap: var(--gw-space-1);
 }
 
-/* The native date input sits under the day button, so its calendar opens
-   there, but the button shows the day in the browser's language */
-.day-field {
-  position: relative;
-}
-
-.day-input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .recorded-days {
   flex-wrap: wrap;
   gap: var(--gw-space-1);

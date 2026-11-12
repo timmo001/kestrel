@@ -138,21 +138,13 @@
                     class="day-previous"
                     label="Previous day"
                   ></gw-button>
-                  <span class="day-field">
-                    <gw-button
-                      class="day"
-                      variant="neutral"
-                      appearance="outlined"
-                      >Today</gw-button
-                    >
-                    <!-- Opened by the button for its calendar, never shown -->
-                    <input
-                      class="day-input"
-                      type="date"
-                      tabindex="-1"
-                      aria-hidden="true"
-                    />
-                  </span>
+                  <!-- Days with recordings stand out; the rest can't be picked -->
+                  <gw-date-picker
+                    class="day"
+                    label="Day"
+                    inline-label
+                    unmarked="disabled"
+                  ></gw-date-picker>
                   <gw-button class="day-next" label="Next day"></gw-button>
                 </gw-row>
                 <gw-select
