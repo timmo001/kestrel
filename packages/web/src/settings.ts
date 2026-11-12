@@ -1,7 +1,7 @@
 /**
  * The Settings page: each source with the settings its kind takes, the
- * cameras of a kind you list yourself, the name you give each camera and
- * the order they show in.
+ * cameras of a kind you list yourself, the name you give each camera, the
+ * order they show in, and what the server records and how long it keeps it.
  * Saving sends them all to the server, which keeps them in the sources file
  * and restarts the sources that changed. Secrets never come back from the
  * server: a saved one shows as saved, and stays as it is unless you type a
@@ -11,9 +11,11 @@ import {
   defaultClipHours,
   defaultContinuousHours,
   defaultDiskShare,
+  hoursText,
   SourceId,
   type Camera,
   type KindInfo,
+  type RecordingSettings,
   type SettingField,
   type Settings,
 } from "@timmo001/kestrel-core";
@@ -25,6 +27,47 @@ import { phFloppyDisk, phPlus, phTrash } from "./icons.ts";
 import { element, find } from "./shared.ts";
 
 type Values = Record<string, string | number>;
+
+type Mutable<T> = { -readonly [K in keyof T]: T[K] };
+
+/** What the server records and keeps when nothing's saved yet. */
+const defaultRecording = (): Mutable<RecordingSettings> => ({
+  cameras: [],
+  folder: null,
+  continuousHours: defaultContinuousHours,
+  clipHours: defaultClipHours,
+  diskShare: defaultDiskShare,
+});
+
+/** A whole-number field, writing what's typed through `set`; the page checks its range before a save. */
+const numberInput = (
+  label: string,
+  hint: (value: number) => string,
+  value: number,
+  set: (value: number) => void,
+) => {
+  const input = element("gw-input");
+
+  input.label = label;
+  input.type = "number";
+  input.inputmode = "numeric";
+  input.value = String(value);
+  input.hint = hint(value);
+  input.addEventListener("input", () => {
+    const typed = Number(input.value);
+
+    set(typed);
+    input.hint = hint(typed);
+  });
+
+  return input;
+};
+
+/** A count of hours in words, such as `7 days`. */
+const hoursHint = (value: number) =>
+  Number.isInteger(value) && value >= 1
+    ? hoursText(value)
+    : "A whole number of hours, 1 or more";
 
 /** A source as the page edits it. */
 interface Draft {
@@ -143,6 +186,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   const addMenu = find("gw-menu-button", "settings-add");
   const saveButton = find("gw-button", "settings-save");
   const orderList = find("gw-sortable", "settings-order-list");
+  const recordingPanel = find("gw-expansion", "settings-recording");
 
   let kinds: ReadonlyArray<KindInfo> = [];
   let drafts: Array<Draft> = [];
@@ -156,6 +200,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
 
   /** The order cameras show in, by id, as saved or as you dragged it. */
   let order: ReadonlyArray<string> = [];
+
+  /** What the server records and keeps, as the page edits it. */
+  let recording = defaultRecording();
 
   /** The source whose panel is open, kept across redraws. */
   let opened: Draft | undefined;
@@ -198,6 +245,13 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     }));
     labels = new Map(settings.cameras.map((each) => [each.camera, each.label]));
     order = settings.order;
+    recording = {
+      cameras: settings.recording.cameras,
+      folder: settings.recording.folder,
+      continuousHours: settings.recording.continuousHours,
+      clipHours: settings.recording.clipHours,
+      diskShare: settings.recording.diskShare,
+    };
     revision = settings.revision ?? "";
     // The panel open before a save stays open after it
     opened = drafts.find((source) => source.id === opened?.id);
@@ -380,7 +434,89 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     return card;
   };
 
+  /** The Recording panel: the cameras the server records, its folder, and how long it keeps each kind. */
+  const recordingFields = () => {
+    if (recordingPanel === null) return;
+
+    const picks = cameras.map((camera) => {
+      const box = element("gw-checkbox");
+
+      box.label = labels.get(camera.id)?.trim() || ownLabel(camera);
+      box.checked = recording.cameras.includes(camera.id);
+      box.addEventListener("change", () => {
+        recording.cameras = box.checked
+          ? [...recording.cameras, camera.id]
+          : recording.cameras.filter((id) => id !== camera.id);
+      });
+
+      return box;
+    });
+
+    const folder = element("gw-input");
+
+    folder.label = "Folder";
+    folder.monospace = true;
+    folder.optional = true;
+    folder.placeholder = "The server's own";
+    folder.hint =
+      "Where recordings go, such as a share on a NAS. Empty uses recordings in the server's state folder.";
+    folder.value = recording.folder ?? "";
+    folder.addEventListener("input", () => {
+      const typed = folder.value.trim();
+
+      recording.folder = typed === "" ? null : typed;
+    });
+
+    const share = numberInput(
+      "Disk share",
+      (value) =>
+        value >= 1 && value <= 90
+          ? `Up to ${value}% of the disk, always leaving 5% free`
+          : "A percentage from 1 to 90",
+      recording.diskShare,
+      (value) => {
+        recording.diskShare = value;
+      },
+    );
+
+    recordingPanel.replaceChildren(
+      group(
+        "Cameras to record",
+        "The server records these itself, from their live streams, beside what their sources keep.",
+        picks.length === 0
+          ? element("p", "The cameras show here once their sources connect.")
+          : fieldGrid(picks),
+      ),
+      group(
+        "Keeping recordings",
+        "The oldest go first. Past the disk share, continuous footage goes before clips.",
+        fieldGrid([
+          numberInput(
+            "Continuous footage, hours",
+            hoursHint,
+            recording.continuousHours,
+            (value) => {
+              recording.continuousHours = value;
+            },
+          ),
+          numberInput(
+            "Clips, hours",
+            hoursHint,
+            recording.clipHours,
+            (value) => {
+              recording.clipHours = value;
+            },
+          ),
+          share,
+          folder,
+        ]),
+      ),
+    );
+  };
+
   const render = () => {
+    recordingFields();
+
     if (orderList !== null) {
       // The server lists cameras in their order already
       orderList.items = cameras.map((camera) => ({
@@ -433,14 +569,28 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   }
 
   /** What the page can tell is wrong before it sends them. */
-  const problems = () =>
-    drafts.flatMap((source) =>
+  const problems = () => [
+    ...drafts.flatMap((source) =>
       isSourceId(source.id)
         ? []
         : [
             `${source.name.trim() || "A new source"} needs an id of lower-case letters, digits and dashes`,
           ],
-    );
+    ),
+    ...(
+      [
+        { what: "Continuous footage", value: recording.continuousHours },
+        { what: "Clips", value: recording.clipHours },
+      ] as const
+    ).flatMap(({ what, value }) =>
+      Number.isInteger(value) && value >= 1
+        ? []
+        : [`${what} needs a whole number of hours, 1 or more`],
+    ),
+    ...(recording.diskShare >= 1 && recording.diskShare <= 90
+      ? []
+      : ["The disk share needs to be from 1 to 90"]),
+  ];
 
   const payload = (): Settings => ({
     sources: drafts.map((source) => ({
@@ -455,13 +605,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       label.trim() === "" ? [] : [{ camera, label: label.trim() }],
     ),
     order,
-    recording: saved?.recording ?? {
-      cameras: [],
-      folder: null,
-      continuousHours: defaultContinuousHours,
-      clipHours: defaultClipHours,
-      diskShare: defaultDiskShare,
-    },
+    recording,
     revision,
   });
 

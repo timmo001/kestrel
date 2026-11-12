@@ -573,6 +573,11 @@ gw-page {
   margin-block-start: var(--gw-space-4);
 }
 
+/* The Recording panel's first group sits at the panel's top */
+.settings-recording .settings-group:first-child {
+  margin-block-start: 0;
+}
+
 .settings-group h4,
 .settings-group p {
   margin: 0;

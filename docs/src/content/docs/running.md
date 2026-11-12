@@ -200,9 +200,10 @@ clips, and 5% of the disk is always left free. A file written to in the
 last two minutes is left alone. Only folders with the server's marker are
 touched, so a shared folder is safe.
 
-The cameras, folder and how long they're kept are saved in `sources.json`
-under `recording`, beside the rest of the settings, so every client sees
-the same ones.
+Pick the cameras, folder and how long they're kept in the Recording panel
+on the Settings page. They're saved in `sources.json` under `recording`,
+beside the rest of the settings, so every client sees the same ones, and
+the server picks up a change without restarting.
 
 After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
