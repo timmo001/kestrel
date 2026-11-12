@@ -7,15 +7,15 @@ The `kestrel` CLI in `packages/cli` reads the recorder through the
 server's [API](/api). Every command takes `--json`. They only read from the
 recorder; `download` also writes the file it saves.
 
-| Command                                                  | Returns                                                    |
-| -------------------------------------------------------- | ---------------------------------------------------------- |
-| `kestrel status`                                     | The connection, the recorder's clock, disks and channels   |
-| `kestrel device`                                     | Its name, firmware and channel count                       |
-| `kestrel recordings -c 1 -d <day>`                   | A channel's recordings on one day, today by default        |
-| `kestrel download -c 1 -d <day> --from … --to …`     | Saves that stretch as an MP4, across recordings            |
-| `kestrel days -m <month>`                            | The days with recordings in a month, this month by default |
-| `kestrel events`                                     | The newest alarm reports                                   |
-| `kestrel video`                                      | Where go2rtc is served, and each channel's stream names    |
+| Command                                          | Returns                                                    |
+| ------------------------------------------------ | ---------------------------------------------------------- |
+| `kestrel status`                                 | The connection, the recorder's clock, disks and channels   |
+| `kestrel device`                                 | Its name, firmware and channel count                       |
+| `kestrel recordings -c 1 -d <day>`               | A channel's recordings on one day, today by default        |
+| `kestrel download -c 1 -d <day> --from … --to …` | Saves that stretch as an MP4, across recordings            |
+| `kestrel days -m <month>`                        | The days with recordings in a month, this month by default |
+| `kestrel events`                                 | The newest alarm reports                                   |
+| `kestrel video`                                  | Where go2rtc is served, and each channel's stream names    |
 
 `download` takes times of day on `--date`, such as `21:46` or `21:46:30`, or
 full ones such as `2026-11-11T21:46:30`. `--sub` saves the small sub stream,
