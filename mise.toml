@@ -65,17 +65,6 @@ op inject --in-file .env.local --out-file "$dir/recorder.env" --file-mode 0600 -
 description = "Remove the saved login, so the server asks 1Password again"
 run = 'rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/kestrel/recorder.env"'
 
-[tasks."auth:rename"]
-description = "Rename the recorder's old DVR_* variables to KESTREL_RAYSHARP_* in .env.local and the saved login"
-run = '''
-saved="${XDG_CONFIG_HOME:-$HOME/.config}/kestrel/recorder.env"
-for file in .env.local "$saved"; do
-  [ -f "$file" ] || continue
-  sed -i -E 's/^(export[[:space:]]+)?DVR_/\1KESTREL_RAYSHARP_/' "$file"
-  echo "Renamed the DVR_* variables in $file"
-done
-'''
-
 [tasks."serve:docs"]
 description = "Start the docs dev server in the background through Pitchfork"
 run = "pitchfork start docs"
