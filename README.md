@@ -43,7 +43,3 @@ mise run test
 
 The plan and what's left are in
 [timmo001/dvr-revival#1](https://github.com/timmo001/dvr-revival/issues/1).
-
-## Licence
-
-[Apache 2.0](LICENSE)
