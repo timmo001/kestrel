@@ -270,7 +270,8 @@ export const livePage = (): LivePage => {
   const saved = kept();
   let layout: Layout = saved.layout;
   let page = saved.page;
-  let picked = saved.picked;
+  // Several cameras start with none picked, so none is marked out
+  let picked = saved.layout === 1 ? saved.picked : undefined;
   /** Where to go back to from one camera alone, by Enter or a double click. */
   let solo: { readonly layout: Layout; readonly page: number } | undefined;
   let paused = false;
@@ -507,6 +508,15 @@ export const livePage = (): LivePage => {
     showPicked();
   };
 
+  /** Clears the pick among several cameras, so none is marked out. */
+  const unpick = () => {
+    if (size() === 1 || picked === undefined) return;
+
+    picked = undefined;
+    keepPlace();
+    showPicked();
+  };
+
   const connect = (tile: Tile) => {
     if (tile.picture !== null) {
       tile.picture.src = stillAddress(tile.stream);
@@ -615,9 +625,10 @@ export const livePage = (): LivePage => {
         return { stream, figure, player, picture, hold, ratio };
       });
 
-    // The pick stays on the page
+    // The pick stays on the page: one camera alone is always picked, and
+    // among several a pick that's moved off the page is cleared
     if (!tiles.some((tile) => tile.stream.id === picked)) {
-      picked = tiles[0]?.stream.id ?? picked;
+      picked = size() === 1 ? tiles[0]?.stream.id : undefined;
       keepPlace();
     }
 
@@ -1188,7 +1199,7 @@ export const livePage = (): LivePage => {
     ["PageUp", () => step(-1)],
     ["PageDown", () => step(1)],
     ["Enter", toggleSolo],
-    ["Escape", leaveSolo],
+    ["Escape", () => (solo === undefined ? unpick() : leaveSolo())],
     ["Backspace", leaveSolo],
     ["+", () => zoomStep(zoomed(), 1)],
     ["=", () => zoomStep(zoomed(), 1)],
@@ -1238,6 +1249,24 @@ export const livePage = (): LivePage => {
     }
 
     requestAnimationFrame(focus);
+  });
+
+  // A click on the space around the cameras clears the pick, as Esc does.
+  // Where the press began counts, so a drag off a tile keeps it
+  let pressedOnCamera = false;
+
+  stage?.addEventListener("pointerdown", (event) => {
+    pressedOnCamera = event
+      .composedPath()
+      .some(
+        (target) =>
+          target instanceof Element &&
+          target.matches(".live-tile, .player-controls"),
+      );
+  });
+
+  stage?.addEventListener("click", () => {
+    if (!pressedOnCamera) unpick();
   });
 
   placeholders();
