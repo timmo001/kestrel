@@ -3,7 +3,8 @@
  * folder comes first: Kestrel's own recordings are written there, and each
  * source's are copied in, with why each was made kept as tags in its file
  * name. What a source has that isn't copied yet, such as footage older than
- * the hours kept, comes from the source itself, marked as remote.
+ * the hours kept, comes from the source itself, marked as remote; where the
+ * source can't hand it over, it's listed but marked as not playable.
  *
  * @module
  */
@@ -238,6 +239,7 @@ export class Library extends Context.Service<
 
           // A copy is named for when its recording starts
           const copied = new Set(local.map((recording) => recording.begin));
+          const playable = recordings?.video !== undefined;
 
           const remote = listed.flatMap((recording): Array<Recording> =>
             copied.has(recording.begin)
@@ -250,6 +252,7 @@ export class Library extends Context.Service<
                     reasons: recording.reasons,
                     bytes: recording.bytes,
                     remote: true,
+                    playable,
                   },
                 ],
           );

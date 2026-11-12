@@ -85,8 +85,9 @@ detections, read every couple of seconds, and its disks or SD card. A hub
 or recorder's recordings are copied into the recordings folder like a
 recorder's: each file is replayed over port 9000, Reolink's own protocol,
 and converted from H.265 to H.264 with ffmpeg. A camera's own SD card
-recordings are listed beside the server's, marked as on the source, but not
-copied: it cuts a download short, and older firmware won't replay a file.
+recordings are listed beside the server's, marked as on the source only and
+faded on the timeline, but not copied or played: it cuts a download short,
+and older firmware won't replay a file.
 Record the camera on the server for footage you can play.
 
 A `bambu` source is a Bambu Lab P1 or A1 printer's camera, from its `host`
@@ -171,7 +172,9 @@ its own recordings there, and copies each source's in beside them, with
 why each was made, such as motion, in the file's name:
 `<day>/<time>.motion.mp4`. What a source has that isn't copied yet, such
 as footage older than the hours kept, is listed too, marked as on the
-source, and plays from it.
+source, and plays from it. A source that can't hand its recordings over,
+such as a Reolink camera's SD card, has them listed as on the source only,
+faded on the timeline, with no Play or Download.
 
 ### Copying from sources
 

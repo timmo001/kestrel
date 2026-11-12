@@ -13,6 +13,8 @@ export interface TimelineSpan {
   /** Which colour it takes, as the table's chips: neutral, info, warning or important. */
   readonly tone: string;
   readonly title: string;
+  /** Drawn faded, for a recording that's listed but can't be played. */
+  readonly muted?: boolean;
 }
 
 /** One channel's track: its name, shown when there are several, and its recordings. */
@@ -107,6 +109,7 @@ export const timelineFor = (
 
             bar.className = "timeline-span";
             bar.dataset.tone = recording.tone;
+            bar.toggleAttribute("data-muted", recording.muted === true);
             bar.title = recording.title;
             bar.style.left = percent(recording.start);
             bar.style.width = `${((recording.end - recording.start) / span) * 100}%`;

@@ -218,6 +218,13 @@ export const reasonChips = (row: TableRow) => {
   return chips;
 };
 
+/** Where a recording is: here, on its source, or only on a source that can't hand it over. */
+const whereOf = (recording: Recording) => {
+  if (recording.playable === false) return "On source only";
+
+  return recording.remote === true ? "On source" : "Here";
+};
+
 /**
  * A recording as a table row: `bytes` sorts the size column, `size` shows
  * it, and `from` and `to` keep the full times for playing it.
@@ -234,7 +241,8 @@ export const recordingRow = (recording: Recording): TableRow => ({
   reasons: recording.reasons.join(", "),
   bytes: recording.bytes,
   size: size(recording.bytes),
-  where: recording.remote === true ? "On source" : "Here",
+  where: whereOf(recording),
+  playable: recording.playable !== false,
 });
 
 export const rowClip = (row: TableRow): Clip => ({
@@ -243,7 +251,10 @@ export const rowClip = (row: TableRow): Clip => ({
   end: String(row.to),
 });
 
-/** A column of each row's Play and Download buttons; Play calls `onPlay`. */
+/**
+ * A column of each row's Play and Download buttons; Play calls `onPlay`.
+ * They're off for a recording that can't be played.
+ */
 export const actionsColumn = (onPlay: (clip: Clip) => void): TableColumn => ({
   id: "actions",
   header: "",
@@ -257,13 +268,18 @@ export const actionsColumn = (onPlay: (clip: Clip) => void): TableColumn => ({
       button.setAttribute("size", "small");
       button.setAttribute("appearance", "plain");
       button.setAttribute("labels", "hide");
+      button.disabled = row.playable === false;
     }
 
     play.setAttribute("icon", phPlay);
     play.addEventListener("click", () => onPlay(rowClip(row)));
     save.setAttribute("icon", phDownloadSimple);
     save.setAttribute("variant", "neutral");
-    save.setAttribute("href", clipUrl(rowClip(row), true));
+
+    if (row.playable !== false) {
+      save.setAttribute("href", clipUrl(rowClip(row), true));
+    }
+
     // Side by side, however narrow the column
     actions.setAttribute("nowrap", "");
     actions.setAttribute("gap", "s");

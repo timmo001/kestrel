@@ -30,6 +30,8 @@ export const Recording = Schema.Struct({
   bytes: Schema.NullOr(Schema.Number),
   /** Whether it's only on its source so far, not in the server's recordings folder. */
   remote: Schema.optional(Schema.Boolean),
+  /** `false` when it's only on a source that can't hand it over, so it's listed but can't be played. */
+  playable: Schema.optional(Schema.Boolean),
 });
 
 export interface Recording extends Schema.Schema.Type<typeof Recording> {}

@@ -374,6 +374,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const timelineHover = find("span", "timeline-hover");
   const timelineClip = find("span", "timeline-clip");
   const timelineTicks = find("div", "timeline-ticks");
+  const idleText = find("p", "player-idle");
+  const pickText = idleText?.textContent.trim() ?? "";
 
   const timeline =
     timelineTrack === null ||
@@ -423,7 +425,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       start: secondOfDay(recording.begin),
       end: secondOfDay(recording.end),
       tone: reasonTones[reason],
-      title: `${clock(recording.begin)} to ${clock(recording.end)}, ${recording.reasons.join(", ")}`,
+      title: `${clock(recording.begin)} to ${clock(recording.end)}, ${recording.reasons.join(", ")}${recording.playable === false ? ", on its source only, so it can't be played" : ""}`,
+      muted: recording.playable === false,
     };
   };
 
@@ -943,18 +946,36 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     // A later pick has moved on
     if (date !== day) return;
 
-    tracks = lists;
-    recordings = lists
+    // What can't be played is listed and drawn, but never played
+    tracks = lists.map((track) => ({
+      camera: track.camera,
+      recordings: track.recordings.filter(
+        (recording) => recording.playable !== false,
+      ),
+    }));
+
+    recordings = tracks
       .flatMap((track) => track.recordings)
       .toSorted((a, b) => a.begin.localeCompare(b.begin));
 
     showColumns();
 
-    if (table !== null) table.rows = recordings.map(recordingRow);
+    const listed = lists
+      .flatMap((track) => track.recordings)
+      .toSorted((a, b) => a.begin.localeCompare(b.begin));
+
+    if (table !== null) table.rows = listed.map(recordingRow);
+
+    if (idleText !== null) {
+      idleText.textContent =
+        recordings.length === 0 && listed.length > 0
+          ? "These recordings are only on the camera, which can't hand them over"
+          : pickText;
+    }
 
     player?.setCameras(tracks, camera);
     timeline?.show(
-      tracks.map((track) => ({
+      lists.map((track) => ({
         label: cameraLabel(track.camera),
         spans: track.recordings.map(spanOf),
       })),
@@ -1202,7 +1223,15 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       // Back where it was last time, paused, when it's on this day
       const position = saved.position;
 
-      if (position !== undefined && onTimeline(position)) {
+      const playable =
+        position !== undefined &&
+        recordings.some(
+          (recording) =>
+            recording.camera === position.camera &&
+            recording.begin === position.begin,
+        );
+
+      if (position !== undefined && playable && onTimeline(position)) {
         playClip(position, position.offset, false);
       }
     }

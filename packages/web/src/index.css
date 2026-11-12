@@ -741,6 +741,11 @@ kbd {
   background: var(--gw-color-important);
 }
 
+/* Listed on its source, but it can't be played */
+.timeline-span[data-muted] {
+  opacity: 0.35;
+}
+
 /* The clip Cut marks, over the recordings */
 .timeline-clip {
   position: absolute;
