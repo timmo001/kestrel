@@ -53,6 +53,7 @@ doesn't ask for a login, so only listen where everyone who can reach it should
 see the cameras.
 
 After changing the server, restart it with `mise run serve:server:restart`.
+If it doesn't come up, `op run` may be waiting for 1Password to be unlocked.
 
 ## Settings
 

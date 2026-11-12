@@ -1,7 +1,9 @@
 /**
  * The operations the CLI and MCP server share, and the `Recorder` service
  * they run against: the server's API, at `DVR_REVIVAL_SERVER`. Every
- * operation only reads, so none needs a confirmation.
+ * operation only reads from the recorder; `download` also writes a file on
+ * this machine, so it's marked as a write. It's CLI-only, as a video file
+ * means nothing in an MCP reply.
  *
  * @module
  */
@@ -16,8 +18,8 @@ export class RecorderError extends Schema.TaggedError<RecorderError>()(
   { message: Schema.String },
 ) {}
 
-/** How an agent may use an operation. */
-export type Access = "read";
+/** How an agent may use an operation: `write` saves a file on this machine. */
+export type Access = "read" | "write";
 
 export interface Operation {
   readonly name: string;
@@ -41,6 +43,12 @@ export const operations: ReadonlyArray<Operation> = [
     name: "recordings",
     description: "A channel's recordings on one day, with why each was made",
     access: "read",
+  },
+  {
+    name: "download",
+    description:
+      "Save what a channel recorded between two times as an MP4 file, across recordings",
+    access: "write",
   },
   {
     name: "days",

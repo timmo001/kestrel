@@ -7,11 +7,12 @@
  * @module
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import type {
-  DeviceInfo,
-  RecordedDay,
-  RecorderStatus,
-  Recording,
+import {
+  LocalTime,
+  type DeviceInfo,
+  type RecordedDay,
+  type RecorderStatus,
+  type Recording,
 } from "@timmo001/dvr-revival-rsnet/domain";
 import type {
   Attention,
@@ -19,10 +20,23 @@ import type {
   ReceivedEvent,
   VideoSources,
 } from "@timmo001/dvr-revival-server/api";
-import { Console, Effect, Layer, Option } from "effect";
+import {
+  Console,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Schema,
+  Stream,
+} from "effect";
 import { Command, Flag } from "effect/cli";
 import { serveMcp } from "./mcp.ts";
-import { operations, Recorder, type Operation } from "./operations.ts";
+import {
+  operations,
+  Recorder,
+  RecorderError,
+  type Operation,
+} from "./operations.ts";
 
 const json = Flag.Boolean("json").pipe(
   Flag.withDescription("Print JSON for scripts and agents instead of text"),
@@ -43,6 +57,13 @@ type Output =
   | { readonly days: ReadonlyArray<RecordedDay> }
   | { readonly events: ReadonlyArray<ReceivedEvent> }
   | VideoSources
+  | {
+      readonly file: string;
+      readonly bytes: number;
+      readonly channel: number;
+      readonly begin: string;
+      readonly end: string;
+    }
   | {
       readonly tool: string;
       readonly operations: ReadonlyArray<
@@ -245,6 +266,122 @@ const video = Command.make(
   ),
 );
 
+const decodeTime = Schema.decodeUnknownEffect(LocalTime);
+
+/**
+ * A recorder time from a flag: a full one such as `2026-11-11T21:46:00`, or
+ * a time of day such as `21:46` or `21:46:30` on `day`.
+ */
+const recorderTime = (day: string, value: string) => {
+  const clock = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value);
+
+  const full =
+    clock === null
+      ? value.replace(" ", "T")
+      : `${day}T${clock[1]?.padStart(2, "0")}:${clock[2]}:${clock[3] ?? "00"}`;
+
+  return decodeTime(full).pipe(
+    Effect.mapError(
+      () =>
+        new RecorderError({
+          message: `"${value}" isn't a time: use 21:46, 21:46:30 or 2026-11-11T21:46:30`,
+        }),
+    ),
+  );
+};
+
+const download = Command.make(
+  "download",
+  {
+    json,
+    channel,
+    date,
+    from: Flag.String("from").pipe(
+      Flag.withDescription(
+        "Where to start: a time on --date, such as 21:46, or a full one, such as 2026-11-11T21:46:00",
+      ),
+    ),
+    to: Flag.String("to").pipe(
+      Flag.withDescription("Where to stop, in the same forms as --from"),
+    ),
+    sub: Flag.Boolean("sub").pipe(
+      Flag.withDescription("The small sub stream instead of the full one"),
+      Flag.withDefault(false),
+    ),
+    output: Flag.String("output").pipe(
+      Flag.withAlias("o"),
+      Flag.withDescription(
+        "The file to write; channel-1_2026-11-11T21-46-00.mp4 and so on by default",
+      ),
+      Flag.optional,
+    ),
+  },
+  Effect.fn("download")(function* (options) {
+    const day = Option.getOrElse(options.date, today);
+    const begin = yield* recorderTime(day, options.from);
+    const end = yield* recorderTime(day, options.to);
+
+    if (end <= begin) {
+      return yield* new RecorderError({
+        message: "--to must come after --from",
+      });
+    }
+
+    const response = yield* (yield* Recorder).call((api) =>
+      api.recorder.video({
+        query: {
+          channel: options.channel,
+          begin,
+          end,
+          stream: options.sub ? "sub" : "main",
+          download: "true",
+        },
+      }),
+    );
+
+    const named = /filename="([^"]+)"/.exec(
+      response.headers["content-disposition"],
+    )?.[1];
+
+    const file = Option.getOrElse(
+      options.output,
+      () => named ?? `channel-${options.channel}.mp4`,
+    );
+
+    const fs = yield* FileSystem.FileSystem;
+
+    yield* response.body.pipe(
+      Stream.run(fs.sink(file)),
+      Effect.mapError(
+        (error) =>
+          new RecorderError({
+            message: `The download stopped: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+      ),
+    );
+
+    const bytes = Number((yield* fs.stat(file)).size);
+
+    if (options.json) {
+      return yield* printJson({
+        file,
+        bytes,
+        channel: options.channel,
+        begin,
+        end,
+      });
+    }
+
+    yield* Console.log(
+      `Saved ${file} (${(bytes / 1024 ** 2).toFixed(1)} MiB), channel ${options.channel} from ${begin.replace("T", " ")} to ${end.slice(11)}`,
+    );
+  }),
+).pipe(
+  Command.withDescription(
+    "Save what a channel recorded between two times as an MP4, across recordings",
+  ),
+);
+
 /** The Code Mode manifest: every operation with how an agent may use it. */
 const agentTools = Command.make(
   "tools",
@@ -280,6 +417,7 @@ const cli = Command.make("dvr-revival").pipe(
     status,
     device,
     recordings,
+    download,
     days,
     events,
     video,

@@ -15,6 +15,7 @@ they're the recorder's own clock, as it keeps them, such as
 | `GET /api/device`                      | The recorder's name, firmware, MAC and channel count            |
 | `GET /api/status`                      | Its clock, disks and each channel's state                       |
 | `GET /api/recordings?channel=1&date=…` | A channel's recordings on one day, such as `2026-11-11`         |
+| `GET /api/recordings/video?…`          | Recorded video as MP4; see below                                |
 | `GET /api/days?month=…`                | The days with recordings in a month, such as `2026-11`          |
 | `GET /api/events/`                     | The last 200 alarm reports, newest first                        |
 | `GET /api/events/live`                 | Alarm reports as server-sent events                             |
@@ -29,6 +30,28 @@ recordings; the page shows it in the Disks card.
 
 Every endpoint that needs the recorder returns 503 with a
 `RecorderUnavailable` error while the server isn't logged in.
+
+## Recorded video
+
+`GET /api/recordings/video?channel=1&begin=2026-11-11T21:46:00&end=2026-11-11T21:48:00`
+sends what a channel recorded between two recorder times as fragmented MP4,
+H.264 with no audio, which plays as it arrives. Add `stream=sub` for the small
+sub stream, and `download=true` to have a browser save it as a file rather
+than play it.
+
+- It runs across recordings, one after another, with the gaps between them
+  closed up, so a range over a run of motion clips plays them back to back.
+- It starts at the first key frame in the second at `begin`, and runs to the
+  end of the key frame group at `end`, so about a second either side.
+- It comes faster than real time, around 17 times on the main stream, so a
+  minute of 1080p takes a few seconds. Nothing is kept on the server.
+- A range with nothing recorded in it returns 404 with a `NoRecordings` error.
+  Once video has started, a failure can only cut the response short.
+
+The page plays it through Media Source Extensions. It sets the length from
+the range, asks for video from a new `begin` when you seek past what has
+loaded, and keeps only a few minutes around the playhead, as a full recording
+is about 250 MB.
 
 ## Live video
 

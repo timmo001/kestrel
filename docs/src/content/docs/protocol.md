@@ -24,6 +24,7 @@ body, is scrambled with a fixed bit permutation that needs no key.
 | 890  | 614     | Status: clock, disks and each channel's state           |
 | 111  | 101     | Recordings on one channel between two times             |
 | 111  | 102     | Days with recordings on a set of channels               |
+| 131  | 0       | Download a stretch of recording, on its own connection  |
 | 896  | 196     | Subscribe to alarm reports                              |
 | 891  | various | Alarm reports, sent by the recorder once subscribed     |
 
@@ -33,6 +34,45 @@ body, is scrambled with a fixed bit permutation that needs no key.
   the same layout. Both reply with ack 1 even when they hold good data.
 - The day outline's time of day is junk; only the date is reliable.
 - Model and serial come back empty in the login reply.
+
+## Downloads
+
+The recorder has no RTSP address for recordings, so recorded video comes
+through the download message, 131. It goes on a second connection with no
+login of its own: the 24-byte request carries the user key from the main
+connection's login reply, the channel from 0 and the stream (0 main, 1 sub).
+One 28-byte record follows, of the kind a search returns, with the range.
+
+The reply is an empty ack, then packs: a 12-byte header (its version, type,
+how many packs the frame takes, the frame's number, the pack's number and its
+size), then a piece of a frame. Type 0 is a frame piece, and type 3 marks the
+end of the file. Each frame starts with a 40-byte header the SDK doesn't
+describe:
+
+| Offset | Size | What it is                                       |
+| ------ | ---- | ------------------------------------------------ |
+| 0      | 4    | `RSFm`                                           |
+| 4      | 1    | `I` for a key frame, `P` for the rest            |
+| 12     | 4    | The size of the H.264 data that follows          |
+| 16     | 8    | The recorder's clock in microseconds, local time |
+| 32     | 2    | Width                                            |
+| 34     | 2    | Height                                           |
+| 36     | 1    | Frames per second                                |
+
+The H.264 is in Annex B form, padded to a multiple of 8 bytes, and key frames
+carry their SPS, PPS and SEI. On the DVR8-4575 the main stream is 1920×1080
+at 15 frames a second with a key frame each second; the sub stream is 352×288
+at about 4.
+
+The range can be any stretch inside a file, and the record can say "all
+types, size unknown". SRV7.1.0 handles ranges in its own way:
+
+- It sends only the first record, though the SDK allows several in a request,
+  so a range across files takes a request for each.
+- It picks the file by the range's end. Where one file runs straight into the
+  next, a range ending on the join gets the next file, from that file's start.
+  The client ends those ranges a second early; the last key frame group still
+  runs to the file's end.
 
 ## Alarm reports
 
