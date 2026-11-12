@@ -34,6 +34,7 @@ import { on, type MenuItem, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
+import { clipUrl, playerFor, type Clip } from "./player.ts";
 import { themeSettings, themes } from "./theme.ts";
 
 // The theme picker in the app bar: every Groundwork theme and mode, with
@@ -172,17 +173,64 @@ const size = (bytes: number | null) =>
       ? `${(bytes / 1024 ** 3).toFixed(1)} GiB`
       : `${Math.round(bytes / 1024 ** 2)} MiB`;
 
-/** A recording as a table row: `bytes` sorts the size column, `size` shows it. */
+/**
+ * A recording as a table row: `bytes` sorts the size column, `size` shows
+ * it, and `from` and `to` keep the full times for playing it.
+ */
 const recordingRow = (recording: Recording): TableRow => ({
   key: `${recording.channel}-${recording.begin}`,
   channel: recording.channel,
   begin: clock(recording.begin),
   end: clock(recording.end),
+  from: recording.begin,
+  to: recording.end,
   length: duration(recording.begin, recording.end),
   reasons: recording.reasons.join(", "),
   bytes: recording.bytes,
   size: size(recording.bytes),
 });
+
+const rowClip = (row: TableRow): Clip => ({
+  channel: Number(row.channel),
+  begin: String(row.from),
+  end: String(row.to),
+});
+
+// mdi's play and download
+const playIcon = "M8,5.14V19.14L19,12.14L8,5.14Z";
+const downloadIcon = "M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z";
+
+/** Set once the player is ready: plays a row's recording. */
+let playRow: (row: TableRow) => void = () => undefined;
+
+/** A row's Play and Download buttons. */
+const rowActions = (row: TableRow) => {
+  const actions = element("gw-row");
+  const play = element("gw-button", "Play");
+  const save = element("gw-button", "Download");
+
+  for (const button of [play, save]) {
+    button.setAttribute("size", "small");
+    button.setAttribute("appearance", "plain");
+    button.setAttribute("labels", "hide");
+  }
+
+  play.setAttribute("icon", playIcon);
+  play.addEventListener("click", () => playRow(row));
+  save.setAttribute("icon", downloadIcon);
+  save.setAttribute("variant", "neutral");
+  save.setAttribute("href", clipUrl(rowClip(row), true));
+  actions.append(play, save);
+
+  return actions;
+};
+
+const actionsColumn = {
+  id: "actions",
+  header: "",
+  sortable: false,
+  cell: rowActions,
+};
 
 // Connection: a banner while the server can't reach the recorder, and
 // nothing while it can
@@ -423,6 +471,7 @@ let day = "";
 let channel = 1;
 
 const recordingColumns = [
+  actionsColumn,
   { id: "begin", header: "Start" },
   { id: "end", header: "End" },
   { id: "length", header: "Length", sortable: false },
@@ -522,6 +571,152 @@ if (channelSelect !== null) {
   });
 }
 
+// Player: the recording picked from a table, its speed, and a clip of it
+// to save, which can run past the recording into the ones either side
+const playerBox = find("div", "player");
+const playerVideo = find("video", "player-video");
+const playerTitle = find("strong", "player-title");
+const playerClock = find("span", "player-clock");
+const playerSpeed = find("gw-segmented", "player-speed");
+const playerClose = find("gw-button", "player-close");
+const playerProblem = find("gw-alert", "player-problem");
+const clipFrom = find("gw-input", "clip-from");
+const clipTo = find("gw-input", "clip-to");
+const clipFromHere = find("gw-button", "clip-from-here");
+const clipToHere = find("gw-button", "clip-to-here");
+const clipDownload = find("gw-button", "clip-download");
+
+if (playerSpeed !== null) {
+  playerSpeed.options = ["0.5", "1", "2", "4", "8"].map((value) => ({
+    value,
+    label: `${value === "0.5" ? "½" : value}×`,
+  }));
+}
+
+const showProblem = (message: string) => {
+  if (playerProblem === null) return;
+
+  playerProblem.textContent = `Video stopped: ${message}`;
+  playerProblem.hidden = false;
+};
+
+const player =
+  playerVideo === null ? undefined : playerFor(playerVideo, showProblem);
+
+/** A clip field's time as `HH:MM:SS`, taking `9:05` or `21:05:30`; empty when it isn't a time. */
+const fieldClock = (field: HTMLElementTagNameMap["gw-input"]) => {
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(field.value.trim());
+
+  const [hours = 0, minutes = 0, rest = 0] = (match?.slice(1) ?? []).map(
+    (part) => Number(part ?? 0),
+  );
+
+  const valid = match !== null && hours < 24 && minutes < 60 && rest < 60;
+
+  field.error = valid || field.value === "" ? "" : "Use HH:MM:SS";
+
+  return valid
+    ? [hours, minutes, rest]
+        .map((part) => String(part).padStart(2, "0"))
+        .join(":")
+    : "";
+};
+
+/** Points Download clip at the From and To times, on the playing recording's day. */
+const showClipLink = () => {
+  const clip = player?.clip();
+
+  if (clip === undefined || clipFrom === null || clipTo === null) return;
+
+  if (clipDownload === null) return;
+
+  const date = clip.begin.slice(0, 10);
+  const from = fieldClock(clipFrom);
+  const to = fieldClock(clipTo);
+  const begin = `${date}T${from}`;
+  const end = `${date}T${to}`;
+  const valid = from !== "" && to !== "" && end > begin;
+
+  clipDownload.disabled = !valid;
+
+  if (valid) {
+    clipDownload.setAttribute(
+      "href",
+      clipUrl({ channel: clip.channel, begin, end }, true),
+    );
+  } else {
+    clipDownload.removeAttribute("href");
+  }
+};
+
+playRow = (row) => {
+  if (player === undefined || playerBox === null) return;
+
+  const clip = rowClip(row);
+
+  playerBox.hidden = false;
+
+  if (playerProblem !== null) playerProblem.hidden = true;
+
+  if (playerTitle !== null) {
+    playerTitle.textContent = `Channel ${clip.channel}, ${dayFormat.format(localDate(clip.begin))}, ${clock(clip.begin)} to ${clock(clip.end)}`;
+  }
+
+  if (clipFrom !== null) clipFrom.value = clock(clip.begin);
+
+  if (clipTo !== null) clipTo.value = clock(clip.end);
+
+  void player.play(clip);
+  showClipLink();
+  playerBox.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+playerVideo?.addEventListener("timeupdate", () => {
+  const time = player?.time();
+
+  if (playerClock !== null && time !== undefined) {
+    playerClock.textContent = timeFormat.format(localDate(time));
+  }
+});
+
+if (playerSpeed !== null) {
+  on(playerSpeed, "change", () => {
+    if (playerVideo === null) return;
+
+    // The default carries the speed over to the next recording played
+    playerVideo.playbackRate = Number(playerSpeed.value);
+    playerVideo.defaultPlaybackRate = Number(playerSpeed.value);
+  });
+}
+
+playerClose?.addEventListener("click", () => {
+  player?.stop();
+
+  if (playerBox !== null) playerBox.hidden = true;
+});
+
+/** Start here and End here: set a clip field to the playhead's time. */
+const markFromPlayhead = (
+  button: HTMLElementTagNameMap["gw-button"] | null,
+  field: HTMLElementTagNameMap["gw-input"] | null,
+) =>
+  button?.addEventListener("click", () => {
+    const time = player?.time();
+
+    if (field === null || time === undefined) return;
+
+    field.value = clock(time);
+    showClipLink();
+  });
+
+markFromPlayhead(clipFromHere, clipFrom);
+
+markFromPlayhead(clipToHere, clipTo);
+
+for (const field of [clipFrom, clipTo]) {
+  field?.addEventListener("input", showClipLink);
+}
+
 // Events: alarm reports as they arrive, and today's motion and PIR clips
 // from the recordings, which show events even if reports don't come through
 const eventsTable = find("gw-table", "events");
@@ -549,6 +744,7 @@ const eventRow = (event: ReceivedEvent): TableRow => ({
 
 if (clipsTable !== null) {
   clipsTable.columns = [
+    actionsColumn,
     { id: "begin", header: "Start" },
     { id: "channel", header: "Channel", numeric: true },
     { id: "length", header: "Length", sortable: false },

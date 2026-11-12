@@ -135,3 +135,45 @@ gw-page {
   flex-wrap: wrap;
   margin-block: var(--gw-space-3);
 }
+
+/* The recordings player, bounded to the window's height like the live grid */
+.player {
+  display: grid;
+  gap: var(--gw-space-3);
+  margin-block-end: var(--gw-space-4);
+  /* Clear of the sticky app bar when a row scrolls it into view */
+  scroll-margin-block-start: calc(var(--gw-space-5) + 4rem);
+}
+
+.player[hidden] {
+  display: none;
+}
+
+.player-bar,
+.player-clip {
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.player-bar {
+  align-items: center;
+}
+
+.player-clock {
+  color: var(--gw-color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.player-close {
+  margin-inline-start: auto;
+}
+
+.player-video {
+  display: block;
+  width: 100%;
+  /* Room for the app bar, the player's own rows and the page's padding */
+  max-height: calc(100dvh - 17rem);
+  aspect-ratio: 16 / 9;
+  border-radius: var(--gw-radius-md, 8px);
+  background: #000;
+}

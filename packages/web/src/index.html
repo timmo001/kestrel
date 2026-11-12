@@ -100,6 +100,65 @@
             ></gw-select>
           </gw-row>
           <gw-row class="recorded-days"></gw-row>
+          <!-- The recording picked from a table, and a clip of it to save -->
+          <div class="player" hidden>
+            <gw-row class="player-bar">
+              <strong class="player-title"></strong>
+              <span class="player-clock"></span>
+              <gw-segmented
+                class="player-speed"
+                label="Speed"
+                size="small"
+                value="1"
+              ></gw-segmented>
+              <gw-button
+                class="player-close"
+                variant="neutral"
+                appearance="plain"
+                size="small"
+                >Close</gw-button
+              >
+            </gw-row>
+            <gw-alert class="player-problem" tone="warning" hidden></gw-alert>
+            <video class="player-video" controls muted playsinline></video>
+            <gw-row class="player-clip" role="group" aria-label="Clip to save">
+              <!-- Text, not a time field: Chrome writes those in its own
+                   language, such as 12-hour times beside the table's 24 -->
+              <gw-input
+                class="clip-from"
+                label="From"
+                placeholder="HH:MM:SS"
+                inputmode="numeric"
+                maxlength="8"
+                size="small"
+              ></gw-input>
+              <gw-button
+                class="clip-from-here"
+                variant="neutral"
+                appearance="outlined"
+                size="small"
+                >Start here</gw-button
+              >
+              <gw-input
+                class="clip-to"
+                label="To"
+                placeholder="HH:MM:SS"
+                inputmode="numeric"
+                maxlength="8"
+                size="small"
+              ></gw-input>
+              <gw-button
+                class="clip-to-here"
+                variant="neutral"
+                appearance="outlined"
+                size="small"
+                >End here</gw-button
+              >
+              <gw-button class="clip-download" size="small"
+                >Download clip</gw-button
+              >
+            </gw-row>
+          </div>
           <gw-table
             class="recordings"
             label="Recordings"
