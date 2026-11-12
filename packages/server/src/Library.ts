@@ -1,24 +1,37 @@
 /**
- * The recordings library: every recording the server has, read only from
- * the recordings folder, so playback never reaches a recorder or camera.
- * Kestrel's own recordings are written there, and each source's are copied
- * in, with why each was made kept as tags in its file name.
+ * The recordings library: every recording, local first. The recordings
+ * folder comes first: Kestrel's own recordings are written there, and each
+ * source's are copied in, with why each was made kept as tags in its file
+ * name. What a source has that isn't copied yet, such as footage older than
+ * the hours kept, comes from the source itself, marked as remote.
  *
  * @module
  */
 import {
+  cameraParts,
   NoRecordings,
   RecordingReason,
+  SourceUnavailable,
   UnknownCamera,
   type CameraId,
   type LocalTime,
   type RecordedDay,
   type RecordedFrame,
   type Recording,
+  type SourceRecordings,
 } from "@timmo001/kestrel-core";
 import * as Mp4 from "@timmo001/kestrel-format-mp4";
 import * as Nvr from "@timmo001/kestrel-nvr";
-import { Context, Effect, FileSystem, Layer, Path, Stream } from "effect";
+import {
+  Context,
+  Duration,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Stream,
+} from "effect";
 import { ownRecordingsFolder } from "./Folders.ts";
 import { Sources } from "./Sources.ts";
 
@@ -29,6 +42,17 @@ const fromSeconds = (seconds: number): LocalTime =>
   new Date(Math.round(seconds) * 1000).toISOString().slice(0, 19);
 
 const daySeconds = 86_400;
+
+/** How long a source has to answer before the library carries on without it. */
+const remoteWait = Duration.seconds(15);
+
+/** What a source answers in time, or nothing when it can't: the library always has its own. */
+const orNone = <A, E>(effect: Effect.Effect<ReadonlyArray<A>, E>) =>
+  effect.pipe(
+    Effect.timeoutOption(remoteWait),
+    Effect.map((found) => Option.getOrElse(found, (): ReadonlyArray<A> => [])),
+    Effect.orElseSucceed((): ReadonlyArray<A> => []),
+  );
 
 /** The tag a reason is kept as in a file's name, such as `alarm-input`. */
 export const reasonTag = (reason: RecordingReason) =>
@@ -69,6 +93,8 @@ export interface VideoOptions {
   readonly end: LocalTime;
   /** Key frames only, one per this many seconds. */
   readonly every?: number | undefined;
+  /** Which stream to play from a source, for what isn't copied yet; copies are always the main stream. */
+  readonly stream?: "main" | "sub" | undefined;
 }
 
 export class Library extends Context.Service<
@@ -91,8 +117,8 @@ export class Library extends Context.Service<
     readonly video: (
       options: VideoOptions,
     ) => Effect.Effect<
-      Stream.Stream<RecordedFrame, Mp4.Mp4Error>,
-      NoRecordings | UnknownCamera
+      Stream.Stream<RecordedFrame, Mp4.Mp4Error | SourceUnavailable>,
+      NoRecordings | UnknownCamera | SourceUnavailable
     >;
   }
 >()("@timmo001/kestrel-server/Library") {
@@ -114,23 +140,69 @@ export class Library extends Context.Service<
           }),
         );
 
-      const cameras = folder.pipe(
+      const localCameras = folder.pipe(
         Effect.flatMap(Nvr.Library.cameras),
         Effect.provideContext(files),
       );
+
+      /** The sources that keep recordings of their own. */
+      const keeping = sources.all.pipe(
+        Effect.map((all) =>
+          all.flatMap((source) =>
+            source.recordings === undefined
+              ? []
+              : [{ source, recordings: source.recordings }],
+          ),
+        ),
+      );
+
+      const remoteCameras = keeping.pipe(
+        Effect.flatMap((all) =>
+          Effect.forEach(
+            all,
+            ({ source }) =>
+              orNone(source.cameras).pipe(
+                Effect.map((found) =>
+                  found.flatMap((camera) =>
+                    camera.recordings ? [camera.id] : [],
+                  ),
+                ),
+              ),
+            { concurrency: "unbounded" },
+          ),
+        ),
+        Effect.map((lists) => lists.flat()),
+      );
+
+      const cameras = Effect.all([localCameras, remoteCameras]).pipe(
+        Effect.map(([local, remote]) => [...new Set([...local, ...remote])]),
+      );
+
+      /** The recordings of a camera's source, where it keeps its own. */
+      const remoteOf = (camera: CameraId) =>
+        sources.find(cameraParts(camera).source).pipe(
+          Effect.map((source) => source.recordings),
+          Effect.orElseSucceed((): SourceRecordings | undefined => undefined),
+        );
 
       const days = (month: string) =>
         Effect.gen(function* () {
           const root = yield* folder;
 
-          const lists = yield* Effect.forEach(yield* cameras, (key) =>
+          const lists = yield* Effect.forEach(yield* localCameras, (key) =>
             Nvr.Library.days(root, key, month).pipe(
               Effect.orElseSucceed(() => []),
             ),
           );
 
-          return mergeDays(
-            lists.flat().flatMap((day): Array<RecordedDay> => {
+          const remote = yield* Effect.forEach(
+            yield* keeping,
+            ({ recordings }) => orNone(recordings.days(month)),
+            { concurrency: "unbounded" },
+          );
+
+          return mergeDays([
+            ...lists.flat().flatMap((day): Array<RecordedDay> => {
               const tagged = day.tags.length === 0 ? [] : [reasonsOf(day.tags)];
 
               const untagged = day.untagged ? [reasonsOf([])] : [];
@@ -139,21 +211,53 @@ export class Library extends Context.Service<
                 { date: day.date, reasons: [...tagged, ...untagged].flat() },
               ];
             }),
-          );
+            ...remote.flat(),
+          ]);
         }).pipe(Effect.provideContext(files));
 
       const list = (camera: CameraId, date: string) =>
-        folder.pipe(
-          Effect.flatMap((root) => Nvr.Library.files(root, camera, date)),
-          Effect.map((found) =>
-            found.map((file): Recording => ({
+        Effect.gen(function* () {
+          const root = yield* folder;
+
+          const local = (yield* Nvr.Library.files(root, camera, date)).map(
+            (file): Recording => ({
               camera,
               begin: file.begin,
               end: fromSeconds(toSeconds(file.begin) + file.duration),
               reasons: reasonsOf(file.tags),
               bytes: file.bytes,
-            })),
-          ),
+            }),
+          );
+
+          const recordings = yield* remoteOf(camera);
+
+          const listed =
+            recordings === undefined
+              ? []
+              : yield* orNone(recordings.list(camera, date));
+
+          // A copy is named for when its recording starts
+          const copied = new Set(local.map((recording) => recording.begin));
+
+          const remote = listed.flatMap((recording): Array<Recording> =>
+            copied.has(recording.begin)
+              ? []
+              : [
+                  {
+                    camera: recording.camera,
+                    begin: recording.begin,
+                    end: recording.end,
+                    reasons: recording.reasons,
+                    bytes: recording.bytes,
+                    remote: true,
+                  },
+                ],
+          );
+
+          return [...local, ...remote].toSorted((a, b) =>
+            a.begin.localeCompare(b.begin),
+          );
+        }).pipe(
           Effect.catchTag("InvalidKey", unknown(camera)),
           Effect.provideContext(files),
         );
@@ -190,8 +294,21 @@ export class Library extends Context.Service<
           });
 
           if (parts.length === 0) {
-            return yield* new NoRecordings({
-              message: `Nothing was recorded on ${options.camera} from ${options.begin} to ${options.end}`,
+            const recordings = yield* remoteOf(options.camera);
+
+            if (recordings === undefined) {
+              return yield* new NoRecordings({
+                message: `Nothing was recorded on ${options.camera} from ${options.begin} to ${options.end}`,
+              });
+            }
+
+            // Nothing's copied yet, so it plays from the source
+            return yield* recordings.video({
+              camera: options.camera,
+              begin: options.begin,
+              end: options.end,
+              stream: options.stream ?? "main",
+              every: options.every,
             });
           }
 

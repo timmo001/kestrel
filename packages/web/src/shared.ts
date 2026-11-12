@@ -233,6 +233,7 @@ export const recordingRow = (recording: Recording): TableRow => ({
   reasons: recording.reasons.join(", "),
   bytes: recording.bytes,
   size: size(recording.bytes),
+  where: recording.remote === true ? "On source" : "Here",
 });
 
 export const rowClip = (row: TableRow): Clip => ({

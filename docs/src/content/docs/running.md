@@ -153,11 +153,13 @@ who can reach it should see the cameras and change its sources.
 
 ## Recordings
 
-Every recording the web client and CLI show comes from the recordings
-folder on the server, so playing one never reaches a recorder or camera.
-The server writes its own recordings there, and copies each source's in
-beside them, with why each was made, such as motion, in the file's name:
-`<day>/<time>.motion.mp4`.
+Recordings are local first: the web client and CLI play from the
+recordings folder on the server wherever it has a copy. The server writes
+its own recordings there, and copies each source's in beside them, with
+why each was made, such as motion, in the file's name:
+`<day>/<time>.motion.mp4`. What a source has that isn't copied yet, such
+as footage older than the hours kept, is listed too, marked as on the
+source, and plays from it.
 
 ### Copying from sources
 

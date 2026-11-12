@@ -907,6 +907,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       { id: "end", header: "End" },
       { id: "length", header: "Length", sortable: false },
       { id: "reasons", header: "Why", cell: reasonChips, wide: true },
+      { id: "where", header: "Where" },
       {
         id: "bytes",
         header: "Size",

@@ -141,12 +141,13 @@ const CamerasHandlers = HttpApiBuilder.group(
       .handle(
         "video",
         Effect.fnUntraced(function* ({ params, query }) {
-          // Read from the library's one copy, whichever stream is asked for
+          // Local copies first, then the source for what isn't copied yet
           const frames = yield* library.video({
             camera: cameraId(params.source, params.camera),
             begin: query.begin,
             end: query.end,
             every: query.every,
+            stream: query.stream,
           });
 
           const name = `${params.source}-${params.camera}_${query.begin.replaceAll(":", "-")}.mp4`;

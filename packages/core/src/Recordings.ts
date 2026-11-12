@@ -27,6 +27,8 @@ export const Recording = Schema.Struct({
   end: LocalTime,
   reasons: Schema.Array(RecordingReason),
   bytes: Schema.NullOr(Schema.Number),
+  /** Whether it's only on its source so far, not in the server's recordings folder. */
+  remote: Schema.optional(Schema.Boolean),
 });
 
 export interface Recording extends Schema.Schema.Type<typeof Recording> {}
