@@ -41,8 +41,13 @@ and work that depends on one waits for it.
 ## Running it
 
 - Start the server only through `mise run serve:server`, never in the
-  foreground. It reads the recorder's address and login from `.env.local`
-  (see `.env.example`) through `op run`, and starts go2rtc beside it.
+  foreground. It reads the recorder's address and login from the private file
+  `mise run auth:save` writes, `~/.config/dvr-revival/recorder.env`, or else
+  from `.env.local` (see `.env.example`) through `op run`, and starts go2rtc
+  beside it.
+- Scripts that talk to the recorder load the saved file with
+  `bun --env-file="$HOME/.config/dvr-revival/recorder.env"`, so they don't
+  ask 1Password each time. Never print or copy what's in it.
 
 ## Checks and rollout
 

@@ -49,6 +49,22 @@ depends = ["install"]
 dir = "docs"
 run = "bun run brand"
 
+# The recorder's login, saved once from .env.local's 1Password references
+# into a file only you can read, so the server and scripts start without
+# asking 1Password each time. auth:forget removes it again.
+[tasks."auth:save"]
+description = "Save the recorder's login from 1Password to a private file, so starting the server doesn't ask each time"
+run = '''
+dir="${XDG_CONFIG_HOME:-$HOME/.config}/dvr-revival"
+mkdir -p "$dir"
+chmod 700 "$dir"
+op inject --in-file .env.local --out-file "$dir/recorder.env" --file-mode 0600 --force
+'''
+
+[tasks."auth:forget"]
+description = "Remove the saved login, so the server asks 1Password again"
+run = 'rm -f "${XDG_CONFIG_HOME:-$HOME/.config}/dvr-revival/recorder.env"'
+
 [tasks."serve:docs"]
 description = "Start the docs dev server in the background through Pitchfork"
 run = "pitchfork start docs"

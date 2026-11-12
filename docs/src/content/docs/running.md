@@ -33,6 +33,12 @@ password: if live players show `wrong user/pass`, set it there.
 login can be `op://vault/item/field` references rather than the values
 themselves. A field whose name has spaces can be referenced by its ID.
 
+So 1Password doesn't ask each time the server starts, run `mise run auth:save`
+once. It fills in the references and saves the result to
+`~/.config/dvr-revival/recorder.env`, which only you can read, and the server
+uses that file while it's there. After changing the login, run it again;
+`mise run auth:forget` removes the file.
+
 ## Starting the server
 
 ```sh
@@ -53,7 +59,8 @@ doesn't ask for a login, so only listen where everyone who can reach it should
 see the cameras.
 
 After changing the server, restart it with `mise run serve:server:restart`.
-If it doesn't come up, `op run` may be waiting for 1Password to be unlocked.
+If it doesn't come up without a saved login, `op run` may be waiting for
+1Password to be unlocked.
 
 ## Settings
 
