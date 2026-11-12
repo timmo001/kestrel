@@ -137,6 +137,9 @@ const drawnSize = (width: number, height: number, ratio: number | null) => ({
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
 
+/** How near two zooms are to count as the same, such as Fill and 100%. */
+const zoomSlack = 0.01;
+
 /** A camera's still picture now; the time makes each one new to the browser. */
 const stillAddress = (camera: Camera) =>
   new URL(`api/cameras/${camera.id}/still?at=${Date.now()}`, location.origin)
@@ -901,11 +904,19 @@ export const livePage = (): LivePage => {
     showZoom();
   };
 
-  /** Whether the picked camera fills its tile. */
+  /**
+   * Whether the picked camera covers its tile: filled, or zoomed in as far
+   * or further. Whole, a picture the tile's own shape only fits it.
+   */
   const filled = () => {
     const tile = zoomed();
 
-    return tile !== undefined && viewOf(tile).level === "fill";
+    if (tile === undefined) return false;
+
+    const { scale, fillScale } = placeOf(tile);
+    const zoomedIn = viewOf(tile).level === "fill" || scale > 1 + zoomSlack;
+
+    return zoomedIn && scale > fillScale - zoomSlack;
   };
 
   if (fitToggle !== null) {
@@ -965,12 +976,15 @@ export const livePage = (): LivePage => {
     const across = known ? box.width / picture.width : 1;
     const down = known ? box.height / picture.height : 1;
     const fitted = Math.min(across, down);
+    const fillScale = Math.max(across, down) / fitted;
     const { level } = viewOf(tile);
-    const scale = level === "fill" ? Math.max(across, down) / fitted : level;
+    const scale = level === "fill" ? fillScale : level;
 
     return {
       box,
       scale,
+      /** The scale that covers the tile, one of the zoom's steps. */
+      fillScale,
       known,
       reachX: known ? Math.max(0, (fitted * scale) / across - 1) / 2 : 0,
       reachY: known ? Math.max(0, (fitted * scale) / down - 1) / 2 : 0,
@@ -1031,24 +1045,28 @@ export const livePage = (): LivePage => {
    */
   const zoomTo = (
     tile: Tile | undefined,
-    next: number,
+    next: number | "fill",
     at = { x: 0, y: 0 },
   ) => {
     if (tile === undefined) return;
 
     const view = viewOf(tile);
-    const { scale } = placeOf(tile);
+    const { scale, fillScale } = placeOf(tile);
+    const to = next === "fill" ? fillScale : next;
 
     view.pan = {
-      x: at.x - ((at.x - view.pan.x) / scale) * next,
-      y: at.y - ((at.y - view.pan.y) / scale) * next,
+      x: at.x - ((at.x - view.pan.x) / scale) * to,
+      y: at.y - ((at.y - view.pan.y) / scale) * to,
     };
     view.level = next;
     showZoom();
     keepViews();
   };
 
-  /** Zooms a picture a step in or out from where it is, filled or not. */
+  /**
+   * Zooms a picture a step in or out from where it is. Filling its tile is
+   * one of the steps, so Z and the zoom go through the same levels.
+   */
   const zoomStep = (
     tile: Tile | undefined,
     by: -1 | 1,
@@ -1056,12 +1074,20 @@ export const livePage = (): LivePage => {
   ) => {
     if (tile === undefined) return;
 
-    const { scale } = placeOf(tile);
+    const { scale, fillScale } = placeOf(tile);
+
+    const scaleOf = (step: number | "fill") =>
+      step === "fill" ? fillScale : step;
+
+    // Fill's a step of its own where it isn't the whole picture
+    const steps = [...pictureZooms, "fill" as const]
+      .filter((each) => each !== "fill" || fillScale > 1 + zoomSlack)
+      .toSorted((a, b) => scaleOf(a) - scaleOf(b));
 
     const next =
       by > 0
-        ? pictureZooms.find((each) => each > scale + 0.01)
-        : pictureZooms.filter((each) => each < scale - 0.01).at(-1);
+        ? steps.find((each) => scaleOf(each) > scale + zoomSlack)
+        : steps.filter((each) => scaleOf(each) < scale - zoomSlack).at(-1);
 
     if (next !== undefined) zoomTo(tile, next, at);
   };
