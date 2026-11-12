@@ -182,6 +182,12 @@ const loginLost = (reply: Reply) =>
   reply.code !== 0 &&
   (reply.error?.rspCode === -6 || reply.error?.detail === "please login first");
 
+/** A channel's own name, or `null` where it has none: firmware sends "0" or "1" for that. */
+const ownName = (name: string | undefined) =>
+  name === undefined || name === "" || name === "0" || name === "1"
+    ? null
+    : name;
+
 /** One of its channels, from 0, and where go2rtc reads its streams. */
 interface Channel {
   readonly channel: number;
@@ -465,12 +471,20 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           online: true,
           name: undefined,
         })),
+      // A hub or recorder lists every slot; an empty one is offline with no
+      // name, while a sleeping camera keeps its name
       onSome: (value) =>
-        value.status.map((each) => ({
-          channel: each.channel,
-          online: each.online === 1,
-          name: each.name,
-        })),
+        value.status.flatMap((each) =>
+          each.online === 1 || ownName(each.name) !== null
+            ? [
+                {
+                  channel: each.channel,
+                  online: each.online === 1,
+                  name: each.name,
+                },
+              ]
+            : [],
+        ),
     });
 
     const urls = yield* call(
@@ -484,11 +498,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           ? yield* valueOf(urls.value, at, RtspUrl).pipe(Effect.option)
           : Option.none();
 
-        // A channel's own name is "0" or "1" on some firmware
-        const own =
-          each.name === undefined || each.name === "0" || each.name === "1"
-            ? null
-            : each.name;
+        const own = ownName(each.name);
 
         return {
           channel: each.channel,
