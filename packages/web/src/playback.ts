@@ -34,7 +34,14 @@ import {
   phStop,
   phX,
 } from "./icons.ts";
-import { clipUrl, playerFor, toSeconds, type Clip } from "./player.ts";
+import {
+  clipUrl,
+  fullView,
+  playerFor,
+  toSeconds,
+  type Clip,
+  type View,
+} from "./player.ts";
 import type { RecordingsSearch } from "./router.ts";
 import {
   actionsColumn,
@@ -70,11 +77,24 @@ const icons = {
 };
 
 /** The speeds on the toggle; any other is typed in beside it. */
-const speeds = ["0.5", "1", "2", "4", "8", "16"];
+const speeds = ["0.5", "1", "2", "4", "8", "16", "32"];
 
-/** The slowest and fastest a browser plays: Chrome stops at 16. */
 const slowest = 0.1;
-const fastest = 16;
+const fastest = 32;
+
+/** The fastest a browser plays a video: Chrome stops at 16. */
+const browserFastest = 16;
+
+/**
+ * What a speed plays from. Up to the browser's fastest, the full stream at
+ * that rate. Past it, the sub stream sped up by the server, which downloads
+ * fast enough where the full one can't keep up, at a rate the browser can.
+ */
+const viewFor = (speed: number): View => {
+  const speedUp = Math.ceil(speed / browserFastest);
+
+  return speedUp > 1 ? { stream: "sub", speedUp } : fullView;
+};
 
 const isSpeed = (speed: number) =>
   Number.isFinite(speed) && speed >= slowest && speed <= fastest;
@@ -518,7 +538,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       caption.textContent =
         clip === undefined
           ? ""
-          : `Channel ${clip.channel} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}`;
+          : `Channel ${clip.channel} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
+              // Past the browser's fastest, it's the sub stream
+              Number(speed) > browserFastest ? " · sub stream" : ""
+            }`;
     }
 
     if (idle && playerClock !== null) playerClock.textContent = "--:--:--";
@@ -577,11 +600,19 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   nextButton?.addEventListener("click", () => void skip(1));
 
   const showSpeed = () => {
+    const view = viewFor(Number(speed));
+    // What's left of the speed after the server's part
+    const rate = Number(speed) / view.speedUp;
+
     if (video !== null) {
-      // The default carries the speed over to the next recording played
-      video.playbackRate = Number(speed);
-      video.defaultPlaybackRate = Number(speed);
+      // The default carries the speed over to the next recording played,
+      // and to the reload a change of view brings
+      video.defaultPlaybackRate = rate;
+      video.playbackRate = rate;
     }
+
+    player?.view(view);
+    showState();
 
     // The toggle marks a preset, and the field shows whichever speed it is,
     // unless it's being typed in or stepped, which it's left to

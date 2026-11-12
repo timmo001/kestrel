@@ -101,10 +101,12 @@ const longestGap = 2;
  * Writes frames as fragmented MP4, a fragment per key frame group, and
  * passes the bytes on as they're written. Frames before the first key frame,
  * and any that don't move time forward, are left out. Time runs from 0 at the
- * first frame, with gaps between files closed up.
+ * first frame, with gaps between files closed up, `speedUp` times faster
+ * than it was recorded.
  */
 export const toMp4 = <E>(
   frames: Stream.Stream<RecordedFrame, E>,
+  speedUp = 1,
 ): Stream.Stream<Uint8Array, E | Mp4Error> =>
   Stream.unwrap(
     Effect.sync(() => {
@@ -156,7 +158,7 @@ export const toMp4 = <E>(
         // Out of order or repeated, such as where two files overlap
         if (frame !== undefined && gap <= 0) return;
 
-        const duration = gap > longestGap ? frameLength : gap;
+        const duration = (gap > longestGap ? frameLength : gap) / speedUp;
 
         await source.add(
           new EncodedPacket(

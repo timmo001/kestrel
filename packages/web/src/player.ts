@@ -20,13 +20,31 @@ export const toSeconds = (time: string) => Date.parse(`${time}Z`) / 1000;
 export const fromSeconds = (seconds: number) =>
   new Date(seconds * 1000).toISOString().slice(0, 19);
 
+/**
+ * Which of a channel's streams a clip plays from, and how many times faster
+ * than it was recorded the server makes it. Browsers play no faster than
+ * 16 times, so faster speeds come from the small sub stream, which
+ * downloads fast enough, sped up by the server.
+ */
+export interface View {
+  readonly stream: "main" | "sub";
+  readonly speedUp: number;
+}
+
+/** The full stream, at the speed it was recorded. */
+export const fullView: View = { stream: "main", speedUp: 1 };
+
 /** The server's MP4 of a clip, to play or, with `download`, to save as a file. */
-export const clipUrl = (clip: Clip, download = false) => {
+export const clipUrl = (clip: Clip, download = false, view = fullView) => {
   const url = new URL("api/recordings/video", location.origin);
 
   url.searchParams.set("channel", String(clip.channel));
   url.searchParams.set("begin", clip.begin);
   url.searchParams.set("end", clip.end);
+
+  if (view.stream !== "main") url.searchParams.set("stream", view.stream);
+
+  if (view.speedUp !== 1) url.searchParams.set("speedUp", String(view.speedUp));
 
   if (download) url.searchParams.set("download", "true");
 
@@ -69,6 +87,8 @@ export interface Player {
   readonly stop: () => void;
   /** Moves to `to` seconds into the playing clip. */
   readonly seek: (to: number) => void;
+  /** Plays from another stream or speed-up, picking up where it was. */
+  readonly view: (next: View) => void;
   /** What's playing, if anything. */
   readonly clip: () => Clip | undefined;
   /** Seconds into the playing clip at the playhead. */
@@ -100,6 +120,8 @@ export const playerFor = (
   /** Where the video's time 0 is in the clip: 0, unless the browser plays the MP4 directly from a later start. */
   let base = 0;
   let objectUrl = "";
+  /** The stream and speed-up: a second of the video is `view.speedUp` seconds of the clip. */
+  let view = fullView;
 
   const ranges = () => {
     const buffered = buffer?.buffered;
@@ -183,8 +205,12 @@ export const playerFor = (
     const controller = new AbortController();
     const { signal } = controller;
 
+    const start = Math.floor(from);
+    const total = toSeconds(clip.end) - toSeconds(clip.begin);
+
     loading = controller;
-    loadingFrom = Math.floor(from);
+    // In the video's time, as the seeks it's checked against are
+    loadingFrom = start / view.speedUp;
     await settle(target);
 
     if (signal.aborted) return;
@@ -192,14 +218,15 @@ export const playerFor = (
     // A new MP4 starts here: reset the parser and place its time at `start`
     if (media.readyState === "open") target.abort();
 
-    const start = Math.floor(from);
-    const total = toSeconds(clip.end) - toSeconds(clip.begin);
-
-    target.timestampOffset = start;
+    target.timestampOffset = start / view.speedUp;
 
     try {
       const response = await fetch(
-        clipUrl({ ...clip, begin: fromSeconds(toSeconds(clip.begin) + start) }),
+        clipUrl(
+          { ...clip, begin: fromSeconds(toSeconds(clip.begin) + start) },
+          false,
+          view,
+        ),
         { signal },
       );
 
@@ -223,7 +250,10 @@ export const playerFor = (
 
       // The whole clip is in: let the video end there. Short of that the
       // download was cut off, and "waiting" picks it up again
-      if (loadedUntil() >= total - 3 && media.readyState === "open") {
+      if (
+        loadedUntil() >= (total - 3) / view.speedUp &&
+        media.readyState === "open"
+      ) {
         await settle(target);
         media.endOfStream();
       }
@@ -245,7 +275,7 @@ export const playerFor = (
     const time = video.currentTime;
 
     if (current !== undefined && !isLoaded(time) && !isComing(time)) {
-      void load(time);
+      void load(time * view.speedUp);
     }
   });
 
@@ -259,7 +289,7 @@ export const playerFor = (
       loading === undefined &&
       !isLoaded(video.currentTime)
     ) {
-      void load(loadedUntil());
+      void load(loadedUntil() * view.speedUp);
     }
   });
 
@@ -298,10 +328,11 @@ export const playerFor = (
       !MediaSource.isTypeSupported(mimeType)
     ) {
       base = start;
-      video.src = clipUrl({
-        ...clip,
-        begin: fromSeconds(toSeconds(clip.begin) + start),
-      });
+      video.src = clipUrl(
+        { ...clip, begin: fromSeconds(toSeconds(clip.begin) + start) },
+        false,
+        view,
+      );
 
       if (autoplay) await video.play().catch(() => undefined);
 
@@ -319,12 +350,12 @@ export const playerFor = (
 
     if (source !== media) return;
 
-    media.duration = toSeconds(clip.end) - toSeconds(clip.begin);
+    media.duration = length / view.speedUp;
     buffer = media.addSourceBuffer(mimeType);
 
     // With no video yet this only sets where playback starts, once the
     // first fragment arrives; the load from there is already coming
-    if (start > 0) video.currentTime = start;
+    if (start > 0) video.currentTime = start / view.speedUp;
 
     void load(start);
 
@@ -332,7 +363,7 @@ export const playerFor = (
   };
 
   /** Seconds into the clip at the playhead. */
-  const offset = () => base + video.currentTime;
+  const offset = () => base + video.currentTime * view.speedUp;
 
   return {
     play,
@@ -350,7 +381,18 @@ export const playerFor = (
         return;
       }
 
-      video.currentTime = to - base;
+      video.currentTime = (to - base) / view.speedUp;
+    },
+    view: (next) => {
+      if (next.stream === view.stream && next.speedUp === view.speedUp) return;
+
+      const clip = current;
+      const at = clip === undefined ? 0 : offset();
+      const playing = !video.paused;
+
+      view = next;
+
+      if (clip !== undefined) void play(clip, at, playing);
     },
     clip: () => current,
     offset: () => (current === undefined ? undefined : offset()),

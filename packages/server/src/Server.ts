@@ -48,7 +48,7 @@ const RecorderHandlers = HttpApiBuilder.group(
           return HttpApiSchema.withHeaders({
             // Headers are already sent by the time anything fails, so a
             // failure ends the response early and is only logged
-            body: toMp4(frames).pipe(
+            body: toMp4(frames, query.speedUp ?? 1).pipe(
               Stream.tapError((error) =>
                 Effect.logWarning(
                   `Recording ${query.begin} to ${query.end} stopped: ${error.message}`,

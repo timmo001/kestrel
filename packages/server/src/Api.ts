@@ -125,6 +125,18 @@ export class RecorderGroup extends HttpApiGroup.make("recorder")
         end: LocalTime,
         stream: Schema.optional(RecordedStream),
         download: Schema.optional(Schema.Literals(["true", "false"])),
+        /**
+         * Plays this many times faster than it was recorded, each frame
+         * shortened to match. Browsers stop at 16 times, so this goes past
+         * it; with the sub stream, which downloads fastest.
+         */
+        speedUp: Schema.optional(
+          Schema.NumberFromString.check(
+            Schema.isInt(),
+            Schema.isGreaterThanOrEqualTo(1),
+            Schema.isLessThanOrEqualTo(4),
+          ),
+        ),
       },
       success: HttpApiSchema.WithHeaders(
         HttpApiSchema.StreamUint8Array({ contentType: "video/mp4" }),
