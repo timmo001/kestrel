@@ -198,7 +198,9 @@ export const restored = (
       (camera, index) => incoming.recording.cameras.indexOf(camera) === index,
     ),
     folder: incoming.recording.folder?.trim() || null,
-    days: incoming.recording.days,
+    continuousHours: incoming.recording.continuousHours,
+    clipHours: incoming.recording.clipHours,
+    diskShare: incoming.recording.diskShare,
   },
 });
 

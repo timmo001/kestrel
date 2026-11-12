@@ -8,7 +8,9 @@
  * new one.
  */
 import {
-  defaultRecordingDays,
+  defaultClipHours,
+  defaultContinuousHours,
+  defaultDiskShare,
   SourceId,
   type Camera,
   type KindInfo,
@@ -456,7 +458,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     recording: saved?.recording ?? {
       cameras: [],
       folder: null,
-      days: defaultRecordingDays,
+      continuousHours: defaultContinuousHours,
+      clipHours: defaultClipHours,
+      diskShare: defaultDiskShare,
     },
     revision,
   });

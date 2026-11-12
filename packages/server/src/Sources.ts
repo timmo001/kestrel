@@ -10,7 +10,9 @@
  * @module
  */
 import {
-  defaultRecordingDays,
+  defaultClipHours,
+  defaultContinuousHours,
+  defaultDiskShare,
   InvalidSettings,
   NotSupported,
   SourceUnavailable,
@@ -68,7 +70,13 @@ const firstSettings: Settings = {
   ],
   cameras: [],
   order: [],
-  recording: { cameras: [], folder: null, days: defaultRecordingDays },
+  recording: {
+    cameras: [],
+    folder: null,
+    continuousHours: defaultContinuousHours,
+    clipHours: defaultClipHours,
+    diskShare: defaultDiskShare,
+  },
 };
 
 /** A source that couldn't start, listed with the reason and nothing else. */

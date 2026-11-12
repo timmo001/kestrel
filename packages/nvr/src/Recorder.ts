@@ -1,5 +1,5 @@
 /**
- * Records a camera to disk and clears out old days. ffmpeg reads the
+ * Records a camera to disk. ffmpeg reads the
  * camera's stream as it arrives and writes it unchanged, video only, as
  * fragmented MP4 files cut every few minutes on the clock, so a crash loses
  * seconds rather than a file. Each camera gets a folder of days, each day a
@@ -19,7 +19,7 @@ import {
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { InvalidKey, dayPattern, isKey, localDate, marker } from "./Layout.ts";
+import { InvalidKey, isKey, localDate, marker } from "./Layout.ts";
 
 const day = Duration.toMillis(Duration.days(1));
 
@@ -147,53 +147,4 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
       );
     }),
   );
-});
-
-export interface PruneOptions {
-  /** The folder every camera's recordings go in. */
-  readonly folder: string;
-  /** How many days back to keep, besides today. */
-  readonly days: number;
-}
-
-/**
- * Deletes the days older than `days` from every camera recorded in a
- * folder, including ones no longer recorded, and returns how many went. Only
- * folders this records into are touched, so a shared folder is safe.
- */
-export const prune = Effect.fnUntraced(function* (options: PruneOptions) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const now = yield* Clock.currentTimeMillis;
-  const cutoff = localDate(now - options.days * day);
-
-  if (!(yield* fs.exists(options.folder))) return 0;
-
-  const entries = yield* fs.readDirectory(options.folder, { recursive: true });
-
-  const cameras = entries.flatMap((entry) =>
-    path.basename(entry) === marker
-      ? [path.join(options.folder, path.dirname(entry))]
-      : [],
-  );
-
-  const old = yield* Effect.forEach(cameras, (camera) =>
-    fs
-      .readDirectory(camera)
-      .pipe(
-        Effect.map((names) =>
-          names.flatMap((name) =>
-            dayPattern.test(name) && name < cutoff
-              ? [path.join(camera, name)]
-              : [],
-          ),
-        ),
-      ),
-  );
-
-  yield* Effect.forEach(old.flat(), (folder) =>
-    fs.remove(folder, { recursive: true }),
-  );
-
-  return old.flat().length;
 });

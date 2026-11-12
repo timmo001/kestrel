@@ -21,6 +21,14 @@ const keyPattern = /^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/;
 
 const tagPattern = /^[a-z0-9-]+$/;
 
+/**
+ * Whether a file with these tags is footage recorded all the time rather
+ * than a clip: one with no tags, or tagged `normal`, as a recorder marks its
+ * continuous files even when something else happened in them.
+ */
+export const isContinuous = (tags: ReadonlyArray<string>) =>
+  tags.length === 0 || tags.includes("normal");
+
 /** A key that isn't lower-case words joined by slashes, which could reach outside the folder. */
 export class InvalidKey extends Data.TaggedError("InvalidKey")<{
   readonly key: string;

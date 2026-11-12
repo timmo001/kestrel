@@ -83,10 +83,33 @@ export const CameraLabel = Schema.Struct({
 
 export interface CameraLabel extends Schema.Schema.Type<typeof CameraLabel> {}
 
-/** How many days of recordings are kept when you haven't said. */
-export const defaultRecordingDays = 14;
+/** How many hours of footage recorded all the time are kept when you haven't said: a week. */
+export const defaultContinuousHours = 7 * 24;
 
-/** What the server records itself: which cameras, where, and for how long. */
+/** How many hours of clips, such as motion, are kept when you haven't said: 30 days. */
+export const defaultClipHours = 30 * 24;
+
+/** The most of its disk recordings may use when you haven't said, as a percentage. */
+export const defaultDiskShare = 10;
+
+const hours = (fallback: number) =>
+  Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(fallback)),
+  );
+
+/** A number of hours in words, as days when it's whole days, such as `7 days`. */
+export const hoursText = (count: number) => {
+  if (count % 24 !== 0) return count === 1 ? "1 hour" : `${count} hours`;
+
+  return count === 24 ? "1 day" : `${count / 24} days`;
+};
+
+/**
+ * What the server records itself and how long recordings are kept: which
+ * cameras, where, how many hours of continuous footage and of clips, and
+ * how much of the disk they may use. The oldest go first when they'd use
+ * more.
+ */
 export const RecordingSettings = Schema.Struct({
   /** The cameras it records, by id. */
   cameras: Schema.Array(CameraId).pipe(
@@ -96,10 +119,14 @@ export const RecordingSettings = Schema.Struct({
   folder: Schema.NullOr(Schema.String).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(null)),
   ),
-  /** How many days back are kept, besides today. */
-  days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(defaultRecordingDays)),
-  ),
+  /** How many hours of footage recorded all the time are kept. */
+  continuousHours: hours(defaultContinuousHours),
+  /** How many hours of clips, recorded for a reason such as motion, are kept. */
+  clipHours: hours(defaultClipHours),
+  /** The most of its disk the recordings folder may use, as a percentage. */
+  diskShare: Schema.Number.check(
+    Schema.isBetween({ minimum: 1, maximum: 90 }),
+  ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultDiskShare))),
 });
 
 export interface RecordingSettings extends Schema.Schema.Type<

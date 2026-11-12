@@ -74,7 +74,8 @@ login is planned for when remote access arrives, in
 - [`packages/format-mp4`](packages/format-mp4): recorded video as MP4,
   written for the browser and read back as frames
 - [`packages/nvr`](packages/nvr): records cameras' streams to disk with
-  ffmpeg, in short files by day, clears out old days and reads the folder
+  ffmpeg, in short files by day, clears out old recordings by age and disk
+  space, and reads the folder
   back
 - [`packages/server`](packages/server): the server, with the API, go2rtc and
   recording

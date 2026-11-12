@@ -5,11 +5,13 @@
  * however many watch or record it, and no login reaches ffmpeg's command
  * line. MP4 rather than go2rtc's RTSP, which some cameras' streams come
  * through with their timestamps out of order. Files go in `recordings` in the state folder, or the folder you
- * chose, and each hour the days older than the ones kept are cleared out.
+ * chose, and each hour recordings past their hours, or past the disk share,
+ * are cleared out, including those synced from sources.
  * A save that changes what's recorded starts the recordings again.
  *
  * @module
  */
+import { hoursText } from "@timmo001/kestrel-core";
 import * as Nvr from "@timmo001/kestrel-nvr";
 import { Config, Duration, Effect, Layer, Schedule, Stream } from "effect";
 import { ownRecordingsFolder } from "./Folders.ts";
@@ -20,7 +22,7 @@ import { Sources } from "./Sources.ts";
 /** How long each recorded file runs. */
 const segment = Duration.minutes(5);
 
-/** How often old days are cleared out. */
+/** How often old recordings are cleared out. */
 const pruneEvery = Duration.hours(1);
 
 export const layer = Layer.effectDiscard(
@@ -38,11 +40,18 @@ export const layer = Layer.effectDiscard(
       Stream.switchMap((settings) => {
         const folder = settings.folder ?? ownFolder;
 
-        const pruning = Nvr.prune({ folder, days: settings.days }).pipe(
-          Effect.tap((removed) =>
-            removed === 0
+        const pruning = Nvr.prune({
+          folder,
+          continuousHours: settings.continuousHours,
+          clipHours: settings.clipHours,
+          diskShare: settings.diskShare,
+        }).pipe(
+          Effect.tap((cleared) =>
+            cleared.expired + cleared.forSpace === 0
               ? Effect.void
-              : Effect.logInfo(`Cleared out ${removed} days of recordings`),
+              : Effect.logInfo(
+                  `Cleared out ${cleared.expired} old recordings and ${cleared.forSpace} for space, ${(cleared.bytes / 1e9).toFixed(1)} GB`,
+                ),
           ),
           Effect.catch((error) =>
             Effect.logWarning(
@@ -75,7 +84,7 @@ export const layer = Layer.effectDiscard(
           Effect.logInfo(
             settings.cameras.length === 0
               ? "Recording no cameras"
-              : `Recording ${settings.cameras.length} cameras to ${folder}, keeping ${settings.days} days`,
+              : `Recording ${settings.cameras.length} cameras to ${folder}, keeping ${hoursText(settings.continuousHours)} continuous and ${hoursText(settings.clipHours)} of clips, in up to ${settings.diskShare}% of the disk`,
           ).pipe(
             Effect.andThen(
               Effect.all([pruning, recording], {

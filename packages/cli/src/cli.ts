@@ -9,6 +9,7 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   cameraParts,
+  hoursText,
   LocalTime,
   type Attention,
   type Camera,
@@ -228,9 +229,11 @@ const sources = Command.make(
     const recording = settings.recording;
 
     yield* Console.log(
-      recording.cameras.length === 0
-        ? `Recording  none, keeping ${recording.days} days`
-        : `Recording  ${recording.cameras.join(", ")} to ${recording.folder ?? "the state folder"}, keeping ${recording.days} days`,
+      `Recording  ${recording.cameras.length === 0 ? "none" : recording.cameras.join(", ")} to ${recording.folder ?? "the state folder"}`,
+    );
+
+    yield* Console.log(
+      `Keeping  ${hoursText(recording.continuousHours)} continuous, ${hoursText(recording.clipHours)} of clips, in up to ${recording.diskShare}% of the disk`,
     );
   }),
 ).pipe(

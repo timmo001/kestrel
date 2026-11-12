@@ -167,13 +167,27 @@ recordings of its own, such as a Reolink camera or a stream. It needs
 so the camera serves one connection however many watch or record it, and
 saved unchanged, video only, as 5-minute MP4 files in
 `recordings/<source>/<camera>/<day>/` in the state folder, or a folder you
-choose, such as a share on a NAS. Each hour, days older than the ones kept
-are deleted: 14 by default. Only folders the server records into are
+choose, such as a share on a NAS.
+
+### Keeping recordings
+
+Each hour the server clears out old recordings, its own and those copied
+from sources alike:
+
+| Setting           | Default       | What it keeps                                                       |
+| ----------------- | ------------- | ------------------------------------------------------------------- |
+| `continuousHours` | 168 (7 days)  | Footage recorded all the time, in files with no reason or `normal`  |
+| `clipHours`       | 720 (30 days) | Clips recorded for a reason, such as motion or PIR                  |
+| `diskShare`       | 10            | The most of its disk the recordings folder may use, as a percentage |
+
+Past the share, the oldest continuous footage goes first, then the oldest
+clips, and 5% of the disk is always left free. A file written to in the
+last two minutes is left alone. Only folders with the server's marker are
 touched, so a shared folder is safe.
 
-The cameras, folder and days are saved in `sources.json` under
-`recording`, beside the rest of the settings, so every client sees the
-same ones.
+The cameras, folder and how long they're kept are saved in `sources.json`
+under `recording`, beside the rest of the settings, so every client sees
+the same ones.
 
 After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
