@@ -97,7 +97,7 @@ gw-page {
   border-radius: 0;
 }
 
-/* The space for the grid, which it measures itself against */
+/* The space for a grid of cameras, which it measures itself against */
 .live-area {
   display: grid;
   place-items: center;
@@ -105,10 +105,10 @@ gw-page {
   container-type: size;
 }
 
-/* A layout's worth of cameras, in the layout's own shape so each picture
-   fills its 16:9 cell, as big as fits and centred on black. Three is one
-   large and two stacked beside it */
-.live-grid {
+/* A layout's worth of cameras, on Live and Recordings, in the layout's own
+   shape so each picture fills its 16:9 cell, as big as fits and centred on
+   black. Three is one large and two stacked beside it */
+.camera-grid {
   --live-ratio: calc(16 / 9);
 
   display: grid;
@@ -119,39 +119,45 @@ gw-page {
   height: min(100cqh, 100cqw / var(--live-ratio));
 }
 
-.live-grid[data-layout="1"] {
+/* The sub stream carries the same 16:9 picture squeezed into 352×288, so
+   it's drawn stretched back out to its cell rather than at its own shape */
+.camera-grid[data-stream="sub"] video {
+  object-fit: fill;
+}
+
+.camera-grid[data-layout="1"] {
   --live-columns: 1;
   --live-rows: 1;
 }
 
-.live-grid[data-layout="2"] {
+.camera-grid[data-layout="2"] {
   --live-columns: 2;
   --live-rows: 1;
   --live-ratio: calc(32 / 9);
 }
 
-.live-grid[data-layout="3"] {
+.camera-grid[data-layout="3"] {
   --live-ratio: calc(48 / 18);
 
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
 }
 
-.live-grid[data-layout="3"] > :first-child {
+.camera-grid[data-layout="3"] > :first-child {
   grid-row: span 2;
 }
 
-.live-grid[data-layout="6"] {
+.camera-grid[data-layout="6"] {
   --live-columns: 3;
   --live-rows: 2;
   --live-ratio: calc(48 / 18);
 }
 
-.live-grid[data-layout="9"] {
+.camera-grid[data-layout="9"] {
   --live-columns: 3;
   --live-rows: 3;
 }
 
-.live-grid[data-layout="16"] {
+.camera-grid[data-layout="16"] {
   --live-columns: 4;
   --live-rows: 4;
 }
@@ -278,7 +284,8 @@ gw-page {
   border-radius: var(--gw-radius-sm, 4px);
   background: rgb(0 0 0 / 55%);
   color: #fff;
-  font-size: 0.875rem;
+  /* The same size as the fields and controls around the player */
+  font-size: 1rem;
   pointer-events: none;
 }
 
@@ -325,6 +332,7 @@ gw-page {
   background: #000;
 }
 
+/* The grid of channels measures itself against it, as on Live */
 .player-screen {
   position: relative;
   display: grid;
@@ -332,6 +340,45 @@ gw-page {
   min-height: 0;
   overflow: hidden;
   touch-action: none;
+  container-type: size;
+}
+
+/* A channel's tile: its video, or a placeholder while it has nothing
+   recorded at the playhead */
+.player-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.player-tile > p {
+  margin: 0;
+  padding: var(--gw-space-2);
+  color: rgb(255 255 255 / 60%);
+  text-align: center;
+}
+
+.player-tile:not([data-empty]) > p,
+.player-tile[data-empty] > video {
+  display: none;
+}
+
+/* With several channels, the picked one, which the zoom, a still, Cut and
+   Download act on */
+.player-grid:not([data-layout="1"]) .player-tile[data-picked]::after {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--gw-color-accent);
+  pointer-events: none;
+  content: "";
+}
+
+.player-grid:not([data-layout="1"]) .player-tile:not([data-picked]) {
+  cursor: pointer;
 }
 
 /* The last frame, over the picture while the next clip loads. It shows at
@@ -368,8 +415,8 @@ gw-page {
   cursor: grab;
 }
 
-/* Pinned to the screen's box: left to size itself, a 16:9 video outgrows
-   it and paints over the controls */
+/* Pinned to its tile's box: left to size itself, a 16:9 video outgrows it
+   and paints over the controls */
 .player-video {
   position: absolute;
   inset: 0;
@@ -523,9 +570,10 @@ kbd {
   gap: var(--gw-space-1);
 }
 
+/* A track per channel when several play, each at least 1.25rem tall */
 .timeline-track {
   position: relative;
-  height: 2.25rem;
+  height: max(2.25rem, var(--timeline-rows, 1) * 1.25rem);
   border-radius: var(--gw-radius-sm, 4px);
   background: var(--gw-color-surface-raised);
   box-shadow: inset 0 0 0 1px var(--gw-color-border-quiet);
@@ -541,9 +589,30 @@ kbd {
   border-radius: inherit;
 }
 
+.timeline-row {
+  position: absolute;
+  inset-inline: 0;
+}
+
+/* Each track's channel, at its start, over the recordings */
+.timeline-row-label {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: var(--gw-space-1);
+  z-index: 1;
+  padding-inline: var(--gw-space-1);
+  border-radius: var(--gw-radius-sm, 4px);
+  background: var(--gw-color-surface-raised);
+  color: var(--gw-color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
 .timeline-span {
   position: absolute;
-  inset-block: 0.5rem;
+  inset-block: 22%;
   /* A five-second clip is far under a pixel across a day */
   min-width: 2px;
 }

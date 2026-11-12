@@ -250,6 +250,8 @@ export const livePage = (): LivePage => {
 
     page = Math.min(page, pages() - 1);
     grid.dataset.layout = String(layout);
+    // The sub stream's pictures are squeezed, which the styles undo
+    grid.dataset.stream = layout > 4 ? "sub" : "main";
     grid.removeAttribute("aria-busy");
 
     tiles = streams
@@ -267,7 +269,11 @@ export const livePage = (): LivePage => {
         // Video only: the recorder offers an audio track but sends nothing
         // on it, and a player waiting for that audio never starts
         player.media = "video";
-        figure.append(player, hold, element("figcaption", stream.name));
+        figure.append(
+          player,
+          hold,
+          element("figcaption", `Ch ${stream.channel}`),
+        );
 
         figure.addEventListener("click", () => {
           picked = stream.channel;

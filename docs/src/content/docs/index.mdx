@@ -29,9 +29,16 @@ The plan is tracked in
   the day that zooms to ten minutes, where a
   click plays from that moment. Playback runs on from one recording into the
   next, any stretch of a day saves as an MP4, and the page remembers where it
-  was, its speed and its zoom in the browser.
+  was, its speed and its zoom in the browser. Up to four channels play
+  together on one clock, ticked in the channel picker: each one that recorded
+  at that moment plays, the rest show a placeholder until their next
+  recording, and the timeline has a track for each. They play the full
+  stream while the recorder keeps up, about 14 times real time across them,
+  and the sub stream past that.
 - **Pages:** Live, Recordings, Events and Recorder each have an address of
-  their own, such as `/recordings?channel=1&date=2026-11-11`.
+  their own, such as `/recordings?channel=1&date=2026-11-11`, or
+  `/recordings?channel=1&channels=1,3,4&date=2026-11-11` for several
+  channels together.
 - **Events:** motion, PIR, video loss and disk reports as the recorder sends
   them, and today's motion and PIR clips found by search.
 - **Live view:** the cameras with a signal through go2rtc, 1, 2, 3 or 4 at a

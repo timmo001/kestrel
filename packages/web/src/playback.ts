@@ -34,11 +34,12 @@ import {
   phSkipForward,
   phStop,
 } from "./icons.ts";
+import { mostChannels, playerGroup } from "./group.ts";
+import { nextMoment, previousMoment, type Track } from "./moments.ts";
 import {
   clipUrl,
   fullView,
   sameView,
-  playerFor,
   toSeconds,
   type Clip,
   type View,
@@ -88,15 +89,24 @@ const fastest = 32;
 /** The fastest a browser plays a video: Chrome stops at 16. */
 const browserFastest = 16;
 
+/** How many times real time the recorder's full stream keeps up with across channels, with some to spare. */
+const fullStreamBudget = 14;
+
 /**
  * What a speed plays from. Up to the browser's fastest, the full stream at
  * that rate. Past it, the recorder's own fast forward: every key frame of
  * the full stream, one a second, which comes about 58 times faster than
  * real time where the whole stream comes at 17, sped up by the server to a
- * rate the browser can play.
+ * rate the browser can play. The full stream is shared, though: with
+ * several channels past about 14 times in all, every channel plays the
+ * small sub stream, which comes 100 to 200 times faster than real time.
  */
-const viewFor = (speed: number): View => {
+const viewFor = (speed: number, count: number): View => {
   const speedUp = Math.ceil(speed / browserFastest);
+
+  if (count > 1 && speed * count > fullStreamBudget) {
+    return { stream: "sub", speedUp };
+  }
 
   return speedUp > 1 ? { stream: "main", speedUp, every: 1 } : fullView;
 };
@@ -139,10 +149,17 @@ const Position = Schema.Struct({
 const decodePosition = Schema.decodeUnknownOption(Position);
 const isDate = Schema.is(LocalDate);
 
+const ChannelList = Schema.Array(
+  Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+);
+
+const decodeChannels = Schema.decodeUnknownOption(ChannelList);
+
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {
   const values = keptAt(storageKey);
   const channel = Number(values?.["channel"]);
+  const ticked = Option.getOrUndefined(decodeChannels(values?.["channels"]));
   const date = values?.["date"];
   const speed = values?.["speed"];
   const timelineZoom = values?.["timelineZoom"];
@@ -150,6 +167,7 @@ const kept = () => {
 
   return {
     channel: Number.isInteger(channel) && channel >= 1 ? channel : undefined,
+    channels: ticked !== undefined && ticked.length > 0 ? ticked : undefined,
     date: isDate(date) ? date : undefined,
     speed: isText(speed) && isSpeed(Number(speed)) ? speed : "1",
     timelineZoom:
@@ -195,7 +213,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   const channelSelect = find("gw-select", "channel");
   const recordedDays = find("gw-row", "recorded-days");
   const table = find("gw-table", "recordings");
-  const video = find("video", "player-video");
+  const grid = find("div", "player-grid");
   const stage = find("div", "player-stage");
   const screen = find("div", "player-screen");
   const caption = find("span", "player-caption");
@@ -226,7 +244,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   let lastDay = "";
   let channels = 0;
   let day = "";
+  /** The picked channel: first and largest, and what Cut and Download act on. */
   let channel = 1;
+  /** Every channel playing, the picked one among them. */
+  let ticked: ReadonlyArray<number> = [1];
   let speed = saved.speed;
 
   /** What the address asked for before the channels were known. */
@@ -238,7 +259,13 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   /** Whether the kept position has been offered, which is once. */
   let resumed = false;
 
-  /** The picked day's recordings on the picked channel, earliest first. */
+  /** Each playing channel's recordings on the picked day, earliest first. */
+  let tracks: ReadonlyArray<Track> = [];
+
+  /** The stream and speed-up playing, which the caption names. */
+  let shownView = fullView;
+
+  /** All of them together, earliest first, for the table and the timeline's clicks. */
   let recordings: ReadonlyArray<Recording> = [];
 
   const showProblem = (message: string) => {
@@ -248,12 +275,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     problem.hidden = false;
   };
 
-  /** Set below: the recording before or after `clip` on its channel. */
-  let neighbour: (
-    clip: Clip,
-    step: -1 | 1,
-  ) => Promise<Recording | undefined> = async () => undefined;
-
   /** Set below: holds the picture showing before the video loads another clip. */
   let beforeLoad: () => void = () => undefined;
 
@@ -261,17 +282,24 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   let playClip: (clip: Clip, from?: number, autoplay?: boolean) => void = () =>
     undefined;
 
-  const player =
-    video === null
-      ? undefined
-      : playerFor(video, {
-          onProblem: showProblem,
-          // Runs on into the next recording, as the recorder's client does
-          onEnded: async (ended) => {
-            const next = await neighbour(ended, 1);
+  /** Set below: what the controls, the clock and the timeline show. */
+  let showState: () => void = () => undefined;
 
-            if (next !== undefined && player?.clip() === ended) playClip(next);
-          },
+  let showTime: () => void = () => undefined;
+
+  /** Set below: makes another playing channel the picked one. */
+  let pickChannel: (picked: number) => void = () => undefined;
+
+  // A player per channel on one clock; it runs on into the next recording,
+  // as the recorder's client does
+  const player =
+    grid === null
+      ? undefined
+      : playerGroup(grid, {
+          onProblem: showProblem,
+          onTime: () => showTime(),
+          onState: () => showState(),
+          onPick: (picked) => pickChannel(picked),
         });
 
   // Where it's playing is kept every few seconds, and as the page goes, so
@@ -309,11 +337,11 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     return date < day ? 0 : date > day ? daySeconds : seconds(time);
   };
 
-  /** Whether `clip` is on the day and channel the timeline shows. */
+  /** Whether `clip` is on the day and channels the timeline shows. */
   const onTimeline = (clip: Clip) =>
-    clip.channel === channel && clip.begin.slice(0, 10) === day;
+    ticked.includes(clip.channel) && clip.begin.slice(0, 10) === day;
 
-  /** The recording at a second of the picked day, or the next one after it. */
+  /** A recording at a second of the picked day on any playing channel, or the next one after it. */
   const recordingAt = (second: number) =>
     recordings.find((recording) => secondOfDay(recording.end) > second);
 
@@ -341,8 +369,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
             clip: timelineClip,
             ticks: timelineTicks,
           },
-          // A click plays the recording under it from there, or the next
-          // one after a gap; in the recording already playing, it seeks
+          // A click plays every channel from there, or from the next
+          // recording after a gap; in the recording already playing, it seeks
           (second) => {
             const hit = recordingAt(second);
 
@@ -357,7 +385,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
               playing.begin === hit.begin
             ) {
               player?.seek(from);
-              void video?.play().catch(() => undefined);
+              player?.resume();
             } else {
               playClip(hit, from);
             }
@@ -506,10 +534,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   nextDay?.setAttribute("appearance", "outlined");
 
   /** Shows what's playing, or the idle screen, on the controls. */
-  const showState = () => {
+  showState = () => {
     const clip = player?.clip();
     const idle = clip === undefined;
-    const playing = video !== null && !video.paused && !idle;
+    const playing = player !== undefined && !player.paused() && !idle;
 
     stage?.toggleAttribute("data-idle", idle);
 
@@ -546,9 +574,13 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       caption.textContent =
         clip === undefined
           ? ""
-          : `Channel ${clip.channel} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
-              // Past the browser's fastest, it's key frames only
-              Number(speed) > browserFastest ? " · key frames" : ""
+          : `${ticked.length > 1 ? `${ticked.length} channels` : `Ch ${clip.channel}`} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
+              // The sub stream, or past the browser's fastest, key frames only
+              shownView.stream === "sub"
+                ? " · sub stream"
+                : shownView.every === undefined
+                  ? ""
+                  : " · key frames"
             }`;
     }
 
@@ -566,16 +598,16 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   };
 
   const togglePlay = () => {
-    if (video === null) return;
+    if (player === undefined) return;
 
     const first = recordings[0];
 
-    if (player?.clip() === undefined) {
+    if (player.clip() === undefined) {
       if (first !== undefined) playClip(first);
-    } else if (video.paused) {
-      void video.play().catch(() => undefined);
+    } else if (player.paused()) {
+      player.resume();
     } else {
-      video.pause();
+      player.pause();
     }
   };
 
@@ -588,39 +620,41 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     showPlayhead();
   });
 
-  frameButton?.addEventListener("click", () => {
-    if (video === null) return;
+  frameButton?.addEventListener("click", () => player?.step(frameSeconds));
 
-    video.pause();
-    video.currentTime += frameSeconds;
-  });
-
-  const skip = async (step: -1 | 1) => {
+  /**
+   * The next recording to start on any playing channel, or the one before
+   * the recording keeping the time, as the recorder's client skips.
+   */
+  const skip = (step: -1 | 1) => {
     const clip = player?.clip();
+    const offset = player?.offset();
 
-    if (clip === undefined) return;
+    if (clip === undefined || offset === undefined) return;
 
-    const next = await neighbour(clip, step);
+    const target =
+      step === 1
+        ? nextMoment(tracks, toSeconds(clip.begin) + offset)
+        : previousMoment(tracks, toSeconds(clip.begin));
 
-    if (next !== undefined) playClip(next);
+    const hit = recordings.find(
+      (recording) => toSeconds(recording.begin) === target,
+    );
+
+    if (hit !== undefined) playClip(hit);
   };
 
-  previousButton?.addEventListener("click", () => void skip(-1));
-  nextButton?.addEventListener("click", () => void skip(1));
-
-  let shownView = fullView;
+  previousButton?.addEventListener("click", () => skip(-1));
+  nextButton?.addEventListener("click", () => skip(1));
 
   const showSpeed = () => {
-    const view = viewFor(Number(speed));
+    const view = viewFor(Number(speed), ticked.length);
     // What's left of the speed after the server's part
     const rate = Number(speed) / view.speedUp;
 
-    if (video !== null) {
-      // The default carries the speed over to the next recording played,
-      // and to the reload a change of view brings
-      video.defaultPlaybackRate = rate;
-      video.playbackRate = rate;
-    }
+    // The default carries the speed over to the next recording played, and
+    // to the reload a change of view brings
+    player?.rate(rate);
 
     // Another view loads the clip again, from the other stream
     if (!sameView(view, shownView)) {
@@ -687,20 +721,32 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     const time = player?.time();
     const clip = player?.clip();
 
-    if (video === null || time === undefined || clip === undefined) return;
+    // The picked channel's picture, or the one keeping the time when the
+    // picked one has nothing then
+    const shot =
+      player?.lead()?.readyState === undefined ||
+      player.lead()?.readyState === 0
+        ? player?.video()
+        : player.lead();
+
+    if (shot === undefined || time === undefined || clip === undefined) return;
+
+    const channelShown = Number(
+      shot.closest("figure")?.dataset.channel ?? clip.channel,
+    );
 
     const canvas = element("canvas");
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d")?.drawImage(video, 0, 0);
+    canvas.width = shot.videoWidth;
+    canvas.height = shot.videoHeight;
+    canvas.getContext("2d")?.drawImage(shot, 0, 0);
     canvas.toBlob(
       (blob) => {
         if (blob === null) return;
 
         const href = URL.createObjectURL(blob);
 
-        save(href, `channel-${clip.channel}_${time.replaceAll(":", "-")}.jpg`);
+        save(href, `channel-${channelShown}_${time.replaceAll(":", "-")}.jpg`);
         setTimeout(() => URL.revokeObjectURL(href), 10_000);
       },
       "image/jpeg",
@@ -709,12 +755,17 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   });
 
   // Zoom: in steps from the buttons, or at the pointer with the wheel, and
-  // panned by dragging the picture. The level is kept; the pan isn't
+  // panned by dragging the picture. It acts on the picked channel's picture.
+  // The level is kept; the pan isn't
   let zoom = saved.pictureZoom;
   let pan = { x: 0, y: 0 };
 
+  /** The box the zoomed picture sits in: the picked channel's tile. */
+  const zoomBox = () =>
+    (player?.lead()?.parentElement ?? screen)?.getBoundingClientRect();
+
   const showZoom = () => {
-    const box = screen?.getBoundingClientRect();
+    const box = zoomBox();
     const reachX = ((zoom - 1) * (box?.width ?? 0)) / 2;
     const reachY = ((zoom - 1) * (box?.height ?? 0)) / 2;
 
@@ -723,9 +774,13 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       y: Math.min(Math.max(pan.y, -reachY), reachY),
     };
 
-    if (video !== null) {
-      video.style.transform =
-        zoom === 1 ? "" : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
+    const lead = player?.lead();
+
+    for (const tileVideo of grid?.querySelectorAll("video") ?? []) {
+      tileVideo.style.transform =
+        tileVideo !== lead || zoom === 1
+          ? ""
+          : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
     }
 
     screen?.toggleAttribute("data-zoomed", zoom > 1);
@@ -768,7 +823,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   /** A pointer's place from the picture's centre. */
   const fromCentre = (event: MouseEvent) => {
-    const box = screen?.getBoundingClientRect();
+    const box = zoomBox();
 
     return {
       x: event.clientX - ((box?.left ?? 0) + (box?.width ?? 0) / 2),
@@ -822,8 +877,19 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     }
   });
 
-  screen?.addEventListener("pointerup", () => {
-    if (press !== undefined && !press.moved) togglePlay();
+  screen?.addEventListener("pointerup", (event) => {
+    // A press on another channel's tile picks that channel instead
+    const tile = event
+      .composedPath()
+      .find(
+        (target) =>
+          target instanceof HTMLElement && target.matches(".player-tile"),
+      );
+
+    const onOther =
+      tile instanceof HTMLElement && tile.dataset.channel !== String(channel);
+
+    if (press !== undefined && !press.moved && !onOther) togglePlay();
 
     press = undefined;
   });
@@ -857,11 +923,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   showZoom();
 
-  for (const type of ["play", "pause", "emptied"]) {
-    video?.addEventListener(type, showState);
-  }
-
-  video?.addEventListener("timeupdate", () => {
+  showTime = () => {
     const time = player?.time();
 
     if (playerClock !== null && time !== undefined) {
@@ -870,7 +932,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     showPlayhead();
     keepPosition();
-  });
+  };
 
   if (timelineZoom !== null) {
     timelineZoom.options = timelineZooms;
@@ -884,7 +946,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   // The day and channel, the month's recorded days, and the day's table
 
-  if (table !== null) {
+  /** The table's columns, with each recording's channel when several play. */
+  const showColumns = () => {
+    if (table === null) return;
+
     table.columns = [
       actionsColumn((clip) => {
         playClip(clip);
@@ -892,6 +957,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
         // The keys then work the player, not the row's button
         stage?.focus({ preventScroll: true });
       }),
+      ...(ticked.length > 1 ? [{ id: "channel", header: "Channel" }] : []),
       { id: "begin", header: "Start" },
       { id: "end", header: "End" },
       { id: "length", header: "Length", sortable: false },
@@ -903,52 +969,62 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
         cell: (row: TableRow) => String(row.size),
       },
     ];
-  }
+  };
 
+  showColumns();
+
+  /** Each playing channel's recordings on the picked day, into the players, the timeline and the table. */
   const showRecordings = async () => {
     if (day === "") return;
 
-    const list = await call((api) =>
-      api.recorder.recordings({ query: { channel, date: day } }),
+    const date = day;
+
+    const lists = await Promise.all(
+      ticked.map((number) =>
+        call((api) =>
+          api.recorder.recordings({ query: { channel: number, date } }),
+        ).then((list) => ({
+          channel: number,
+          recordings: list.toSorted((a, b) => a.begin.localeCompare(b.begin)),
+        })),
+      ),
     );
 
-    recordings = list.toSorted((a, b) => a.begin.localeCompare(b.begin));
+    // A later pick has moved on
+    if (date !== day) return;
 
-    if (table !== null) table.rows = list.map(recordingRow);
+    tracks = lists;
+    recordings = lists
+      .flatMap((track) => track.recordings)
+      .toSorted((a, b) => a.begin.localeCompare(b.begin));
 
-    timeline?.show(recordings.map(spanOf));
+    showColumns();
+
+    if (table !== null) table.rows = recordings.map(recordingRow);
+
+    player?.setChannels(tracks, channel);
+    timeline?.show(
+      tracks.map((track) => ({
+        label: `Ch ${track.channel}`,
+        spans: track.recordings.map(spanOf),
+      })),
+    );
+    showSpeed();
+    showZoom();
     showPlayhead();
     showClip();
     showState();
   };
 
-  // The recordings either side come from the server's list for the clip's
-  // own day and channel, as the page may show another by now
-  neighbour = async (clip, step) => {
-    const list = onTimeline(clip)
-      ? recordings
-      : await call((api) =>
-          api.recorder.recordings({
-            query: { channel: clip.channel, date: clip.begin.slice(0, 10) },
-          }),
-        )
-          .then((found) =>
-            found.toSorted((a, b) => a.begin.localeCompare(b.begin)),
-          )
-          .catch((): ReadonlyArray<Recording> => []);
+  /** The address for a day, on the channels playing, with `lead` picked. */
+  const searchFor = (date: string, lead = channel): RecordingsSearch => ({
+    channel: lead,
+    ...(ticked.length > 1 && { channels: ticked }),
+    date,
+  });
 
-    // Back-to-back files start the second the last one ends
-    return step === 1
-      ? list.find(
-          (recording) => toSeconds(recording.begin) > toSeconds(clip.end) - 2,
-        )
-      : list.findLast(
-          (recording) => toSeconds(recording.end) < toSeconds(clip.begin) + 2,
-        );
-  };
-
-  /** Asks the address for the picked day, on this channel. */
-  const pick = (date: string) => options.onPick({ channel, date });
+  /** Asks the address for the picked day, on these channels. */
+  const pick = (date: string) => options.onPick(searchFor(date));
 
   /** The days with recordings on any channel in a month, such as `2026-11`. */
   const recordedDaysIn = async (month: string) =>
@@ -995,7 +1071,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
       return {
         value: String(number),
-        label: `Channel ${number}`,
+        label: `Ch ${number}`,
         ...(empty && {
           description: "Nothing recorded this day",
           disabled: true,
@@ -1003,7 +1079,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       };
     });
 
-    channelSelect.value = String(channel);
+    channelSelect.values = ticked.map(String);
   };
 
   /** Finds which channels recorded on a day: a quick search of each. */
@@ -1026,13 +1102,18 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     showChannels();
   };
 
-  /** Shows a channel and day: the month's recorded days and the day's recordings. */
-  const show = async (picked: { channel: number; date: string }) => {
+  /** Shows channels and a day: the month's recorded days and the day's recordings. */
+  const show = async (picked: {
+    channel: number;
+    channels: ReadonlyArray<number>;
+    date: string;
+  }) => {
     channel = picked.channel;
+    ticked = picked.channels;
     day = picked.date;
-    keep(storageKey, { channel, date: day });
+    keep(storageKey, { channel, channels: [...ticked], date: day });
 
-    if (channelSelect !== null) channelSelect.value = String(channel);
+    if (channelSelect !== null) channelSelect.values = ticked.map(String);
 
     // Recordings stop at the last day, so there's no day after it to go to
     if (dayPicker !== null) {
@@ -1082,20 +1163,67 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     if (day !== "") pick(shiftDay(1));
   });
 
+  // Ticking channels plays them together; the picked one stays picked while
+  // it's ticked. The layouts stop at four, so a fifth unticks the first
+  // ticked, and the last can't be unticked
   if (channelSelect !== null) {
-    on(channelSelect, "change", () =>
-      options.onPick({ channel: Number(channelSelect.value), date: day }),
-    );
+    channelSelect.multiple = true;
+
+    on(channelSelect, "change", () => {
+      const picks = channelSelect.values.map(Number).slice(-mostChannels);
+
+      if (picks.length === 0) {
+        channelSelect.values = ticked.map(String);
+
+        return;
+      }
+
+      options.onPick({
+        channel: picks.includes(channel) ? channel : (picks[0] ?? channel),
+        ...(picks.length > 1 && { channels: picks.toSorted((a, b) => a - b) }),
+        date: day,
+      });
+    });
   }
+
+  pickChannel = (picked) => options.onPick(searchFor(day, picked));
+
+  /** The same channels, in any order. */
+  const sameChannels = (a: ReadonlyArray<number>, b: ReadonlyArray<number>) =>
+    a.length === b.length && a.every((number) => b.includes(number));
 
   /** Shows what the address asks for, filling in what it leaves out. */
   const follow = async (search: RecordingsSearch) => {
+    const lead = Math.min(search.channel ?? saved.channel ?? 1, channels);
+
+    // The address's channels, or the kept ones when it names none, or the
+    // picked one alone; always with the picked one, on this recorder
+    const asked =
+      search.channels ??
+      (search.channel === undefined ? saved.channels : undefined) ??
+      [];
+
+    const set = [...new Set([lead, ...asked])]
+      .filter((number) => number <= channels)
+      .slice(0, mostChannels)
+      .toSorted((a, b) => a - b);
+
     const wanted = {
-      channel: Math.min(search.channel ?? saved.channel ?? 1, channels),
+      channel: lead,
+      channels: set,
       date: search.date ?? saved.date ?? lastDay,
     };
 
-    if (wanted.channel !== channel || wanted.date !== day) await show(wanted);
+    if (wanted.date !== day || !sameChannels(wanted.channels, ticked)) {
+      await show(wanted);
+    } else if (wanted.channel !== channel) {
+      // Another of the same channels picked: it moves first, with no reload
+      channel = wanted.channel;
+      keep(storageKey, { channel });
+      player?.setChannels(tracks, channel);
+      showZoom();
+      showState();
+    }
 
     if (search.at !== undefined && search.at !== playedAt) {
       // A time to play from, such as a clip from the Events page
@@ -1158,8 +1286,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     ["j", () => seekBy(-10)],
     ["l", () => seekBy(10)],
     [".", () => frameButton?.click()],
-    ["n", () => void skip(1)],
-    ["p", () => void skip(-1)],
+    ["n", () => skip(1)],
+    ["p", () => skip(-1)],
     ["[", () => stepSpeed(-1)],
     ["]", () => stepSpeed(1)],
     ["+", () => zoomStep(1)],
@@ -1233,9 +1361,19 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   );
 
   // The last frame, held over the picture while the next clip loads, then
-  // faded out once the next one draws, rather than a flash of black
+  // faded out once the next one draws, rather than a flash of black. With
+  // several channels, each tile loads on its own, so there's nothing to hold
   const holdFrame = () => {
-    if (hold === null || video === null || video.readyState < 2) return;
+    const video = player?.video();
+
+    if (
+      hold === null ||
+      video === undefined ||
+      video.readyState < 2 ||
+      ticked.length > 1
+    ) {
+      return;
+    }
 
     hold.width = video.videoWidth;
     hold.height = video.videoHeight;
@@ -1277,7 +1415,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       else void follow(search);
     },
     pause: () => {
-      video?.pause();
+      player?.pause();
       keepPosition(true);
     },
     focus: focusPlayer,

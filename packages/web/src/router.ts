@@ -9,7 +9,7 @@
  * @module
  */
 import { LocalDate, LocalTime } from "@timmo001/dvr-revival-rsnet/domain";
-import { Option, Schema } from "effect";
+import { Option, Schema, SchemaGetter } from "effect";
 import { Atom } from "effect/reactivity";
 
 /** What a route's search params encode to: optional strings by name. */
@@ -41,9 +41,24 @@ const ChannelNumber = Schema.NumberFromString.check(
   Schema.isGreaterThanOrEqualTo(1),
 );
 
-/** The Recordings page: a channel and day, and a recorder time to play from. */
+/** Channels as a comma list, such as `1,3,4`. */
+const ChannelList = Schema.String.pipe(
+  Schema.decodeTo(Schema.Array(ChannelNumber), {
+    decode: SchemaGetter.transform((text: string) => text.split(",")),
+    encode: SchemaGetter.transform((parts: ReadonlyArray<string>) =>
+      parts.join(","),
+    ),
+  }),
+);
+
+/**
+ * The Recordings page: the picked channel and the others played with it, a
+ * day, and a recorder time to play from. Without `channels`, the picked
+ * channel plays alone.
+ */
 export const RecordingsSearch = Schema.Struct({
   channel: Schema.optional(ChannelNumber),
+  channels: Schema.optional(ChannelList),
   date: Schema.optional(LocalDate),
   at: Schema.optional(LocalTime),
 });

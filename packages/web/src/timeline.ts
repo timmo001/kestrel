@@ -1,8 +1,9 @@
 /**
  * The playback timeline under the player: one day's recordings as a bar,
- * zoomed from the whole day down to minutes. It follows the playhead, pans
- * when dragged, and calls back with the second of the day that's clicked.
- * It only draws; what plays is the page's to decide.
+ * a track per channel when several play, zoomed from the whole day down to
+ * minutes. It follows the playhead, pans when dragged, and calls back with
+ * the second of the day that's clicked. It only draws; what plays is the
+ * page's to decide.
  */
 
 /** A recording on the timeline, in seconds of its day. */
@@ -12,6 +13,12 @@ export interface TimelineSpan {
   /** Which colour it takes, as the table's chips: neutral, info, warning or important. */
   readonly tone: string;
   readonly title: string;
+}
+
+/** One channel's track: its name, shown when there are several, and its recordings. */
+export interface TimelineRow {
+  readonly label: string;
+  readonly spans: ReadonlyArray<TimelineSpan>;
 }
 
 export interface TimelineElements {
@@ -29,8 +36,8 @@ export interface TimelineElements {
 }
 
 export interface Timeline {
-  /** Draws a day's recordings, in place of the last day's. */
-  readonly show: (spans: ReadonlyArray<TimelineSpan>) => void;
+  /** Draws a day's recordings, a track per row, in place of the last day's. */
+  readonly show: (rows: ReadonlyArray<TimelineRow>) => void;
   /** Moves the playhead, or hides it; the view follows it when zoomed. */
   readonly playhead: (second: number | undefined) => void;
   /** Shows the stretch marked for a clip, or hides it. */
@@ -61,7 +68,7 @@ export const timelineFor = (
   elements: TimelineElements,
   onPick: (second: number) => void,
 ): Timeline => {
-  let spans: ReadonlyArray<TimelineSpan> = [];
+  let rows: ReadonlyArray<TimelineRow> = [];
   let span = daySeconds;
   let start = 0;
   let head: number | undefined;
@@ -80,19 +87,45 @@ export const timelineFor = (
   };
 
   const draw = () => {
+    elements.track.style.setProperty("--timeline-rows", String(rows.length));
+
     elements.spans.replaceChildren(
-      ...spans.flatMap((recording) => {
-        if (recording.end < start || recording.start > start + span) return [];
+      ...rows.map((row, index) => {
+        const band = document.createElement("div");
 
-        const bar = document.createElement("span");
+        band.className = "timeline-row";
+        band.style.top = `${(index / rows.length) * 100}%`;
+        band.style.height = `${100 / rows.length}%`;
 
-        bar.className = "timeline-span";
-        bar.dataset.tone = recording.tone;
-        bar.title = recording.title;
-        bar.style.left = percent(recording.start);
-        bar.style.width = `${((recording.end - recording.start) / span) * 100}%`;
+        band.append(
+          ...row.spans.flatMap((recording) => {
+            if (recording.end < start || recording.start > start + span) {
+              return [];
+            }
 
-        return [bar];
+            const bar = document.createElement("span");
+
+            bar.className = "timeline-span";
+            bar.dataset.tone = recording.tone;
+            bar.title = recording.title;
+            bar.style.left = percent(recording.start);
+            bar.style.width = `${((recording.end - recording.start) / span) * 100}%`;
+
+            return [bar];
+          }),
+        );
+
+        // Named only when there's more than one to tell apart, over the
+        // recordings
+        if (rows.length > 1) {
+          const name = document.createElement("span");
+
+          name.className = "timeline-row-label";
+          name.textContent = row.label;
+          band.append(name);
+        }
+
+        return band;
       }),
     );
 
@@ -183,7 +216,7 @@ export const timelineFor = (
 
   return {
     show: (next) => {
-      spans = next;
+      rows = next;
       draw();
     },
     playhead: (second) => {
