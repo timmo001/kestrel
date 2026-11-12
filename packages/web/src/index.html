@@ -100,6 +100,17 @@
             ></gw-select>
           </gw-row>
           <gw-row class="recorded-days"></gw-row>
+          <!-- The picked day and channel as a bar: each recording on it and
+               where the player is. A click plays from there; the table below
+               is the way in from a keyboard or screen reader -->
+          <div class="timeline" hidden>
+            <div class="timeline-track" aria-hidden="true">
+              <div class="timeline-segments"></div>
+              <span class="timeline-playhead" hidden></span>
+              <span class="timeline-hover" hidden></span>
+            </div>
+            <div class="timeline-hours" aria-hidden="true"></div>
+          </div>
           <!-- The recording picked from a table, and a clip of it to save -->
           <div class="player" hidden>
             <gw-row class="player-bar">

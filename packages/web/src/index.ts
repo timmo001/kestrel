@@ -34,7 +34,7 @@ import { on, type MenuItem, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
-import { clipUrl, playerFor, type Clip } from "./player.ts";
+import { clipUrl, playerFor, toSeconds, type Clip } from "./player.ts";
 import { themeSettings, themes } from "./theme.ts";
 
 // The theme picker in the app bar: every Groundwork theme and mode, with
@@ -470,6 +470,12 @@ const recordingsTable = find("gw-table", "recordings");
 let day = "";
 let channel = 1;
 
+/** The picked day's recordings on the picked channel, earliest first. */
+let dayRecordings: ReadonlyArray<Recording> = [];
+
+/** Set once the timeline is ready: draws the day's recordings on it. */
+let drawTimeline: () => void = () => undefined;
+
 const recordingColumns = [
   actionsColumn,
   { id: "begin", header: "Start" },
@@ -493,7 +499,9 @@ const showRecordings = async () => {
     api.recorder.recordings({ query: { channel, date: day } }),
   );
 
+  dayRecordings = recordings.toSorted((a, b) => a.begin.localeCompare(b.begin));
   recordingsTable.rows = recordings.map(recordingRow);
+  drawTimeline();
 };
 
 const showDays = (days: ReadonlyArray<RecordedDay>) => {
@@ -600,8 +608,16 @@ const showProblem = (message: string) => {
   playerProblem.hidden = false;
 };
 
+/** Set below: plays the recording after `clip` on its channel, if there is one. */
+let playNext: (clip: Clip) => Promise<void> = async () => undefined;
+
 const player =
-  playerVideo === null ? undefined : playerFor(playerVideo, showProblem);
+  playerVideo === null
+    ? undefined
+    : playerFor(playerVideo, {
+        onProblem: showProblem,
+        onEnded: (clip) => void playNext(clip),
+      });
 
 /** A clip field's time as `HH:MM:SS`, taking `9:05` or `21:05:30`; empty when it isn't a time. */
 const fieldClock = (field: HTMLElementTagNameMap["gw-input"]) => {
@@ -649,10 +665,24 @@ const showClipLink = () => {
   }
 };
 
-playRow = (row) => {
-  if (player === undefined || playerBox === null) return;
+const timeline = find("div", "timeline");
+const timelineTrack = find("div", "timeline-track");
+const timelineSegments = find("div", "timeline-segments");
+const timelinePlayhead = find("span", "timeline-playhead");
+const timelineHover = find("span", "timeline-hover");
+const timelineHours = find("div", "timeline-hours");
 
-  const clip = rowClip(row);
+/** Whether `clip` is on the day and channel the timeline shows. */
+const onTimeline = (clip: Clip) =>
+  clip.channel === channel && clip.begin.slice(0, 10) === day;
+
+/**
+ * Plays a recording from `from` seconds in, with the clip fields set to all
+ * of it. `scroll` brings the player into view, with the timeline above it
+ * when it shows this recording.
+ */
+const playClip = (clip: Clip, options: { from?: number; scroll: boolean }) => {
+  if (player === undefined || playerBox === null) return;
 
   playerBox.hidden = false;
 
@@ -666,10 +696,155 @@ playRow = (row) => {
 
   if (clipTo !== null) clipTo.value = clock(clip.end);
 
-  void player.play(clip);
+  void player.play(clip, options.from);
   showClipLink();
-  playerBox.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  if (options.scroll) {
+    const target =
+      timeline !== null && !timeline.hidden && onTimeline(clip)
+        ? timeline
+        : playerBox;
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 };
+
+playRow = (row) => playClip(rowClip(row), { scroll: true });
+
+// Runs on into the next recording on the same channel, from the server's
+// list rather than the table's, as the table may show another day by now
+playNext = async (ended) => {
+  const list = await call((api) =>
+    api.recorder.recordings({
+      query: { channel: ended.channel, date: ended.begin.slice(0, 10) },
+    }),
+  ).catch((): ReadonlyArray<Recording> => []);
+
+  // Back-to-back files start the second the last one ends
+  const after = toSeconds(ended.end) - 2;
+
+  const next = list
+    .toSorted((a, b) => a.begin.localeCompare(b.begin))
+    .find((recording) => toSeconds(recording.begin) > after);
+
+  // Something else was picked while the list loaded
+  if (next === undefined || player?.clip() !== ended) return;
+
+  playClip(
+    { channel: next.channel, begin: next.begin, end: next.end },
+    { scroll: false },
+  );
+};
+
+const daySeconds = 24 * 60 * 60;
+
+/** Where a recorder time falls on the picked day, in seconds, held to the day. */
+const secondOfDay = (time: string) => {
+  const date = time.slice(0, 10);
+
+  return date < day ? 0 : date > day ? daySeconds : seconds(time);
+};
+
+const percentOfDay = (second: number) => `${(second / daySeconds) * 100}%`;
+
+/** Seconds of the day as `HH:MM:SS`. */
+const clockOf = (second: number) =>
+  [second / 3600, (second / 60) % 60, second % 60]
+    .map((part) => String(Math.floor(part)).padStart(2, "0"))
+    .join(":");
+
+timelineHours?.replaceChildren(
+  ...Array.from({ length: 9 }, (_, index) => {
+    const label = element("span", `${String(index * 3).padStart(2, "0")}:00`);
+
+    label.style.left = percentOfDay(index * 3 * 3600);
+
+    return label;
+  }),
+);
+
+/** The marker where the player is, while it plays a recording the timeline shows. */
+const showPlayhead = () => {
+  const clip = player?.clip();
+  const time = player?.time();
+
+  if (timelinePlayhead === null) return;
+
+  const shown = clip !== undefined && time !== undefined && onTimeline(clip);
+
+  timelinePlayhead.hidden = !shown;
+
+  if (shown) timelinePlayhead.style.left = percentOfDay(secondOfDay(time));
+};
+
+drawTimeline = () => {
+  if (timeline === null || timelineSegments === null) return;
+
+  timeline.hidden = dayRecordings.length === 0;
+  timelineSegments.replaceChildren(
+    ...dayRecordings.map((recording) => {
+      const segment = element("span");
+      const start = secondOfDay(recording.begin);
+
+      const reason =
+        recording.reasons.find((found) => found !== "normal") ?? "normal";
+
+      segment.className = "timeline-segment";
+      segment.dataset.tone = reasonTones[reason];
+      segment.style.left = percentOfDay(start);
+      segment.style.width = percentOfDay(secondOfDay(recording.end) - start);
+      segment.title = `${clock(recording.begin)} to ${clock(recording.end)}, ${recording.reasons.join(", ")}`;
+
+      return segment;
+    }),
+  );
+
+  showPlayhead();
+};
+
+/** The second of the day under the pointer. */
+const secondAt = (event: MouseEvent) => {
+  const box = timelineTrack?.getBoundingClientRect();
+
+  if (box === undefined || box.width === 0) return 0;
+
+  const share = Math.min(
+    Math.max((event.clientX - box.left) / box.width, 0),
+    1,
+  );
+
+  return Math.floor(share * (daySeconds - 1));
+};
+
+timelineTrack?.addEventListener("pointermove", (event) => {
+  if (timelineHover === null) return;
+
+  const second = secondAt(event);
+
+  timelineHover.hidden = false;
+  timelineHover.style.left = percentOfDay(second);
+  timelineHover.dataset.time = clockOf(second);
+});
+
+timelineTrack?.addEventListener("pointerleave", () => {
+  if (timelineHover !== null) timelineHover.hidden = true;
+});
+
+// A click plays the recording under it from there, or the next one after a gap
+timelineTrack?.addEventListener("click", (event) => {
+  const second = secondAt(event);
+
+  const hit = dayRecordings.find(
+    (recording) => secondOfDay(recording.end) > second,
+  );
+
+  if (hit === undefined) return;
+
+  playClip(
+    { channel, begin: hit.begin, end: hit.end },
+    { from: second - secondOfDay(hit.begin), scroll: true },
+  );
+});
 
 playerVideo?.addEventListener("timeupdate", () => {
   const time = player?.time();
@@ -677,6 +852,8 @@ playerVideo?.addEventListener("timeupdate", () => {
   if (playerClock !== null && time !== undefined) {
     playerClock.textContent = timeFormat.format(localDate(time));
   }
+
+  showPlayhead();
 });
 
 if (playerSpeed !== null) {

@@ -56,8 +56,11 @@ const isQuotaError = (error: Error) =>
   error instanceof DOMException && error.name === "QuotaExceededError";
 
 export interface Player {
-  /** Plays a clip from its start, in place of whatever was playing. */
-  readonly play: (clip: Clip) => Promise<void>;
+  /**
+   * Plays a clip, from `from` seconds in (its start by default), in place of
+   * whatever was playing.
+   */
+  readonly play: (clip: Clip, from?: number) => Promise<void>;
   /** Stops and lets go of the video. */
   readonly stop: () => void;
   /** What's playing, if anything. */
@@ -66,18 +69,26 @@ export interface Player {
   readonly time: () => string | undefined;
 }
 
-/**
- * Plays clips in `video`. `onProblem` hears why video stopped coming, such as
- * the recorder dropping the download.
- */
+export interface PlayerEvents {
+  /** Why video stopped coming, such as the recorder dropping the download. */
+  readonly onProblem: (message: string) => void;
+  /** A clip played to its end. */
+  readonly onEnded: (clip: Clip) => void;
+}
+
+/** How far past the start of a load a seek waits for it rather than starting another. */
+const loadReach = 10;
+
+/** Plays clips in `video`, telling `events` when one ends or stops early. */
 export const playerFor = (
   video: HTMLVideoElement,
-  onProblem: (message: string) => void,
+  events: PlayerEvents,
 ): Player => {
   let current: Clip | undefined;
   let source: MediaSource | undefined;
   let buffer: SourceBuffer | undefined;
   let loading: AbortController | undefined;
+  let loadingFrom = 0;
   let objectUrl = "";
 
   const ranges = () => {
@@ -163,6 +174,7 @@ export const playerFor = (
     const { signal } = controller;
 
     loading = controller;
+    loadingFrom = Math.floor(from);
     await settle(target);
 
     if (signal.aborted) return;
@@ -209,14 +221,26 @@ export const playerFor = (
       if (signal.aborted) return;
 
       loading = undefined;
-      onProblem(error instanceof Error ? error.message : String(error));
+      events.onProblem(error instanceof Error ? error.message : String(error));
     }
   };
 
+  /** Whether the load under way starts at or just before `time`, so will reach it soon. */
+  const isComing = (time: number) =>
+    loading !== undefined &&
+    loadingFrom <= time &&
+    time < loadingFrom + loadReach;
+
   video.addEventListener("seeking", () => {
-    if (current !== undefined && !isLoaded(video.currentTime)) {
-      void load(video.currentTime);
+    const time = video.currentTime;
+
+    if (current !== undefined && !isLoaded(time) && !isComing(time)) {
+      void load(time);
     }
+  });
+
+  video.addEventListener("ended", () => {
+    if (current !== undefined) events.onEnded(current);
   });
 
   video.addEventListener("waiting", () => {
@@ -243,21 +267,30 @@ export const playerFor = (
     objectUrl = "";
   };
 
-  const play = async (clip: Clip) => {
+  const play = async (clip: Clip, from = 0) => {
     stop();
-    current = clip;
+
+    const start = Math.max(0, Math.floor(from));
 
     // Without Media Source Extensions, such as on an iPhone, the browser
-    // plays the MP4 as it arrives, seeking only within what has loaded
+    // plays the MP4 as it arrives, seeking only within what has loaded. It
+    // starts at `from`, so the clip does too, to keep its times right
     if (
       typeof MediaSource === "undefined" ||
       !MediaSource.isTypeSupported(mimeType)
     ) {
-      video.src = clipUrl(clip);
+      current = {
+        ...clip,
+        begin: fromSeconds(toSeconds(clip.begin) + start),
+      };
+
+      video.src = clipUrl(current);
       await video.play().catch(() => undefined);
 
       return;
     }
+
+    current = clip;
 
     const media = new MediaSource();
 
@@ -270,7 +303,12 @@ export const playerFor = (
 
     media.duration = toSeconds(clip.end) - toSeconds(clip.begin);
     buffer = media.addSourceBuffer(mimeType);
-    void load(0);
+
+    // With no video yet this only sets where playback starts, once the
+    // first fragment arrives; the load from there is already coming
+    if (start > 0) video.currentTime = start;
+
+    void load(start);
     await video.play().catch(() => undefined);
   };
 
