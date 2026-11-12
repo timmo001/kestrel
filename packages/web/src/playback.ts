@@ -962,6 +962,52 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     );
   };
 
+  /** The channels with recordings on the day shown, once known. */
+  let recordedChannels: ReadonlySet<number> | undefined;
+
+  /** The channel picker, with channels that recorded nothing that day greyed out. */
+  const showChannels = () => {
+    if (channelSelect === null) return;
+
+    channelSelect.options = Array.from({ length: channels }, (_, index) => {
+      const number = index + 1;
+
+      const empty =
+        recordedChannels !== undefined && !recordedChannels.has(number);
+
+      return {
+        value: String(number),
+        label: `Channel ${number}`,
+        ...(empty && {
+          description: "Nothing recorded this day",
+          disabled: true,
+        }),
+      };
+    });
+
+    channelSelect.value = String(channel);
+  };
+
+  /** Finds which channels recorded on a day: a quick search of each. */
+  const findRecordedChannels = async (date: string) => {
+    const found = await Promise.all(
+      Array.from({ length: channels }, (_, index) =>
+        call((api) =>
+          api.recorder.recordings({ query: { channel: index + 1, date } }),
+        )
+          .then((list) => (list.length > 0 ? [index + 1] : []))
+          // Unknown, so left to pick
+          .catch(() => [index + 1]),
+      ),
+    );
+
+    // A later pick has moved on
+    if (date !== day) return;
+
+    recordedChannels = new Set(found.flat());
+    showChannels();
+  };
+
   /** Shows a channel and day: the month's recorded days and the day's recordings. */
   const show = async (picked: { channel: number; date: string }) => {
     channel = picked.channel;
@@ -984,6 +1030,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     ).catch(() => []);
 
     showDays(days.map((recorded) => recorded.date));
+    void findRecordedChannels(day);
     await showRecordings();
   };
 
@@ -1245,12 +1292,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       lastDay = today;
       channels = count;
 
-      if (channelSelect !== null) {
-        channelSelect.options = Array.from({ length: count }, (_, index) => ({
-          value: String(index + 1),
-          label: `Channel ${index + 1}`,
-        }));
-      }
+      showChannels();
 
       if (waiting !== undefined) void follow(waiting);
 
