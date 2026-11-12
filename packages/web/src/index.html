@@ -101,6 +101,14 @@
                 ></gw-select>
               </gw-row>
               <gw-row class="controls-end">
+                <!-- The picked camera's zoom: fit or fill, as the theme's
+                     mode switcher, then a step at a time from there -->
+                <gw-segmented
+                  class="live-fit"
+                  label="Zoom"
+                  labels="hide"
+                  value="fit"
+                ></gw-segmented>
                 <gw-button class="live-zoom-out" label="Zoom out"></gw-button>
                 <!-- The zoom, which goes back to the whole picture -->
                 <gw-button
@@ -112,13 +120,6 @@
                 >
                 <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
                 <span class="controls-divider" aria-hidden="true"></span>
-                <!-- Fit or fill, as the theme's mode switcher -->
-                <gw-segmented
-                  class="live-fit"
-                  label="Pictures"
-                  labels="hide"
-                  value="fit"
-                ></gw-segmented>
                 <gw-button class="live-capture" label="Capture"></gw-button>
                 <gw-button
                   class="live-help"
@@ -145,15 +146,16 @@
                     <dd>The picked camera alone, and back</dd>
                     <dt><kbd>Esc</kbd> or <kbd>Backspace</kbd></dt>
                     <dd>Back from one camera alone</dd>
+                    <dt><kbd>Z</kbd></dt>
+                    <dd>Fit the picked camera whole, or fill its tile</dd>
                     <dt><kbd>+</kbd> <kbd>-</kbd></dt>
                     <dd>
-                      Zoom the picked camera in or out; Ctrl and the wheel, or a
-                      pinch, zooms at the pointer, and a drag moves around
+                      Zoom the picked camera in or out, from fit or fill; Ctrl
+                      and the wheel, or a pinch, zooms at the pointer, and a
+                      drag moves around. Each camera keeps its own zoom
                     </dd>
                     <dt><kbd>0</kbd></dt>
                     <dd>Back to the whole picture</dd>
-                    <dt><kbd>Z</kbd></dt>
-                    <dd>Fit whole pictures, or fill the tiles</dd>
                     <dt><kbd>S</kbd></dt>
                     <dd>Save a still of the picked camera</dd>
                     <dt><kbd>F</kbd></dt>
