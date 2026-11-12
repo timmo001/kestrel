@@ -16,6 +16,7 @@ import {
 import { on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { call } from "./api.ts";
+import { ownLabel } from "./cameras.ts";
 import { phFloppyDisk, phPlus, phTrash } from "./icons.ts";
 import { element, find } from "./shared.ts";
 
@@ -179,8 +180,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     const inputs = own.map((camera) => {
       const input = element("gw-input");
 
-      input.label =
-        camera.channel === null ? camera.name : `Ch ${camera.channel}`;
+      input.label = ownLabel(camera);
       input.placeholder = camera.name;
       input.value = labels.get(camera.id) ?? "";
       input.addEventListener("input", () => labels.set(camera.id, input.value));

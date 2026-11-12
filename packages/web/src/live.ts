@@ -118,7 +118,8 @@ const kept = () => {
   const page = Number(values?.["page"]);
 
   return {
-    layout: layouts.includes(layout) ? layout : 4,
+    /** `undefined` until one's picked, so every camera shows at first. */
+    layout: layouts.includes(layout) ? layout : undefined,
     page: Number.isInteger(page) && page >= 0 ? page : 0,
     // Kept before camera ids, the recorder's channel by number
     picked: Option.getOrUndefined(decodeSavedCamera(values?.["picked"])),
@@ -169,7 +170,9 @@ export const livePage = (): LivePage => {
   const section = stage?.closest("section");
 
   const saved = kept();
-  let layout = saved.layout;
+  /** Whether a layout's been picked, rather than the one that shows them all. */
+  let chosen = saved.layout !== undefined;
+  let layout = saved.layout ?? 4;
   let page = saved.page;
   let picked = saved.picked;
   /** Where to go back to from one camera alone, by Enter or a double click. */
@@ -219,7 +222,11 @@ export const livePage = (): LivePage => {
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
   const keepPlace = () =>
-    keep(storageKey, { layout, page, picked: picked ?? null });
+    keep(storageKey, {
+      layout: chosen ? layout : null,
+      page,
+      picked: picked ?? null,
+    });
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
@@ -377,6 +384,7 @@ export const livePage = (): LivePage => {
     // The first camera shown stays in view
     page = Math.floor((page * layout) / size);
     layout = size;
+    chosen = true;
     solo = undefined;
     keepPlace();
     render();
@@ -574,9 +582,9 @@ export const livePage = (): LivePage => {
           (camera.live !== null || camera.still) && camera.signal !== false,
       );
 
-      // A layout bigger than there are cameras for falls back to the one
-      // that shows them all
-      if (!layoutsFor(streams.length).includes(layout)) {
+      // Until a layout's picked, and for one bigger than there are cameras
+      // for, the one that shows them all
+      if (!chosen || !layoutsFor(streams.length).includes(layout)) {
         layout = layoutsFor(streams.length).at(-1) ?? 1;
       }
 
