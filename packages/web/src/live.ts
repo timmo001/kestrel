@@ -1,11 +1,12 @@
 /**
  * The Live page: every camera with a signal at once, or a layout's worth at a
  * time (1, 2, 3 or 4, and 6, 9 or 16 where there are more cameras), paged
- * with Previous and Next, under one set of controls: pause, a still of the
- * picked camera, full screen and keys. The layout, page, picked camera and
- * how many cameras there were are kept in this browser, so the placeholders
- * take the cameras' places before they're known. The players only run while
- * the page shows, so a hidden page streams nothing.
+ * with Previous and Next, under one set of controls: pause, fit or fill, a
+ * still of the picked camera, full screen and keys. The layout, page, picked
+ * camera, fit or fill and how many cameras there were are kept in this
+ * browser, so the placeholders take the cameras' places before they're
+ * known. The players only run while the page shows, so a hidden page
+ * streams nothing.
  */
 import type { Camera, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
@@ -15,6 +16,8 @@ import { Option, Schema } from "effect";
 import { SavedCamera } from "./addresses.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
+  phArrowsInSimple,
+  phArrowsOutSimple,
   phCamera,
   phCaretLeft,
   phCaretRight,
@@ -105,10 +108,19 @@ const gridFor = (count: number) => {
 
 /**
  * Past four at once, the small sub stream where there is one: the main one
- * is more than a small tile shows.
+ * is more than a small tile shows. `ratio` is the shape to draw it at when
+ * its frames squeeze the picture into another, else `null`.
  */
 const streamFor = (live: LiveStreams, count: number) =>
-  count > 4 ? (live.sub ?? live.main) : live.main;
+  count > 4 && live.sub !== null
+    ? { name: live.sub, ratio: live.subRatio }
+    : { name: live.main, ratio: null };
+
+/** A frame's size drawn at `ratio`, from its height, or as it is without one. */
+const drawnSize = (width: number, height: number, ratio: number | null) => ({
+  width: ratio === null ? width : Math.round(height * ratio),
+  height,
+});
 
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
@@ -151,6 +163,8 @@ const kept = () => {
     page: Number.isInteger(page) && page >= 0 ? page : 0,
     /** How many cameras there were last time, for the placeholders' shape. */
     count: Number.isInteger(count) && count > 0 ? count : 4,
+    /** Whether the pictures fill their tiles, cropped, rather than fit. */
+    fill: values?.["fill"] === true,
     // Kept before camera ids, the recorder's channel by number
     picked: Option.getOrUndefined(decodeSavedCamera(values?.["picked"])),
   };
@@ -165,6 +179,8 @@ interface Tile {
   /** Its picture, for a camera with only a still one. */
   readonly picture: HTMLImageElement | null;
   readonly hold: HTMLCanvasElement;
+  /** The shape to draw its video at, for a squeezed sub stream; else `null`. */
+  readonly ratio: number | null;
 }
 
 /** The local time as a file name's part, such as `2026-11-12T10-30-05`. */
@@ -193,6 +209,8 @@ export const livePage = (): LivePage => {
   const previousButton = find("gw-button", "live-previous");
   const playButton = find("gw-button", "live-play");
   const nextButton = find("gw-button", "live-next");
+  const pageCount = find("span", "live-page-count");
+  const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");
@@ -203,6 +221,7 @@ export const livePage = (): LivePage => {
   let layout: Layout = saved.layout;
   let page = saved.page;
   let picked = saved.picked;
+  let fill = saved.fill;
   /** Where to go back to from one camera alone, by Enter or a double click. */
   let solo: { readonly layout: Layout; readonly page: number } | undefined;
   let paused = false;
@@ -229,8 +248,7 @@ export const livePage = (): LivePage => {
         : { layout: String(layout), columns: null, rows: null };
 
     target.dataset.layout = arrangement.layout;
-    // The sub stream's pictures are squeezed, which the styles undo
-    target.dataset.stream = size() > 4 ? "sub" : "main";
+    target.toggleAttribute("data-fill", fill);
 
     const ratio =
       arrangement.columns === null || arrangement.rows === null
@@ -297,16 +315,18 @@ export const livePage = (): LivePage => {
   setIcon(previousButton, phCaretLeft, "Previous cameras (←)");
   setIcon(nextButton, phCaretRight, "Next cameras (→)");
   setIcon(captureButton, phCamera, "Save a still (S)");
-  setIcon(helpButton, phQuestion);
+  setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   previousButton?.setAttribute("aria-keyshortcuts", "ArrowLeft");
   nextButton?.setAttribute("aria-keyshortcuts", "ArrowRight");
+  fitToggle?.setAttribute("aria-keyshortcuts", "z");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
+  helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
   const keepPlace = () =>
-    keep(storageKey, { layout, page, picked: picked ?? null });
+    keep(storageKey, { layout, page, picked: picked ?? null, fill });
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
@@ -324,6 +344,31 @@ export const livePage = (): LivePage => {
     if (previousButton !== null) previousButton.disabled = single;
 
     if (nextButton !== null) nextButton.disabled = single;
+
+    // Which page shows, when there's more than one
+    if (pageCount !== null) {
+      pageCount.hidden = single;
+      pageCount.textContent = `${page + 1} of ${pages()}`;
+      pageCount.title = `Page ${page + 1} of ${pages()}`;
+    }
+
+    if (fitToggle !== null) {
+      fitToggle.options = [
+        {
+          value: "fit",
+          label: "Fit",
+          icon: phArrowsInSimple,
+          hint: "Fit: whole pictures (Z)",
+        },
+        {
+          value: "fill",
+          label: "Fill",
+          icon: phArrowsOutSimple,
+          hint: "Fill: pictures zoomed to their tiles (Z)",
+        },
+      ];
+      fitToggle.value = fill ? "fill" : "fit";
+    }
 
     setIcon(
       playButton,
@@ -363,7 +408,7 @@ export const livePage = (): LivePage => {
     );
 
     tile.player.src = new URL(
-      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, size()))}`,
+      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, size()).name)}`,
       location.origin,
     ).href;
   };
@@ -397,10 +442,19 @@ export const livePage = (): LivePage => {
 
         const picture = player === null ? element("img") : null;
 
+        const ratio =
+          stream.live === null ? null : streamFor(stream.live, size()).ratio;
+
         figure.className = "live-tile";
         figure.dataset.loading = "";
         hold.className = "live-hold";
         hold.setAttribute("aria-hidden", "true");
+
+        // A squeezed stream's player takes the picture's own shape
+        if (ratio !== null) {
+          figure.dataset.squeezed = "";
+          figure.style.setProperty("--tile-ratio", String(ratio));
+        }
 
         if (player !== null) {
           player.mode = "mse,hls";
@@ -432,7 +486,7 @@ export const livePage = (): LivePage => {
           toggleSolo();
         });
 
-        return { stream, figure, player, picture, hold };
+        return { stream, figure, player, picture, hold, ratio };
       });
 
     if (streams.length === 0) {
@@ -512,9 +566,15 @@ export const livePage = (): LivePage => {
       } else if (paused) {
         // The last frame stays up while the stream is closed
         if (video !== null && video.readyState >= 2) {
-          tile.hold.width = video.videoWidth;
-          tile.hold.height = video.videoHeight;
-          tile.hold.getContext("2d")?.drawImage(video, 0, 0);
+          const { width, height } = drawnSize(
+            video.videoWidth,
+            video.videoHeight,
+            tile.ratio,
+          );
+
+          tile.hold.width = width;
+          tile.hold.height = height;
+          tile.hold.getContext("2d")?.drawImage(video, 0, 0, width, height);
           tile.hold.toggleAttribute("data-shown", true);
         }
 
@@ -544,7 +604,13 @@ export const livePage = (): LivePage => {
         ? tile.hold
         : video);
 
-    const { width, height } = sizeOf(source);
+    const size = sizeOf(source);
+
+    // A squeezed stream's frame is saved at the picture's own shape
+    const { width, height } =
+      source instanceof HTMLVideoElement
+        ? drawnSize(size.width, size.height, tile.ratio)
+        : size;
 
     if (width === 0) return;
 
@@ -552,7 +618,7 @@ export const livePage = (): LivePage => {
 
     canvas.width = width;
     canvas.height = height;
-    canvas.getContext("2d")?.drawImage(source, 0, 0);
+    canvas.getContext("2d")?.drawImage(source, 0, 0, width, height);
     canvas.toBlob(
       (blob) => {
         if (blob === null) return;
@@ -605,6 +671,18 @@ export const livePage = (): LivePage => {
     shortcutsPopover?.show(helpButton),
   );
 
+  /** Fit whole pictures, or fill the tiles with them. */
+  const setFill = (next: boolean) => {
+    fill = next;
+    grid?.toggleAttribute("data-fill", fill);
+    keepPlace();
+    showControls();
+  };
+
+  if (fitToggle !== null) {
+    on(fitToggle, "change", () => setFill(fitToggle.value === "fill"));
+  }
+
   const keys = new Map<string, () => void>([
     [" ", togglePause],
     ["k", togglePause],
@@ -612,7 +690,9 @@ export const livePage = (): LivePage => {
     ["ArrowRight", () => step(1)],
     ["Enter", toggleSolo],
     ["s", capture],
+    ["z", () => setFill(!fill)],
     ["f", () => fullscreenButton?.click()],
+    ["?", () => helpButton?.click()],
     // A digit key for each layout up to 9, and A for All
     ...layouts.flatMap((each): Array<[string, () => void]> =>
       each < 10 ? [[String(each), () => setLayout(each)]] : [],

@@ -114,7 +114,10 @@ The server serves go2rtc under `/go2rtc/`, its WebSocket included, so live
 video plays from the same address as the page, through a proxy or over HTTPS.
 Each camera's `live` in `/api/cameras` names its streams, from its id: such
 as `swann_1` for the main stream and `swann_1_sub` for the sub stream. Play
-one with `/go2rtc/stream.html?src=swann_1_sub`.
+one with `/go2rtc/stream.html?src=swann_1_sub`. `subRatio` is the width over
+height to draw the sub stream at when its frames squeeze the picture into
+another shape, as the DVR8-4575's 352×288 sub stream does with a 16:9
+picture, and `null` when it's drawn at its own shape.
 
 The DVR8-4575 offers an audio track on every stream but sends nothing on it,
 and an MSE player that asks for audio waits for it forever. The page plays

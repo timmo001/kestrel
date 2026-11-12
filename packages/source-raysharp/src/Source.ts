@@ -463,6 +463,8 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           camera: cameraId(id, String(channel)),
           main: rtsp(channel, 0),
           sub: rtsp(channel, 1),
+          // The sub stream squeezes the 16:9 picture into 352×288
+          subRatio: 16 / 9,
         })),
       ),
     ),

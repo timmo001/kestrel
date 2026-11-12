@@ -76,6 +76,12 @@ export interface LiveFeed {
   readonly camera: CameraId;
   readonly main: Redacted.Redacted;
   readonly sub: Redacted.Redacted | null;
+  /**
+   * The width over height to draw the sub stream at, for one whose frames
+   * squeeze the picture into another shape, such as a recorder's 16:9
+   * picture in 352×288. Left out, it's drawn at its own shape.
+   */
+  readonly subRatio?: number;
 }
 
 /** Recordings, for a source that keeps them. */

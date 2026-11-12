@@ -11,12 +11,7 @@
  *
  * @module
  */
-import type {
-  CameraId,
-  LiveFeed,
-  LiveStreams,
-  Source,
-} from "@timmo001/kestrel-core";
+import type { LiveFeed, LiveStreams, Source } from "@timmo001/kestrel-core";
 import {
   Config,
   Context,
@@ -41,11 +36,15 @@ const restart = Schedule.min([
 /** How often the sources' streams are read again, since a source doesn't say when it's ready. */
 const checkEvery = Duration.seconds(5);
 
-/** A camera's go2rtc stream names, such as `swann_3` and `swann_3_sub`. */
-export const streamNames = (camera: CameraId, hasSub: boolean): LiveStreams => {
-  const main = camera.replace("/", "_");
+/** A camera's go2rtc stream names, such as `swann_3` and `swann_3_sub`, and how to draw its sub stream. */
+export const streamNames = (feed: LiveFeed): LiveStreams => {
+  const main = feed.camera.replace("/", "_");
 
-  return { main, sub: hasSub ? `${main}_sub` : null };
+  return {
+    main,
+    sub: feed.sub === null ? null : `${main}_sub`,
+    subRatio: feed.subRatio ?? null,
+  };
 };
 
 /**
@@ -109,7 +108,7 @@ export class Go2rtc extends Context.Service<
           rtsp: { listen: `127.0.0.1:${rtspPort}` },
           streams: Object.fromEntries(
             feeds.flatMap((feed) => {
-              const names = streamNames(feed.camera, feed.sub !== null);
+              const names = streamNames(feed);
 
               return names.sub === null || feed.sub === null
                 ? [[names.main, Redacted.value(feed.main)]]

@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 import svgpath from "svgpath";
 
 const names = [
+  "arrows-in-simple",
+  "arrows-out-simple",
   "bell",
   "bell-ringing",
   "film-strip",

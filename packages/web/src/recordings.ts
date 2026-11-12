@@ -1334,6 +1334,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["f", () => fullscreenButton?.click()],
     ["c", () => cutButton?.click()],
     ["s", () => captureButton?.click()],
+    ["?", () => helpButton?.click()],
   ]);
 
   document.addEventListener("keydown", (event) => {
@@ -1359,6 +1360,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     [zoomOutButton, "−", "-"],
     [zoomInButton, "+", "+"],
     [fullscreenButton, "F", "f"],
+    [helpButton, "?", "?"],
   ];
 
   for (const [button, shown, key] of shortcuts) {

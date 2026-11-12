@@ -91,8 +91,17 @@
                 ></gw-button>
                 <gw-button class="live-play" label="Pause"></gw-button>
                 <gw-button class="live-next" label="Next cameras"></gw-button>
+                <!-- Which page of cameras shows, when a layout pages them -->
+                <span class="live-page-count" hidden></span>
               </gw-row>
               <gw-row class="controls-end">
+                <!-- Fit or fill, as the theme's mode switcher -->
+                <gw-segmented
+                  class="live-fit"
+                  label="Pictures"
+                  labels="hide"
+                  value="fit"
+                ></gw-segmented>
                 <gw-button class="live-capture" label="Capture"></gw-button>
                 <gw-button
                   class="live-help"
@@ -115,10 +124,14 @@
                     <dd>Previous or next cameras</dd>
                     <dt><kbd>Enter</kbd> or a double click</dt>
                     <dd>The picked camera alone, and back</dd>
+                    <dt><kbd>Z</kbd></dt>
+                    <dd>Fit whole pictures, or fill the tiles</dd>
                     <dt><kbd>S</kbd></dt>
                     <dd>Save a still of the picked camera</dd>
                     <dt><kbd>F</kbd></dt>
                     <dd>Full screen</dd>
+                    <dt><kbd>?</kbd></dt>
+                    <dd>These keys</dd>
                   </dl>
                 </gw-popover>
               </gw-row>
@@ -289,6 +302,8 @@
                       <dd>Save a still</dd>
                       <dt><kbd>F</kbd></dt>
                       <dd>Full screen</dd>
+                      <dt><kbd>?</kbd></dt>
+                      <dd>These keys</dd>
                     </dl>
                   </gw-popover>
                 </gw-row>

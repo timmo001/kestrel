@@ -109,10 +109,7 @@ const camerasOf = (source: Source, labels: ReadonlyArray<CameraLabel>) =>
         label: labels.find((each) => each.camera === camera.id)?.label ?? null,
         channel: camera.channel,
         signal: camera.signal,
-        live:
-          camera.live && feed !== undefined
-            ? streamNames(camera.id, feed.sub !== null)
-            : null,
+        live: camera.live && feed !== undefined ? streamNames(feed) : null,
         still: camera.still && source.stills !== undefined,
         recordings: camera.recordings && source.recordings !== undefined,
         events: camera.events && source.events !== undefined,

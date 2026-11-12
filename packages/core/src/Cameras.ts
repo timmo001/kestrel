@@ -11,6 +11,8 @@ import { CameraId, SourceId } from "./Ids.ts";
 export const LiveStreams = Schema.Struct({
   main: Schema.String,
   sub: Schema.NullOr(Schema.String),
+  /** The width over height to draw a squeezed sub stream at; `null` for its own shape. */
+  subRatio: Schema.NullOr(Schema.Number),
 });
 
 export interface LiveStreams extends Schema.Schema.Type<typeof LiveStreams> {}
