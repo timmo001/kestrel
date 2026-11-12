@@ -130,18 +130,28 @@ const copy = (folder: string, want: Wanted) =>
     );
   }).pipe(Effect.timeout(longest));
 
-/** Whether a clear-out would delete something older than this to make room for it. */
+/**
+ * Whether a clear-out would delete something further through its hours
+ * than this to make room for it, rather than this straight after.
+ */
 const roomFor = (
   stored: ReadonlyArray<Nvr.StoredFile>,
   want: Wanted,
-  begin: string,
-) =>
-  stored.some(
-    (file) =>
-      (file.continuous &&
-        (!want.continuous || Nvr.localTime(file.time) < begin)) ||
-      (!want.continuous && Nvr.localTime(file.time) < begin),
+  limits: { readonly continuousHours: number; readonly clipHours: number },
+  now: number,
+) => {
+  // A recording's time is this machine's local time, as the files' names are
+  const wanted = Nvr.spent(
+    limits,
+    {
+      time: new Date(want.recording.begin).getTime(),
+      continuous: want.continuous,
+    },
+    now,
   );
+
+  return stored.some((file) => Nvr.spent(limits, file, now) > wanted);
+};
 
 const sum = (files: ReadonlyArray<Nvr.StoredFile>) =>
   files.reduce((total, file) => total + file.bytes, 0);
@@ -200,7 +210,9 @@ export const layer = Layer.effectDiscard(
             const space = yield* Nvr.disk(folder);
             const fits = used + bytes <= Nvr.budget(settings, space, used);
 
-            if (!fits && !roomFor(files, want, want.recording.begin)) return;
+            const now = yield* Clock.currentTimeMillis;
+
+            if (!fits && !roomFor(files, want, settings, now)) return;
 
             yield* copy(folder, want);
 

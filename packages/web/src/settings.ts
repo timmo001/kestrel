@@ -494,7 +494,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       ),
       group(
         "Keeping recordings",
-        "The oldest go first. Past the disk share, continuous footage goes before clips.",
+        "The oldest go first. Past the disk share, what's furthest through its own hours goes first.",
         fieldGrid([
           numberInput(
             "Continuous footage, hours",

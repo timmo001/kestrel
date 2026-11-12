@@ -2,8 +2,9 @@
  * Clearing out old recordings. Footage recorded all the time and clips,
  * recorded for a reason such as motion, are kept for their own number of
  * hours, and the whole folder may use only a share of its disk, always
- * leaving some of the disk free. Past that, the oldest continuous footage
- * goes first, then the oldest clips. Only folders with the recordings
+ * leaving some of the disk free. Past that, what's furthest through its
+ * own hours goes first, so last week's clips go before this morning's
+ * continuous footage. Only folders with the recordings
  * marker are touched, so a shared folder is safe, and a file written to in
  * the last few minutes is left alone, as it may still be being recorded.
  *
@@ -148,6 +149,18 @@ export const stored = Effect.fnUntraced(function* (folder: string) {
     .toSorted((a, b) => a.time - b.time);
 });
 
+/**
+ * How far through the hours its kind is kept a recording started at `time`
+ * is, at `now`: 0.5 is halfway. Past the share, the furthest goes first.
+ */
+export const spent = (
+  options: Pick<RetentionOptions, "continuousHours" | "clipHours">,
+  file: Pick<StoredFile, "time" | "continuous">,
+  now: number,
+) =>
+  (now - file.time) /
+  ((file.continuous ? options.continuousHours : options.clipHours) * hour);
+
 const sum = (files: ReadonlyArray<StoredFile>) =>
   files.reduce((total, file) => total + file.bytes, 0);
 
@@ -193,10 +206,9 @@ export const prune = Effect.fnUntraced(function* (options: RetentionOptions) {
 
   const forSpace: Array<StoredFile> = [];
 
-  for (const file of [
-    ...kept.filter((one) => one.continuous),
-    ...kept.filter((one) => !one.continuous),
-  ]) {
+  for (const file of kept.toSorted(
+    (a, b) => spent(options, b, now) - spent(options, a, now),
+  )) {
     if (over <= 0) break;
 
     forSpace.push(file);

@@ -291,12 +291,19 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   /** All of them together, earliest first, for the table and the timeline's clicks. */
   let recordings: ReadonlyArray<Recording> = [];
 
-  const showProblem = (message: string) => {
+  /** Those and the ones that can't be played, as the table lists them. */
+  let listed: ReadonlyArray<Recording> = [];
+
+  /** Shows `text` over the player until something else plays. */
+  const showNote = (text: string) => {
     if (problem === null) return;
 
-    problem.textContent = `Video stopped: ${message}`;
+    problem.textContent = text;
     problem.hidden = false;
   };
+
+  const showProblem = (message: string) =>
+    showNote(`Video stopped: ${message}`);
 
   /** Set below: holds the picture showing before the video loads another clip. */
   let beforeLoad: () => void = () => undefined;
@@ -397,6 +404,19 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
           // A click plays every camera from there, or from the next
           // recording after a gap; in the recording already playing, it seeks
           (second) => {
+            const at = (recording: Recording) =>
+              secondOfDay(recording.begin) <= second &&
+              secondOfDay(recording.end) > second;
+
+            // A clip only on the camera doesn't skip on to a later recording
+            if (!recordings.some(at) && listed.some(at)) {
+              showNote(
+                "That clip is only on the camera, which can't hand it over",
+              );
+
+              return;
+            }
+
             const hit = recordingAt(second);
 
             if (hit === undefined) return;
@@ -960,7 +980,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     showColumns();
 
-    const listed = lists
+    listed = lists
       .flatMap((track) => track.recordings)
       .toSorted((a, b) => a.begin.localeCompare(b.begin));
 

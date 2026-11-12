@@ -207,10 +207,13 @@ from sources alike:
 | `clipHours`       | 720 (30 days) | Clips recorded for a reason, such as motion or PIR                  |
 | `diskShare`       | 10            | The most of its disk the recordings folder may use, as a percentage |
 
-Past the share, the oldest continuous footage goes first, then the oldest
-clips, and 5% of the disk is always left free. A file written to in the
-last two minutes is left alone. Only folders with the server's marker are
-touched, so a shared folder is safe.
+Past the share, whatever is furthest through its own hours goes first: a
+clip a week into its 30 days goes before continuous footage an hour into
+its 7, and footage 4 days into its 7 goes before that clip. 5% of the disk
+is always left free. Copying from sources follows the same order, so it
+never copies an old clip only to clear out newer footage for it. A file
+written to in the last two minutes is left alone. Only folders with the
+server's marker are touched, so a shared folder is safe.
 
 Pick the cameras, folder and how long they're kept in the Recording panel
 on the Settings page. They're saved in `sources.json` under `recording`,

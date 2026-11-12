@@ -239,7 +239,13 @@ export class Library extends Context.Service<
 
           // A copy is named for when its recording starts
           const copied = new Set(local.map((recording) => recording.begin));
-          const playable = recordings?.video !== undefined;
+          const handsOver = recordings?.video !== undefined;
+
+          // The server's own footage of the time plays in its place
+          const covered = (recording: Recording) =>
+            local.some(
+              (own) => own.begin < recording.end && own.end > recording.begin,
+            );
 
           const remote = listed.flatMap((recording): Array<Recording> =>
             copied.has(recording.begin)
@@ -252,7 +258,7 @@ export class Library extends Context.Service<
                     reasons: recording.reasons,
                     bytes: recording.bytes,
                     remote: true,
-                    playable,
+                    playable: handsOver || covered(recording),
                   },
                 ],
           );
