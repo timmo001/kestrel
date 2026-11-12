@@ -1,13 +1,41 @@
 # Kestrel
 
-A web client and bridge for Raysharp-made recorders, such as the Swann
-DVR8-4575. Their own apps and browser plugins have stopped working, so this
-talks to the recorder directly: recorder health, recordings, motion and PIR
-events, and live view, from any browser or as an app on your phone.
+![Kestrel: your cameras and recorders, watched over in one app](.github/social-preview.png)
 
-A small server sits between the recorder and the page. It holds one logged-in
-session on the recorder's control port, passes on what it reports, and runs
-[go2rtc](https://github.com/AlexxIT/go2rtc) for live video.
+One app for your cameras and recorders: live view, recordings, events and
+each one's health, from any browser or as an app on your phone. It talks to
+each system directly, through a small server on your own network, so nothing
+goes through a vendor's cloud and old hardware stays useful after its own apps
+stop working.
+
+## What it works with
+
+- **Raysharp-made recorders**, such as the Swann DVR8-4575, which are sold
+  under several brands. Their own apps and browser plugins no longer work in
+  modern browsers.
+
+On the way, each behind the same pages:
+
+- Reolink cameras ([#12](https://github.com/timmo001/kestrel/issues/12))
+- the camera in a Bambu Lab printer
+  ([#13](https://github.com/timmo001/kestrel/issues/13))
+- any camera with a stream address
+  ([#14](https://github.com/timmo001/kestrel/issues/14))
+- recording any of them itself
+  ([#15](https://github.com/timmo001/kestrel/issues/15))
+
+## What it does
+
+- **Live:** every camera in 1 to 4 at once, with its own controls.
+- **Recordings:** a day's timeline, with several channels played together on
+  one clock, playback up to 32 times, clips, stills and MP4 downloads.
+- **Events:** motion, PIR and alarms as they happen.
+- **Health:** whether each system is reachable, its disks and each camera's
+  signal, with problems pushed to your phone.
+- **For agents:** the `kestrel` CLI, with Code Mode and MCP.
+
+The server runs [go2rtc](https://github.com/AlexxIT/go2rtc) for the video, and
+the pages are built on [Groundwork](https://github.com/timmo001/groundwork).
 
 ## Running it
 
@@ -25,10 +53,10 @@ the settings, the API and the protocol.
 
 ## Parts
 
-- [`packages/rsnet`](packages/rsnet): the recorder's control protocol, in
-  TypeScript with [Effect](https://effect.website)
-- [`packages/server`](packages/server): the server, with the recorder session,
-  go2rtc and the API
+- [`packages/rsnet`](packages/rsnet): the Raysharp recorders' control
+  protocol, in TypeScript with [Effect](https://effect.website)
+- [`packages/server`](packages/server): the server, with the sessions, go2rtc
+  and the API
 - [`packages/web`](packages/web): the web client, installable on a phone
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and
   MCP for agents, and its [skill](skills/kestrel/SKILL.md)
@@ -41,5 +69,5 @@ mise run check   # lint, types, formatting and the docs
 mise run test
 ```
 
-The plan and what's left are in
-[timmo001/kestrel#1](https://github.com/timmo001/kestrel/issues/1).
+Where it's heading is in
+[timmo001/kestrel#11](https://github.com/timmo001/kestrel/issues/11).

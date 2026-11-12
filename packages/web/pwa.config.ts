@@ -6,8 +6,8 @@ import { definePwaConfig } from "@timmo001/groundwork-pwa";
 
 export default definePwaConfig({
   name: "Kestrel",
-  shortName: "DVR",
-  description: "Recorder health, recordings and events from your DVR",
+  shortName: "Kestrel",
+  description: "Your cameras and recorders: live view, recordings and events",
   shortcuts: [
     { name: "Recordings", url: "./recordings" },
     { name: "Events", url: "./events" },

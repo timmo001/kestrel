@@ -6,7 +6,7 @@ export default defineConfig(
   docsConfig({
     title: "Kestrel",
     description:
-      "A web client and bridge for Raysharp-made recorders, such as the Swann DVR8-4575.",
+      "One app for your cameras and recorders: live view, recordings, events and health, through a small server on your own network.",
     site: "kestrel.timmo.dev",
     github: { owner: "timmo001", repo: "kestrel" },
     navigation: {

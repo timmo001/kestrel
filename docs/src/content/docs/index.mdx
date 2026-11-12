@@ -1,19 +1,23 @@
 ---
 title: Overview
-description: A web client and bridge for Raysharp-made recorders, such as the Swann DVR8-4575.
+description: One app for your cameras and recorders, through a small server on your own network.
 ---
 
-Kestrel brings an old recorder back into use from a browser. Raysharp makes
-recorders for Swann, Lorex, Night Owl and others, and their own apps and
-plugins have stopped working in modern browsers. This talks to the recorder
-directly instead.
+Kestrel is one app for your cameras and recorders: live view, recordings,
+events and each one's health, from any browser or as an app on your phone. It
+talks to each system directly, so nothing goes through a vendor's cloud and
+old hardware stays useful after its own apps stop working.
 
-A small server sits between the recorder and the page. Browsers can't open the
-recorder's control port or play its RTSP streams, so the server holds one
-logged-in session, passes on what it reports, and runs go2rtc for live video.
+It starts with Raysharp-made recorders, which Swann, Lorex, Night Owl and
+others sell, and whose own apps and plugins have stopped working in modern
+browsers. Reolink cameras, a Bambu Lab printer's camera, any stream address
+and recording to your own disk are on the way, as
+[timmo001/kestrel#11](https://github.com/timmo001/kestrel/issues/11) sets
+out.
 
-The plan is tracked in
-[timmo001/kestrel#1](https://github.com/timmo001/kestrel/issues/1). See
+A small server sits between your cameras and the page. Browsers can't open a
+recorder's control port or play its RTSP streams, so the server holds the
+sessions, passes on what they report, and runs go2rtc for the video. See
 [Running it](/running) to set it up.
 
 ## What it does
