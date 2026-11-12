@@ -132,8 +132,13 @@ const webClient = (directory: string) =>
           Effect.orElseSucceed(() => false),
         ));
 
+      // Checked with the browser each time, by ETag, so a new build reaches
+      // the page and its service worker at once rather than when the
+      // browser's own guess at freshness runs out
       return yield* HttpServerResponse.file(
         isFile ? file : path.join(directory, "index.html"),
+      ).pipe(
+        Effect.map(HttpServerResponse.setHeader("cache-control", "no-cache")),
       );
     }).pipe(
       Effect.catch(() =>
