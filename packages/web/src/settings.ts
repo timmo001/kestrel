@@ -438,7 +438,12 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   const recordingFields = () => {
     if (recordingPanel === null) return;
 
-    const picks = cameras.map((camera) => {
+    // Only a camera with live video can be recorded, so the rest aren't offered
+    const picks = cameras.flatMap((camera) => {
+      if (camera.live === null && !recording.cameras.includes(camera.id)) {
+        return [];
+      }
+
       const box = element("gw-checkbox");
 
       box.label = labels.get(camera.id)?.trim() || ownLabel(camera);
@@ -449,7 +454,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
           : recording.cameras.filter((id) => id !== camera.id);
       });
 
-      return box;
+      return [box];
     });
 
     const folder = element("gw-input");
