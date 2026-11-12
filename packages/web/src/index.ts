@@ -15,9 +15,12 @@ import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
-import type {
-  ChannelStatus,
-  ReceivedEvent,
+import {
+  cameraParts,
+  type Camera,
+  type ChannelStatus,
+  type ReceivedEvent,
+  type SourceInfo,
 } from "@timmo001/kestrel-core/domain";
 import type { Attention } from "@timmo001/kestrel-server/api";
 import {
@@ -37,6 +40,7 @@ import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
+import { cameraLabel, loadCameras } from "./cameras.ts";
 import {
   phBell,
   phBellRinging,
@@ -103,34 +107,31 @@ if (themePicker !== null) {
 
 const pwa = connectPwa(config);
 
-// Connection: a banner while the server can't reach the recorder, and
-// nothing while it can
+// Connection: a banner while the server can't reach a source, and nothing
+// while it reaches them all
 const offline = find("gw-banner", "offline");
 
 const offlineMessage = document.querySelector("p.offline-message");
 
+/** Why a source can't be reached, as the banner says it. */
+const unreachable = (source: SourceInfo) =>
+  `Can't reach ${source.name}${source.connection.error === null ? "" : `: ${source.connection.error}`}.`;
+
+/** The sources, or null when the server itself can't be reached. */
 const showConnection = async () => {
-  const connection = await call((api) => api.recorder.connection()).catch(
-    () => null,
-  );
+  const sources = await call((api) => api.sources.list()).catch(() => null);
+  const down = sources?.filter((source) => !source.connection.connected) ?? [];
 
-  const connected = connection?.connected === true;
-
-  if (offline !== null) offline.open = !connected;
+  if (offline !== null) offline.open = sources === null || down.length > 0;
 
   if (offlineMessage !== null) {
-    const why =
-      connection?.error === null || connection === null
-        ? ""
-        : `: ${connection.error}`;
-
     offlineMessage.textContent =
-      connection === null
+      sources === null
         ? "Can't reach the server. Trying again…"
-        : `Can't reach the recorder${why}. Trying again…`;
+        : `${down.map(unreachable).join(" ")} Trying again…`;
   }
 
-  return connected;
+  return sources;
 };
 
 // What needs you, from the server's attention list: alerts first, then
@@ -150,7 +151,7 @@ const attentionAlert = (item: Attention) => {
 };
 
 const fetchAttention = () =>
-  call((api) => api.recorder.attention()).catch(() => []);
+  call((api) => api.sources.attention()).catch(() => []);
 
 const showAttention = async () => {
   const items = (await fetchAttention()).filter((item) => !isDiskNote(item));
@@ -166,12 +167,12 @@ const showAttention = async () => {
   );
 };
 
-// Recorder: device facts, disks and each channel's state
+// Recorder: device facts, disks and each channel's state, from the source
+// with details, which is the recorder
 const deviceCard = find("gw-card", "device");
 const disksCard = find("gw-card", "disks");
 const channelsTable = find("gw-table", "channels");
 let today = "";
-let channelCount = 0;
 
 if (channelsTable !== null) {
   channelsTable.columns = [
@@ -189,15 +190,27 @@ const channelRow = (status: ChannelStatus): TableRow => ({
   motion: status.motion ? "Yes" : "No",
 });
 
-const showRecorder = async () => {
+/** Today on the recorder's clock where there's one, or the browser's. */
+const browserToday = () => new Date().toISOString().slice(0, 10);
+
+const showRecorder = async (sources: ReadonlyArray<SourceInfo>) => {
+  const recorder = sources.find((source) => source.details);
+
+  if (recorder === undefined) {
+    today = browserToday();
+
+    return;
+  }
+
+  const params = { source: recorder.id };
+
   const [device, status, attention] = await Promise.all([
-    call((api) => api.recorder.device()),
-    call((api) => api.recorder.status()),
+    call((api) => api.sources.device({ params })),
+    call((api) => api.sources.status({ params })),
     fetchAttention(),
   ]);
 
-  channelCount = device.channels;
-  today = status.time?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
+  today = status.time?.slice(0, 10) ?? browserToday();
 
   if (deviceCard !== null) {
     const facts = element("gw-facts");
@@ -242,16 +255,14 @@ const showRecorder = async () => {
   if (channelsTable !== null) {
     channelsTable.rows = status.channels.map(channelRow);
   }
-
-  return status.channels;
 };
 
 // Live: its own module, with its layouts and controls
 const live = livePage();
-let liveChannels: ReadonlyArray<ChannelStatus> | undefined;
+let cameras: ReadonlyArray<Camera> | undefined;
 
 // Recordings: its own module, as the recorder's client lays out playback.
-// Its channel, day and the time to play from live in the address
+// Its cameras, day and the time to play from live in the address
 const playback = playbackPage({
   onPick: (search) => navigate(href("recordings", { search })),
 });
@@ -269,7 +280,7 @@ if (eventsTable !== null) {
       cell: (row) => timeFormat.format(new Date(String(row.receivedAt))),
     },
     { id: "kind", header: "What" },
-    { id: "channel", header: "Channel", numeric: true },
+    { id: "camera", header: "Camera" },
     { id: "state", header: "State" },
   ];
 }
@@ -277,18 +288,18 @@ if (eventsTable !== null) {
 const eventRow = (event: ReceivedEvent): TableRow => ({
   receivedAt: event.receivedAt,
   kind: event.kind,
-  channel: event.channel,
+  camera: event.camera === null ? "" : cameraLabel(event.camera),
   state: event.active === null ? "" : event.active ? "Started" : "Ended",
 });
 
 if (clipsTable !== null) {
   clipsTable.columns = [
-    // Plays it on the Recordings page, on its own day and channel
+    // Plays it on the Recordings page, on its own day and camera
     actionsColumn((clip) =>
       navigate(
         href("recordings", {
           search: {
-            channel: clip.channel,
+            camera: clip.camera,
             date: clip.begin.slice(0, 10),
             at: clip.begin,
           },
@@ -296,7 +307,7 @@ if (clipsTable !== null) {
       ),
     ),
     { id: "begin", header: "Start" },
-    { id: "channel", header: "Channel", numeric: true },
+    { id: "cameraLabel", header: "Camera" },
     { id: "length", header: "Length", sortable: false },
     { id: "reasons", header: "Why", cell: reasonChips, wide: true },
   ];
@@ -314,20 +325,21 @@ const showEvents = async () => {
   });
 };
 
-const showClips = async () => {
-  const perChannel = await Promise.all(
-    Array.from({ length: channelCount }, (_, index) =>
+const showClips = async (list: ReadonlyArray<Camera>) => {
+  const perCamera = await Promise.all(
+    list.map((camera) =>
       call((api) =>
-        api.recorder.recordings({
-          query: { channel: index + 1, date: today },
+        api.cameras.recordings({
+          params: cameraParts(camera.id),
+          query: { date: today },
         }),
-      ),
+      ).catch(() => []),
     ),
   );
 
   if (clipsTable === null) return;
 
-  clipsTable.rows = perChannel
+  clipsTable.rows = perCamera
     .flat()
     .filter((clip) =>
       clip.reasons.some((reason) => reason === "motion" || reason === "PIR"),
@@ -407,9 +419,7 @@ const showPage = (location: Location) => {
 
   if (page === "live") requestAnimationFrame(live.focus);
 
-  if (page === "live" && liveChannels !== undefined) {
-    void live.show(liveChannels);
-  }
+  if (page === "live" && cameras !== undefined) void live.show(cameras);
 };
 
 AtomRegistry.make().subscribe(currentLocation, showPage, { immediate: true });
@@ -519,29 +529,39 @@ void pwa.worker.then(async (registration) => {
   }
 });
 
-// Start once the recorder is reachable, then keep the health fresh
+/** Every source connected, so their cameras are all known. */
+const allConnected = (sources: ReadonlyArray<SourceInfo> | null) =>
+  sources !== null && sources.every((source) => source.connection.connected);
+
+// Start once the sources are reachable, then keep the health fresh
 const start = async () => {
-  if (!(await showConnection())) {
+  const sources = await showConnection();
+
+  if (sources === null || !allConnected(sources)) {
     setTimeout(() => void start(), 5000);
 
     return;
   }
 
-  liveChannels = await showRecorder();
+  await showRecorder(sources);
 
-  playback.start(today, channelCount);
+  const known = await loadCameras();
+  const recorded = known.filter((camera) => camera.recordings);
+
+  cameras = known;
+  playback.start(today, recorded);
 
   await Promise.all([
     showAttention(),
-    currentPage === "live" ? live.show(liveChannels) : undefined,
+    currentPage === "live" ? live.show(known) : undefined,
     showEvents(),
-    showClips(),
+    showClips(recorded),
   ]);
 
   setInterval(() => {
     void showAttention();
-    void showConnection().then((connected) =>
-      connected ? showRecorder() : undefined,
+    void showConnection().then((next) =>
+      next === null ? undefined : showRecorder(next),
     );
   }, 30_000);
 };

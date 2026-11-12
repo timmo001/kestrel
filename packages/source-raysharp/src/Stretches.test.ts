@@ -3,11 +3,11 @@
  * gets wrong silently: a range ending where the next file starts sends that
  * file instead.
  */
-import type { Recording } from "@timmo001/kestrel-core";
+import type { ChannelRecording } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
 import { stretches } from "./Stretches.ts";
 
-const recording = (begin: string, end: string): Recording => ({
+const recording = (begin: string, end: string): ChannelRecording => ({
   channel: 1,
   begin: `2026-11-11T${begin}`,
   end: `2026-11-11T${end}`,

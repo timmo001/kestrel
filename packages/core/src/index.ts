@@ -1,9 +1,17 @@
 /**
  * What every source shares: the shapes they report, their errors, and the
- * `Recorder` service a source provides and the server reads.
+ * `Source` interface each kind implements and the server serves.
  *
  * @module
  */
 export * from "./Domain.ts";
 
-export { Recorder, type LiveFeed, type RecordedFrame } from "./Recorder.ts";
+export type {
+  CameraInfo,
+  LiveFeed,
+  RecordedFrame,
+  Source,
+  SourceDetails,
+  SourceEvents,
+  SourceRecordings,
+} from "./Source.ts";

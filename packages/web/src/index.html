@@ -121,14 +121,14 @@
           </div>
         </section>
 
-        <!-- Recordings: a day and channel, the player with its controls and
+        <!-- Recordings: a day and cameras, the player with its controls and
              the day's timeline under it, and the day's recordings -->
         <section class="page" data-page="recordings" hidden>
           <!-- The heading, the video and the timeline fill the window; the
                clip and the day's recordings are below it -->
           <div class="playback-view">
             <!-- The app bar marks the page, so its name is only for screen
-                 readers; the month's recorded days and the day and channel
+                 readers; the month's recorded days and the day and cameras
                  share one row -->
             <h2 class="visually-hidden">Recordings</h2>
             <div class="playback-bar">
@@ -152,9 +152,8 @@
                   <gw-button class="day-next" label="Next day"></gw-button>
                 </gw-row>
                 <gw-select
-                  class="channel"
-                  label="Channel"
-                  value="1"
+                  class="camera"
+                  label="Cameras"
                   inline-label
                 ></gw-select>
               </gw-row>
@@ -164,7 +163,7 @@
             <!-- Focusable, so the keyboard controls reach it after a click -->
             <div class="player-stage" tabindex="-1">
               <div class="player-screen">
-                <!-- A tile per channel playing, each with its own video -->
+                <!-- A tile per camera playing, each with its own video -->
                 <div class="player-grid camera-grid" data-layout="1"></div>
                 <!-- The last frame, held while the next clip loads, then
                      faded out over it -->
@@ -291,7 +290,7 @@
               </div>
             </div>
 
-            <!-- The day on the picked channel. A click plays from there; the
+            <!-- The day on the cameras playing. A click plays from there; the
                  table below is the way in from a keyboard or screen reader -->
             <div class="timeline">
               <div class="timeline-track" aria-hidden="true">

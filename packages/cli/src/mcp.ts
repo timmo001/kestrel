@@ -6,28 +6,31 @@
  */
 import { BunStdio } from "@effect/platform-bun";
 import {
-  Connection,
+  Camera,
+  cameraParts,
   DeviceInfo,
   LocalDate,
   ReceivedEvent,
   RecordedDay,
   RecorderStatus,
   Recording,
+  SourceInfo,
 } from "@timmo001/kestrel-core/domain";
-import {
-  Attention,
-  LocalMonth,
-  VideoSources,
-} from "@timmo001/kestrel-server/api";
+import { Attention, LocalMonth } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
-import { Recorder, RecorderError } from "./operations.ts";
+import {
+  Recorder,
+  RecorderError,
+  recorderSource,
+  resolveCamera,
+} from "./operations.ts";
 
 const Status = Tool.make("status", {
   description:
-    "The recorder's connection, clock, disks and each channel's state",
+    "What needs you, each source's connection, and the recorder's clock, disks and each channel's state",
   success: Schema.Struct({
-    connection: Connection,
+    sources: Schema.Array(SourceInfo),
     alerts: Schema.Number,
     attention: Schema.Array(Attention),
     status: Schema.NullOr(RecorderStatus),
@@ -43,10 +46,21 @@ const Device = Tool.make("device", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
+const Cameras = Tool.make("cameras", {
+  description:
+    "Every camera's id, name and what it can do, with its live stream names",
+  success: Schema.Struct({ cameras: Schema.Array(Camera) }),
+  failure: RecorderError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
 const Recordings = Tool.make("recordings", {
-  description: "A channel's recordings on one day, with why each was made",
+  description: "A camera's recordings on one day, with why each was made",
   parameters: Schema.Struct({
-    channel: Schema.Number.annotate({ description: "The channel, from 1" }),
+    camera: Schema.String.annotate({
+      description:
+        "The camera's id, such as swann/3; while there's one source, its own id, such as 3",
+    }),
     date: LocalDate.annotate({ description: "The day, such as 2026-11-11" }),
   }),
   success: Schema.Struct({ recordings: Schema.Array(Recording) }),
@@ -55,7 +69,7 @@ const Recordings = Tool.make("recordings", {
 }).annotate(Tool.Readonly, true);
 
 const Days = Tool.make("days", {
-  description: "The days in a month that have recordings",
+  description: "The days in a month that have recordings on any camera",
   parameters: Schema.Struct({
     month: LocalMonth.annotate({ description: "The month, such as 2026-11" }),
   }),
@@ -71,50 +85,64 @@ const Events = Tool.make("events", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
-const Video = Tool.make("video", {
-  description:
-    "Where the server serves go2rtc, and each channel's live stream names",
-  success: VideoSources,
-  failure: RecorderError,
-  failureMode: "return",
-}).annotate(Tool.Readonly, true);
-
-const Tools = Toolkit.make(Status, Device, Recordings, Days, Events, Video);
+const Tools = Toolkit.make(Status, Device, Cameras, Recordings, Days, Events);
 
 const handlers = Effect.gen(function* () {
   const recorder = yield* Recorder;
 
   return Tools.of({
     status: Effect.fn("mcp.status")(function* () {
-      const connection = yield* recorder.call((api) =>
-        api.recorder.connection(),
+      const sources = yield* recorder.call((api) => api.sources.list());
+      const attention = yield* recorder.call((api) => api.sources.attention());
+
+      const withDetails = sources.find(
+        (source) => source.details && source.connection.connected,
       );
 
-      const attention = yield* recorder.call((api) => api.recorder.attention());
-
       return {
-        connection,
+        sources,
         alerts: attention.filter((item) => item.level === "alert").length,
         attention,
-        status: connection.connected
-          ? yield* recorder.call((api) => api.recorder.status())
-          : null,
+        status:
+          withDetails === undefined
+            ? null
+            : yield* recorder.call((api) =>
+                api.sources.status({ params: { source: withDetails.id } }),
+              ),
       };
     }),
-    device: () => recorder.call((api) => api.recorder.device()),
-    recordings: ({ channel, date }) =>
+    device: Effect.fn("mcp.device")(function* () {
+      const source = yield* recorderSource().pipe(
+        Effect.provideService(Recorder, recorder),
+      );
+
+      return yield* recorder.call((api) =>
+        api.sources.device({ params: { source: source.id } }),
+      );
+    }),
+    cameras: () =>
       recorder
-        .call((api) => api.recorder.recordings({ query: { channel, date } }))
-        .pipe(Effect.map((list) => ({ recordings: list }))),
+        .call((api) => api.cameras.list())
+        .pipe(Effect.map((list) => ({ cameras: list }))),
+    recordings: Effect.fn("mcp.recordings")(function* ({ camera, date }) {
+      const id = yield* resolveCamera(camera).pipe(
+        Effect.provideService(Recorder, recorder),
+      );
+
+      const list = yield* recorder.call((api) =>
+        api.cameras.recordings({ params: cameraParts(id), query: { date } }),
+      );
+
+      return { recordings: list };
+    }),
     days: ({ month }) =>
       recorder
-        .call((api) => api.recorder.days({ query: { month } }))
+        .call((api) => api.cameras.days({ query: { month } }))
         .pipe(Effect.map((list) => ({ days: list }))),
     events: () =>
       recorder
         .call((api) => api.events.recent())
         .pipe(Effect.map((list) => ({ events: list }))),
-    video: () => recorder.call((api) => api.video.sources()),
   });
 });
 

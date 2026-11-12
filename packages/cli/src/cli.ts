@@ -1,22 +1,25 @@
 #!/usr/bin/env bun
 /**
- * The `kestrel` CLI: the recorder's status, recordings and events from
- * the server, with `--json` for scripts and agents, `agent tools --json` for
+ * The `kestrel` CLI: the cameras' status, recordings and events from the
+ * server, with `--json` for scripts and agents, `agent tools --json` for
  * Code Mode and `mcp` to serve the same operations over MCP.
  *
  * @module
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
+  cameraParts,
   LocalTime,
-  type Connection,
+  type Camera,
+  type CameraId,
   type DeviceInfo,
   type ReceivedEvent,
   type RecordedDay,
   type RecorderStatus,
   type Recording,
+  type SourceInfo,
 } from "@timmo001/kestrel-core/domain";
-import type { Attention, VideoSources } from "@timmo001/kestrel-server/api";
+import type { Attention } from "@timmo001/kestrel-server/api";
 import {
   Console,
   Effect,
@@ -32,6 +35,8 @@ import {
   operations,
   Recorder,
   RecorderError,
+  recorderSource,
+  resolveCamera,
   type Operation,
 } from "./operations.ts";
 
@@ -43,21 +48,22 @@ const json = Flag.Boolean("json").pipe(
 /** Everything a command prints with `--json`. */
 type Output =
   | {
-      readonly connection: Connection;
+      readonly sources: ReadonlyArray<SourceInfo>;
       /** How many alerts there are, for scripts that only need the count. */
       readonly alerts: number;
       readonly attention: ReadonlyArray<Attention>;
+      /** The recorder's status, while it's connected. */
       readonly status: RecorderStatus | null;
     }
   | DeviceInfo
+  | { readonly cameras: ReadonlyArray<Camera> }
   | { readonly recordings: ReadonlyArray<Recording> }
   | { readonly days: ReadonlyArray<RecordedDay> }
   | { readonly events: ReadonlyArray<ReceivedEvent> }
-  | VideoSources
   | {
       readonly file: string;
       readonly bytes: number;
-      readonly channel: number;
+      readonly camera: CameraId;
       readonly begin: string;
       readonly end: string;
     }
@@ -90,18 +96,26 @@ const status = Command.make(
   { json },
   Effect.fn("status")(function* ({ json }) {
     const recorder = yield* Recorder;
-    const connection = yield* recorder.call((api) => api.recorder.connection());
-    const attention = yield* recorder.call((api) => api.recorder.attention());
+    const sources = yield* recorder.call((api) => api.sources.list());
+    const attention = yield* recorder.call((api) => api.sources.attention());
 
     const alerts = attention.filter((item) => item.level === "alert").length;
 
-    const current = connection.connected
-      ? yield* recorder.call((api) => api.recorder.status())
-      : null;
+    // The recorder's clock, disks and channels, while it's connected
+    const withDetails = sources.find(
+      (source) => source.details && source.connection.connected,
+    );
+
+    const current =
+      withDetails === undefined
+        ? null
+        : yield* recorder.call((api) =>
+            api.sources.status({ params: { source: withDetails.id } }),
+          );
 
     if (json) {
       return yield* printJson({
-        connection,
+        sources,
         alerts,
         attention,
         status: current,
@@ -132,7 +146,7 @@ const status = Command.make(
   }),
 ).pipe(
   Command.withDescription(
-    "The recorder's connection, clock, disks and each channel's state",
+    "What needs you, each source's connection, and the recorder's clock, disks and each channel's state",
   ),
 );
 
@@ -140,7 +154,11 @@ const device = Command.make(
   "device",
   { json },
   Effect.fn("device")(function* ({ json }) {
-    const info = yield* (yield* Recorder).call((api) => api.recorder.device());
+    const source = yield* recorderSource();
+
+    const info = yield* (yield* Recorder).call((api) =>
+      api.sources.device({ params: { source: source.id } }),
+    );
 
     if (json) return yield* printJson(info);
 
@@ -152,10 +170,11 @@ const device = Command.make(
   Command.withDescription("The recorder's name, firmware and channel count"),
 );
 
-const channel = Flag.Int("channel").pipe(
+const camera = Flag.String("camera").pipe(
   Flag.withAlias("c"),
-  Flag.withDescription("The channel, from 1"),
-  Flag.withDefault(1),
+  Flag.withDescription(
+    "The camera, such as swann/3; while there's one source, its camera's own id, such as 3",
+  ),
 );
 
 const date = Flag.String("date").pipe(
@@ -164,22 +183,51 @@ const date = Flag.String("date").pipe(
   Flag.optional,
 );
 
+const cameras = Command.make(
+  "cameras",
+  { json },
+  Effect.fn("cameras")(function* ({ json }) {
+    const list = yield* (yield* Recorder).call((api) => api.cameras.list());
+
+    if (json) return yield* printJson({ cameras: list });
+
+    if (list.length === 0) {
+      return yield* Console.log("No cameras yet: is every source connected?");
+    }
+
+    for (const each of list) {
+      const can = [
+        each.live === null ? [] : ["live"],
+        each.recordings ? ["recordings"] : [],
+        each.events ? ["events"] : [],
+      ].flat();
+
+      yield* Console.log(
+        `${each.id}  ${each.name}  ${can.join(", ")}${each.signal === false ? "  no signal" : ""}`,
+      );
+    }
+  }),
+).pipe(
+  Command.withDescription(
+    "Every camera's id, name and what it can do, with its live stream names",
+  ),
+);
+
 const recordings = Command.make(
   "recordings",
-  { json, channel, date },
-  Effect.fn("recordings")(function* ({ json, channel, date }) {
+  { json, camera, date },
+  Effect.fn("recordings")(function* ({ json, camera, date }) {
     const day = Option.getOrElse(date, today);
+    const id = yield* resolveCamera(camera);
 
     const list = yield* (yield* Recorder).call((api) =>
-      api.recorder.recordings({ query: { channel, date: day } }),
+      api.cameras.recordings({ params: cameraParts(id), query: { date: day } }),
     );
 
     if (json) return yield* printJson({ recordings: list });
 
     if (list.length === 0) {
-      return yield* Console.log(
-        `No recordings on channel ${channel} on ${day}`,
-      );
+      return yield* Console.log(`No recordings on ${id} on ${day}`);
     }
 
     for (const recording of list) {
@@ -190,7 +238,7 @@ const recordings = Command.make(
   }),
 ).pipe(
   Command.withDescription(
-    "A channel's recordings on one day, with why each was made",
+    "A camera's recordings on one day, with why each was made",
   ),
 );
 
@@ -208,7 +256,7 @@ const days = Command.make(
     const picked = Option.getOrElse(month, () => today().slice(0, 7));
 
     const list = yield* (yield* Recorder).call((api) =>
-      api.recorder.days({ query: { month: picked } }),
+      api.cameras.days({ query: { month: picked } }),
     );
 
     if (json) return yield* printJson({ days: list });
@@ -219,7 +267,11 @@ const days = Command.make(
         : list.map((recorded) => recorded.date).join("\n"),
     );
   }),
-).pipe(Command.withDescription("The days in a month that have recordings"));
+).pipe(
+  Command.withDescription(
+    "The days in a month that have recordings on any camera",
+  ),
+);
 
 const events = Command.make(
   "events",
@@ -235,31 +287,13 @@ const events = Command.make(
 
     for (const event of list) {
       yield* Console.log(
-        `${event.receivedAt}  ${event.kind}${event.channel === null ? "" : `  channel ${event.channel}`}`,
+        `${event.receivedAt}  ${event.kind}${event.camera === null ? "" : `  ${event.camera}`}`,
       );
     }
   }),
 ).pipe(
   Command.withDescription(
     "The newest motion, PIR, video loss and disk reports",
-  ),
-);
-
-const video = Command.make(
-  "video",
-  { json },
-  Effect.fn("video")(function* ({ json }) {
-    const sources = yield* (yield* Recorder).call((api) => api.video.sources());
-
-    if (json) return yield* printJson(sources);
-
-    for (const stream of sources.streams) {
-      yield* Console.log(`${stream.name}  ${stream.main}  ${stream.sub}`);
-    }
-  }),
-).pipe(
-  Command.withDescription(
-    "Where the server serves go2rtc, and each channel's live stream names",
   ),
 );
 
@@ -291,7 +325,7 @@ const download = Command.make(
   "download",
   {
     json,
-    channel,
+    camera,
     date,
     from: Flag.String("from").pipe(
       Flag.withDescription(
@@ -308,7 +342,7 @@ const download = Command.make(
     output: Flag.String("output").pipe(
       Flag.withAlias("o"),
       Flag.withDescription(
-        "The file to write; channel-1_2026-11-11T21-46-00.mp4 and so on by default",
+        "The file to write; swann-3_2026-11-11T21-46-00.mp4 and so on by default",
       ),
       Flag.optional,
     ),
@@ -324,10 +358,12 @@ const download = Command.make(
       });
     }
 
+    const id = yield* resolveCamera(options.camera);
+
     const response = yield* (yield* Recorder).call((api) =>
-      api.recorder.video({
+      api.cameras.video({
+        params: cameraParts(id),
         query: {
-          channel: options.channel,
           begin,
           end,
           stream: options.sub ? "sub" : "main",
@@ -342,7 +378,7 @@ const download = Command.make(
 
     const file = Option.getOrElse(
       options.output,
-      () => named ?? `channel-${options.channel}.mp4`,
+      () => named ?? `${id.replace("/", "-")}.mp4`,
     );
 
     const fs = yield* FileSystem.FileSystem;
@@ -363,19 +399,19 @@ const download = Command.make(
       return yield* printJson({
         file,
         bytes,
-        channel: options.channel,
+        camera: id,
         begin,
         end,
       });
     }
 
     yield* Console.log(
-      `Saved ${file} (${(bytes / 1024 ** 2).toFixed(1)} MiB), channel ${options.channel} from ${begin.replace("T", " ")} to ${end.slice(11)}`,
+      `Saved ${file} (${(bytes / 1024 ** 2).toFixed(1)} MiB), ${id} from ${begin.replace("T", " ")} to ${end.slice(11)}`,
     );
   }),
 ).pipe(
   Command.withDescription(
-    "Save what a channel recorded between two times as an MP4, across recordings",
+    "Save what a camera recorded between two times as an MP4, across recordings",
   ),
 );
 
@@ -408,16 +444,16 @@ const mcp = Command.make("mcp", {}, () => serveMcp).pipe(
 
 const cli = Command.make("kestrel").pipe(
   Command.withDescription(
-    "Read your recorder's status, recordings and events through the Kestrel server",
+    "Read your cameras' status, recordings and events through the Kestrel server",
   ),
   Command.withSubcommands([
     status,
     device,
+    cameras,
     recordings,
     download,
     days,
     events,
-    video,
     agent,
     mcp,
   ]),

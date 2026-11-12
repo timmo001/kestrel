@@ -5,7 +5,7 @@
  *
  * @module
  */
-import type { LocalTime, Recording } from "@timmo001/kestrel-core";
+import type { ChannelRecording, LocalTime } from "@timmo001/kestrel-core";
 
 /** A recorder time as seconds since 1970, read as UTC: the recorder keeps no zone. */
 export const toSeconds = (time: LocalTime) => Date.parse(`${time}Z`) / 1000;
@@ -28,7 +28,7 @@ export interface Stretch {
  * frame group runs to its end anyway.
  */
 export const stretches = (
-  recordings: ReadonlyArray<Recording>,
+  recordings: ReadonlyArray<ChannelRecording>,
   begin: LocalTime,
   end: LocalTime,
 ): Array<Stretch> => {

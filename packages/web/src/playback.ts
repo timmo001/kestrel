@@ -4,18 +4,23 @@
  * filling the window, with the clip and the day's recordings below. Play,
  * Stop, a frame at a time, the recordings either side, speed, Cut for a
  * clip, Capture for a still and Download, then the recorder's clock, zoom
- * and full screen. The channel and day come from the address; where it was,
+ * and full screen. The cameras and day come from the address; where it was,
  * its speed and both zooms are kept in this browser for next time.
  */
 import {
+  cameraParts,
   LocalDate,
   LocalTime,
+  type Camera,
+  type CameraId,
   type Recording,
 } from "@timmo001/kestrel-core/domain";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { isText, keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
+import { SavedCamera } from "./addresses.ts";
 import { call } from "./api.ts";
+import { cameraLabel, fileName } from "./cameras.ts";
 import {
   phCamera,
   phCaretLeft,
@@ -34,7 +39,7 @@ import {
   phSkipForward,
   phStop,
 } from "./icons.ts";
-import { mostChannels, playerGroup } from "./group.ts";
+import { mostCameras, playerGroup } from "./group.ts";
 import { nextMoment, previousMoment, type Track } from "./moments.ts";
 import {
   clipUrl,
@@ -98,7 +103,7 @@ const fullStreamBudget = 14;
  * the full stream, one a second, which comes about 58 times faster than
  * real time where the whole stream comes at 17, sped up by the server to a
  * rate the browser can play. The full stream is shared, though: with
- * several channels past about 14 times in all, every channel plays the
+ * several cameras past about 14 times in all, every camera plays the
  * small sub stream, which comes 100 to 200 times faster than real time.
  */
 const viewFor = (speed: number, count: number): View => {
@@ -138,36 +143,46 @@ const keepEvery = 2000;
 /** Where this page's settings are kept, as Upkeep keeps its pages'. */
 const storageKey = "kestrel.recordings";
 
-/** Where it was playing: a recording and the seconds into it. */
+/**
+ * Where it was playing: a recording and the seconds into it. One kept
+ * before camera ids names the recorder's channel instead.
+ */
 const Position = Schema.Struct({
-  channel: Schema.Int,
+  camera: Schema.optional(SavedCamera),
+  channel: Schema.optional(SavedCamera),
   begin: LocalTime,
   end: LocalTime,
   offset: Schema.Finite,
 });
 
 const decodePosition = Schema.decodeUnknownOption(Position);
+const decodeCamera = Schema.decodeUnknownOption(SavedCamera);
+const decodeCameras = Schema.decodeUnknownOption(Schema.Array(SavedCamera));
 const isDate = Schema.is(LocalDate);
-
-const ChannelList = Schema.Array(
-  Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
-);
-
-const decodeChannels = Schema.decodeUnknownOption(ChannelList);
 
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {
   const values = keptAt(storageKey);
-  const channel = Number(values?.["channel"]);
-  const ticked = Option.getOrUndefined(decodeChannels(values?.["channels"]));
+
+  // Kept before camera ids, the cameras are the recorder's channels by number
+  const camera = Option.getOrUndefined(
+    decodeCamera(values?.["camera"] ?? values?.["channel"]),
+  );
+
+  const ticked = Option.getOrUndefined(
+    decodeCameras(values?.["cameras"] ?? values?.["channels"]),
+  );
+
+  const position = Option.getOrUndefined(decodePosition(values?.["position"]));
+  const positionCamera = position?.camera ?? position?.channel;
   const date = values?.["date"];
   const speed = values?.["speed"];
   const timelineZoom = values?.["timelineZoom"];
   const pictureZoom = Number(values?.["pictureZoom"]);
 
   return {
-    channel: Number.isInteger(channel) && channel >= 1 ? channel : undefined,
-    channels: ticked !== undefined && ticked.length > 0 ? ticked : undefined,
+    camera,
+    cameras: ticked !== undefined && ticked.length > 0 ? ticked : undefined,
     date: isDate(date) ? date : undefined,
     speed: isText(speed) && isSpeed(Number(speed)) ? speed : "1",
     timelineZoom:
@@ -176,7 +191,15 @@ const kept = () => {
         ? timelineZoom
         : "86400",
     pictureZoom: pictureZooms.includes(pictureZoom) ? pictureZoom : 1,
-    position: Option.getOrUndefined(decodePosition(values?.["position"])),
+    position:
+      position === undefined || positionCamera === undefined
+        ? undefined
+        : {
+            camera: positionCamera,
+            begin: position.begin,
+            end: position.end,
+            offset: position.offset,
+          },
   };
 };
 
@@ -190,14 +213,14 @@ const save = (href: string, name?: string) => {
 };
 
 export interface PlaybackOptions {
-  /** Asks to show a channel and day: the page follows once the address does. */
+  /** Asks to show cameras and a day: the page follows once the address does. */
   readonly onPick: (search: RecordingsSearch) => void;
 }
 
 export interface PlaybackPage {
-  /** The recorder's channels, and its last day, which is the default one. */
-  readonly start: (today: string, channels: number) => void;
-  /** Shows what the address asks for: a channel, a day and a time to play. */
+  /** The cameras with recordings, and the last day, which is the default one. */
+  readonly start: (today: string, cameras: ReadonlyArray<Camera>) => void;
+  /** Shows what the address asks for: cameras, a day and a time to play. */
   readonly open: (search: RecordingsSearch) => void;
   /** Pauses, for when the page is left. */
   readonly pause: () => void;
@@ -210,7 +233,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   const dayPicker = find("gw-date-picker", "day");
   const previousDay = find("gw-button", "day-previous");
   const nextDay = find("gw-button", "day-next");
-  const channelSelect = find("gw-select", "channel");
+  const cameraSelect = find("gw-select", "camera");
   const recordedDays = find("gw-row", "recorded-days");
   const table = find("gw-table", "recordings");
   const grid = find("div", "player-grid");
@@ -242,15 +265,16 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   const saved = kept();
   let lastDay = "";
-  let channels = 0;
+  /** The cameras with recordings, in order. */
+  let cameras: ReadonlyArray<Camera> = [];
   let day = "";
-  /** The picked channel: first and largest, and what Cut and Download act on. */
-  let channel = 1;
-  /** Every channel playing, the picked one among them. */
-  let ticked: ReadonlyArray<number> = [1];
+  /** The picked camera: first and largest, and what Cut and Download act on. */
+  let camera: CameraId = "";
+  /** Every camera playing, the picked one among them. */
+  let ticked: ReadonlyArray<CameraId> = [];
   let speed = saved.speed;
 
-  /** What the address asked for before the channels were known. */
+  /** What the address asked for before the cameras were known. */
   let waiting: RecordingsSearch | undefined;
 
   /** The last `at` played, so the same address doesn't play it again. */
@@ -259,7 +283,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   /** Whether the kept position has been offered, which is once. */
   let resumed = false;
 
-  /** Each playing channel's recordings on the picked day, earliest first. */
+  /** Each playing camera's recordings on the picked day, earliest first. */
   let tracks: ReadonlyArray<Track> = [];
 
   /** The stream and speed-up playing, which the caption names. */
@@ -287,10 +311,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   let showTime: () => void = () => undefined;
 
-  /** Set below: makes another playing channel the picked one. */
-  let pickChannel: (picked: number) => void = () => undefined;
+  /** Set below: makes another playing camera the picked one. */
+  let pickCamera: (picked: CameraId) => void = () => undefined;
 
-  // A player per channel on one clock; it runs on into the next recording,
+  // A player per camera on one clock; it runs on into the next recording,
   // as the recorder's client does
   const player =
     grid === null
@@ -299,7 +323,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
           onProblem: showProblem,
           onTime: () => showTime(),
           onState: () => showState(),
-          onPick: (picked) => pickChannel(picked),
+          onPick: (picked) => pickCamera(picked),
         });
 
   // Where it's playing is kept every few seconds, and as the page goes, so
@@ -318,7 +342,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
         clip === undefined || offset === undefined
           ? null
           : {
-              channel: clip.channel,
+              camera: clip.camera,
               begin: clip.begin,
               end: clip.end,
               offset: Math.floor(offset),
@@ -337,11 +361,11 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     return date < day ? 0 : date > day ? daySeconds : seconds(time);
   };
 
-  /** Whether `clip` is on the day and channels the timeline shows. */
+  /** Whether `clip` is on the day and cameras the timeline shows. */
   const onTimeline = (clip: Clip) =>
-    ticked.includes(clip.channel) && clip.begin.slice(0, 10) === day;
+    ticked.includes(clip.camera) && clip.begin.slice(0, 10) === day;
 
-  /** A recording at a second of the picked day on any playing channel, or the next one after it. */
+  /** A recording at a second of the picked day on any playing camera, or the next one after it. */
   const recordingAt = (second: number) =>
     recordings.find((recording) => secondOfDay(recording.end) > second);
 
@@ -369,7 +393,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
             clip: timelineClip,
             ticks: timelineTicks,
           },
-          // A click plays every channel from there, or from the next
+          // A click plays every camera from there, or from the next
           // recording after a gap; in the recording already playing, it seeks
           (second) => {
             const hit = recordingAt(second);
@@ -381,7 +405,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
             if (
               playing !== undefined &&
-              playing.channel === hit.channel &&
+              playing.camera === hit.camera &&
               playing.begin === hit.begin
             ) {
               player?.seek(from);
@@ -447,7 +471,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     const end = `${day}T${to}`;
 
     return from !== "" && to !== "" && end > begin
-      ? { channel, begin, end }
+      ? { camera, begin, end }
       : undefined;
   };
 
@@ -574,7 +598,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       caption.textContent =
         clip === undefined
           ? ""
-          : `${ticked.length > 1 ? `${ticked.length} channels` : `Ch ${clip.channel}`} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
+          : `${ticked.length > 1 ? `${ticked.length} cameras` : cameraLabel(clip.camera)} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
               // The sub stream, or past the browser's fastest, key frames only
               shownView.stream === "sub"
                 ? " · sub stream"
@@ -623,7 +647,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   frameButton?.addEventListener("click", () => player?.step(frameSeconds));
 
   /**
-   * The next recording to start on any playing channel, or the one before
+   * The next recording to start on any playing camera, or the one before
    * the recording keeping the time, as the recorder's client skips.
    */
   const skip = (step: -1 | 1) => {
@@ -721,7 +745,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     const time = player?.time();
     const clip = player?.clip();
 
-    // The picked channel's picture, or the one keeping the time when the
+    // The picked camera's picture, or the one keeping the time when the
     // picked one has nothing then
     const shot =
       player?.lead()?.readyState === undefined ||
@@ -731,9 +755,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     if (shot === undefined || time === undefined || clip === undefined) return;
 
-    const channelShown = Number(
-      shot.closest("figure")?.dataset.channel ?? clip.channel,
-    );
+    const cameraShown = shot.closest("figure")?.dataset.camera ?? clip.camera;
 
     const canvas = element("canvas");
 
@@ -746,7 +768,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
         const href = URL.createObjectURL(blob);
 
-        save(href, `channel-${channelShown}_${time.replaceAll(":", "-")}.jpg`);
+        save(href, `${fileName(cameraShown)}_${time.replaceAll(":", "-")}.jpg`);
         setTimeout(() => URL.revokeObjectURL(href), 10_000);
       },
       "image/jpeg",
@@ -755,12 +777,12 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   });
 
   // Zoom: in steps from the buttons, or at the pointer with the wheel, and
-  // panned by dragging the picture. It acts on the picked channel's picture.
+  // panned by dragging the picture. It acts on the picked camera's picture.
   // The level is kept; the pan isn't
   let zoom = saved.pictureZoom;
   let pan = { x: 0, y: 0 };
 
-  /** The box the zoomed picture sits in: the picked channel's tile. */
+  /** The box the zoomed picture sits in: the picked camera's tile. */
   const zoomBox = () =>
     (player?.lead()?.parentElement ?? screen)?.getBoundingClientRect();
 
@@ -878,7 +900,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   });
 
   screen?.addEventListener("pointerup", (event) => {
-    // A press on another channel's tile picks that channel instead
+    // A press on another camera's tile picks that camera instead
     const tile = event
       .composedPath()
       .find(
@@ -887,7 +909,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       );
 
     const onOther =
-      tile instanceof HTMLElement && tile.dataset.channel !== String(channel);
+      tile instanceof HTMLElement && tile.dataset.camera !== camera;
 
     if (press !== undefined && !press.moved && !onOther) togglePlay();
 
@@ -944,9 +966,9 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     });
   }
 
-  // The day and channel, the month's recorded days, and the day's table
+  // The day and cameras, the month's recorded days, and the day's table
 
-  /** The table's columns, with each recording's channel when several play. */
+  /** The table's columns, with each recording's camera when several play. */
   const showColumns = () => {
     if (table === null) return;
 
@@ -957,7 +979,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
         // The keys then work the player, not the row's button
         stage?.focus({ preventScroll: true });
       }),
-      ...(ticked.length > 1 ? [{ id: "channel", header: "Channel" }] : []),
+      ...(ticked.length > 1 ? [{ id: "cameraLabel", header: "Camera" }] : []),
       { id: "begin", header: "Start" },
       { id: "end", header: "End" },
       { id: "length", header: "Length", sortable: false },
@@ -973,18 +995,22 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   showColumns();
 
-  /** Each playing channel's recordings on the picked day, into the players, the timeline and the table. */
+  /** A camera's recordings on a day. */
+  const recordingsOn = (id: CameraId, date: string) =>
+    call((api) =>
+      api.cameras.recordings({ params: cameraParts(id), query: { date } }),
+    );
+
+  /** Each playing camera's recordings on the picked day, into the players, the timeline and the table. */
   const showRecordings = async () => {
     if (day === "") return;
 
     const date = day;
 
     const lists = await Promise.all(
-      ticked.map((number) =>
-        call((api) =>
-          api.recorder.recordings({ query: { channel: number, date } }),
-        ).then((list) => ({
-          channel: number,
+      ticked.map((id) =>
+        recordingsOn(id, date).then((list) => ({
+          camera: id,
           recordings: list.toSorted((a, b) => a.begin.localeCompare(b.begin)),
         })),
       ),
@@ -1002,10 +1028,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     if (table !== null) table.rows = recordings.map(recordingRow);
 
-    player?.setChannels(tracks, channel);
+    player?.setCameras(tracks, camera);
     timeline?.show(
       tracks.map((track) => ({
-        label: `Ch ${track.channel}`,
+        label: cameraLabel(track.camera),
         spans: track.recordings.map(spanOf),
       })),
     );
@@ -1016,20 +1042,20 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     showState();
   };
 
-  /** The address for a day, on the channels playing, with `lead` picked. */
-  const searchFor = (date: string, lead = channel): RecordingsSearch => ({
-    channel: lead,
-    ...(ticked.length > 1 && { channels: ticked }),
+  /** The address for a day, on the cameras playing, with `lead` picked. */
+  const searchFor = (date: string, lead = camera): RecordingsSearch => ({
+    camera: lead,
+    ...(ticked.length > 1 && { cameras: ticked }),
     date,
   });
 
-  /** Asks the address for the picked day, on these channels. */
+  /** Asks the address for the picked day, on these cameras. */
   const pick = (date: string) => options.onPick(searchFor(date));
 
-  /** The days with recordings on any channel in a month, such as `2026-11`. */
+  /** The days with recordings on any camera in a month, such as `2026-11`. */
   const recordedDaysIn = async (month: string) =>
     (
-      await call((api) => api.recorder.days({ query: { month } })).catch(
+      await call((api) => api.cameras.days({ query: { month } })).catch(
         () => [],
       )
     ).map((recorded) => recorded.date);
@@ -1056,22 +1082,20 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     );
   };
 
-  /** The channels with recordings on the day shown, once known. */
-  let recordedChannels: ReadonlySet<number> | undefined;
+  /** The cameras with recordings on the day shown, once known. */
+  let recordedCameras: ReadonlySet<CameraId> | undefined;
 
-  /** The channel picker, with channels that recorded nothing that day greyed out. */
-  const showChannels = () => {
-    if (channelSelect === null) return;
+  /** The camera picker, with cameras that recorded nothing that day greyed out. */
+  const showCameras = () => {
+    if (cameraSelect === null) return;
 
-    channelSelect.options = Array.from({ length: channels }, (_, index) => {
-      const number = index + 1;
-
+    cameraSelect.options = cameras.map((each) => {
       const empty =
-        recordedChannels !== undefined && !recordedChannels.has(number);
+        recordedCameras !== undefined && !recordedCameras.has(each.id);
 
       return {
-        value: String(number),
-        label: `Ch ${number}`,
+        value: each.id,
+        label: cameraLabel(each.id),
         ...(empty && {
           description: "Nothing recorded this day",
           disabled: true,
@@ -1079,41 +1103,45 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       };
     });
 
-    channelSelect.values = ticked.map(String);
+    cameraSelect.values = [...ticked];
   };
 
-  /** Finds which channels recorded on a day: a quick search of each. */
-  const findRecordedChannels = async (date: string) => {
+  /** Finds which cameras recorded on a day: a quick search of each. */
+  const findRecordedCameras = async (date: string) => {
     const found = await Promise.all(
-      Array.from({ length: channels }, (_, index) =>
-        call((api) =>
-          api.recorder.recordings({ query: { channel: index + 1, date } }),
-        )
-          .then((list) => (list.length > 0 ? [index + 1] : []))
+      cameras.map((each) =>
+        recordingsOn(each.id, date)
+          .then((list) => (list.length > 0 ? [each.id] : []))
           // Unknown, so left to pick
-          .catch(() => [index + 1]),
+          .catch(() => [each.id]),
       ),
     );
 
     // A later pick has moved on
     if (date !== day) return;
 
-    recordedChannels = new Set(found.flat());
-    showChannels();
+    recordedCameras = new Set(found.flat());
+    showCameras();
   };
 
-  /** Shows channels and a day: the month's recorded days and the day's recordings. */
+  /** Where a camera comes in the picker, so ticked ones play in that order. */
+  const placeOf = (id: CameraId) => cameras.findIndex((each) => each.id === id);
+
+  const inOrder = (ids: ReadonlyArray<CameraId>) =>
+    ids.toSorted((a, b) => placeOf(a) - placeOf(b));
+
+  /** Shows cameras and a day: the month's recorded days and the day's recordings. */
   const show = async (picked: {
-    channel: number;
-    channels: ReadonlyArray<number>;
+    camera: CameraId;
+    cameras: ReadonlyArray<CameraId>;
     date: string;
   }) => {
-    channel = picked.channel;
-    ticked = picked.channels;
+    camera = picked.camera;
+    ticked = picked.cameras;
     day = picked.date;
-    keep(storageKey, { channel, channels: [...ticked], date: day });
+    keep(storageKey, { camera, cameras: [...ticked], date: day });
 
-    if (channelSelect !== null) channelSelect.values = ticked.map(String);
+    if (cameraSelect !== null) cameraSelect.values = [...ticked];
 
     // Recordings stop at the last day, so there's no day after it to go to
     if (dayPicker !== null) {
@@ -1127,7 +1155,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     showDays(days);
     markDays(days);
-    void findRecordedChannels(day);
+    void findRecordedCameras(day);
     await showRecordings();
   };
 
@@ -1163,64 +1191,73 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     if (day !== "") pick(shiftDay(1));
   });
 
-  // Ticking channels plays them together; the picked one stays picked while
+  // Ticking cameras plays them together; the picked one stays picked while
   // it's ticked. The layouts stop at four, so a fifth unticks the first
   // ticked, and the last can't be unticked
-  if (channelSelect !== null) {
-    channelSelect.multiple = true;
+  if (cameraSelect !== null) {
+    cameraSelect.multiple = true;
 
-    on(channelSelect, "change", () => {
-      const picks = channelSelect.values.map(Number).slice(-mostChannels);
+    on(cameraSelect, "change", () => {
+      const picks = cameraSelect.values
+        .filter((value) => placeOf(value) !== -1)
+        .slice(-mostCameras);
 
       if (picks.length === 0) {
-        channelSelect.values = ticked.map(String);
+        cameraSelect.values = [...ticked];
 
         return;
       }
 
       options.onPick({
-        channel: picks.includes(channel) ? channel : (picks[0] ?? channel),
-        ...(picks.length > 1 && { channels: picks.toSorted((a, b) => a - b) }),
+        camera: picks.includes(camera) ? camera : (picks[0] ?? camera),
+        ...(picks.length > 1 && { cameras: inOrder(picks) }),
         date: day,
       });
     });
   }
 
-  pickChannel = (picked) => options.onPick(searchFor(day, picked));
+  pickCamera = (picked) => options.onPick(searchFor(day, picked));
 
-  /** The same channels, in any order. */
-  const sameChannels = (a: ReadonlyArray<number>, b: ReadonlyArray<number>) =>
-    a.length === b.length && a.every((number) => b.includes(number));
+  /** The same cameras, in any order. */
+  const sameCameras = (
+    a: ReadonlyArray<CameraId>,
+    b: ReadonlyArray<CameraId>,
+  ) => a.length === b.length && a.every((id) => b.includes(id));
 
   /** Shows what the address asks for, filling in what it leaves out. */
   const follow = async (search: RecordingsSearch) => {
-    const lead = Math.min(search.channel ?? saved.channel ?? 1, channels);
+    const known = (id: CameraId | undefined): id is CameraId =>
+      id !== undefined && placeOf(id) !== -1;
 
-    // The address's channels, or the kept ones when it names none, or the
-    // picked one alone; always with the picked one, on this recorder
+    // The address's camera, or the kept one, or the first with recordings
+    const lead = [search.camera, saved.camera].find(known) ?? cameras[0]?.id;
+
+    if (lead === undefined) return;
+
+    // The address's cameras, or the kept ones when it names none, or the
+    // picked one alone; always with the picked one, and only cameras there are
     const asked =
-      search.channels ??
-      (search.channel === undefined ? saved.channels : undefined) ??
+      search.cameras ??
+      (search.camera === undefined ? saved.cameras : undefined) ??
       [];
 
-    const set = [...new Set([lead, ...asked])]
-      .filter((number) => number <= channels)
-      .slice(0, mostChannels)
-      .toSorted((a, b) => a - b);
+    const set = inOrder(
+      [...new Set([lead, ...asked])].filter(known).slice(0, mostCameras),
+    );
 
     const wanted = {
-      channel: lead,
-      channels: set,
+      camera: lead,
+      cameras: set,
       date: search.date ?? saved.date ?? lastDay,
     };
 
-    if (wanted.date !== day || !sameChannels(wanted.channels, ticked)) {
+    if (wanted.date !== day || !sameCameras(wanted.cameras, ticked)) {
       await show(wanted);
-    } else if (wanted.channel !== channel) {
-      // Another of the same channels picked: it moves first, with no reload
-      channel = wanted.channel;
-      keep(storageKey, { channel });
-      player?.setChannels(tracks, channel);
+    } else if (wanted.camera !== camera) {
+      // Another of the same cameras picked: it moves first, with no reload
+      camera = wanted.camera;
+      keep(storageKey, { camera });
+      player?.setCameras(tracks, camera);
       showZoom();
       showState();
     }
@@ -1362,7 +1399,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
   // The last frame, held over the picture while the next clip loads, then
   // faded out once the next one draws, rather than a flash of black. With
-  // several channels, each tile loads on its own, so there's nothing to hold
+  // several cameras, each tile loads on its own, so there's nothing to hold
   const holdFrame = () => {
     const video = player?.video();
 
@@ -1400,18 +1437,18 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   showState();
 
   return {
-    start: (today, count) => {
+    start: (today, list) => {
       lastDay = today;
-      channels = count;
+      cameras = list;
 
-      showChannels();
+      showCameras();
 
       if (waiting !== undefined) void follow(waiting);
 
       waiting = undefined;
     },
     open: (search) => {
-      if (channels === 0) waiting = search;
+      if (cameras.length === 0) waiting = search;
       else void follow(search);
     },
     pause: () => {

@@ -9,11 +9,11 @@
 import * as NodeSocket from "@effect/platform-node-shared/NodeSocket";
 import type {
   AlarmEvent,
+  ChannelRecording,
   DeviceInfo,
   LocalTime,
   RecordedDay,
   RecorderStatus,
-  Recording,
 } from "@timmo001/kestrel-core/domain";
 import {
   Array as Arr,
@@ -150,7 +150,7 @@ export interface Session {
     readonly channel: number;
     readonly begin: LocalTime;
     readonly end: LocalTime;
-  }) => Effect.Effect<Array<Recording>, SessionError>;
+  }) => Effect.Effect<Array<ChannelRecording>, SessionError>;
   /** Days with recordings on any of the channels (from 1) between two recorder times. */
   readonly recordedDays: (options: {
     readonly channels: ReadonlyArray<number>;

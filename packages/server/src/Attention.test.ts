@@ -15,6 +15,8 @@ const channel = (number: number, videoLoss: boolean): ChannelStatus => ({
 
 const connected = { connected: true, since: null, error: null };
 
+const source = { id: "swann", name: "Swann recorder" };
+
 test("only a camera that had a signal alerts when it loses it", () => {
   const status = {
     time: null,
@@ -22,13 +24,15 @@ test("only a camera that had a signal alerts when it loses it", () => {
     channels: [channel(1, true), channel(5, true)],
   };
 
-  expect(attentionFor(connected, status, new Set([1]))).toEqual([
+  expect(attentionFor(source, connected, status, new Set([1]))).toEqual([
     {
+      source: "swann",
       level: "passive",
       kind: "disk",
       message: "Disk 1 is full, so the oldest recordings are recorded over",
     },
     {
+      source: "swann",
       level: "alert",
       kind: "signal",
       message: "Channel 1 has lost its camera's signal",
@@ -39,15 +43,17 @@ test("only a camera that had a signal alerts when it loses it", () => {
 test("a lost connection is the only item", () => {
   expect(
     attentionFor(
+      source,
       { connected: false, since: null, error: "Connection refused" },
       null,
       new Set([1]),
     ),
   ).toEqual([
     {
+      source: "swann",
       level: "alert",
       kind: "connection",
-      message: "Can't reach the recorder: Connection refused",
+      message: "Can't reach Swann recorder: Connection refused",
     },
   ]);
 });

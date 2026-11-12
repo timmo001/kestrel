@@ -1,18 +1,15 @@
 /**
  * Live video through go2rtc. Browsers can't play RTSP, so the server runs
- * go2rtc beside it with the source's live streams, each channel's main and
- * sub stream, and the web client plays them through the server, under
- * `/go2rtc/`. The config holds the source's addresses, which can carry its
- * login, so it's written to a private temporary file rather than passed on
- * the command line, and go2rtc's own logging is kept off.
+ * go2rtc beside it with every source's live streams, each camera's main and
+ * sub stream, named from the camera's id, and the web client plays them
+ * through the server, under `/go2rtc/`. The config holds the sources'
+ * addresses, which can carry their logins, so it's written to a private
+ * temporary file rather than passed on the command line, and go2rtc's own
+ * logging is kept off.
  *
  * @module
  */
-import {
-  Recorder,
-  type LiveFeed,
-  type RecorderUnavailable,
-} from "@timmo001/kestrel-core";
+import type { CameraId, LiveFeed, LiveStreams } from "@timmo001/kestrel-core";
 import {
   Config,
   Context,
@@ -25,26 +22,32 @@ import {
   Schedule,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import type { VideoSources } from "./Api.ts";
 import { basePath } from "./Go2rtc.ts";
+import { Sources } from "./Sources.ts";
 
 const restart = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
   Schedule.spaced(Duration.seconds(30)),
 ]);
 
+/** A camera's go2rtc stream names, such as `swann_3` and `swann_3_sub`. */
+export const streamNames = (camera: CameraId, hasSub: boolean): LiveStreams => {
+  const main = camera.replace("/", "_");
+
+  return { main, sub: hasSub ? `${main}_sub` : null };
+};
+
 export class Video extends Context.Service<
   Video,
   {
     /** The port go2rtc listens on, on 127.0.0.1. */
     readonly port: number;
-    readonly sources: Effect.Effect<VideoSources, RecorderUnavailable>;
   }
 >()("@timmo001/kestrel-server/Video") {
   static readonly layer = Layer.effect(
     Video,
     Effect.gen(function* () {
-      const recorder = yield* Recorder;
+      const sources = yield* Sources;
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -65,20 +68,31 @@ export class Video extends Context.Service<
           api: { listen: `127.0.0.1:${port}`, base_path: basePath },
           rtsp: { listen: "" },
           streams: Object.fromEntries(
-            feeds.flatMap((feed) => [
-              [feed.stream.main, Redacted.value(feed.main)],
-              [feed.stream.sub, Redacted.value(feed.sub)],
-            ]),
+            feeds.flatMap((feed) => {
+              const names = streamNames(feed.camera, feed.sub !== null);
+
+              return names.sub === null || feed.sub === null
+                ? [[names.main, Redacted.value(feed.main)]]
+                : [
+                    [names.main, Redacted.value(feed.main)],
+                    [names.sub, Redacted.value(feed.sub)],
+                  ];
+            }),
           ),
         });
 
       const run = Effect.scoped(
         Effect.gen(function* () {
-          // The streams come from the source once it's ready, such as after
-          // a recorder's login, so wait for them.
-          const feeds = yield* recorder.live.pipe(
-            Effect.retry(Schedule.spaced(Duration.seconds(5))),
-          );
+          // Each source's streams come once it's ready, such as after a
+          // recorder's login, so wait for them all.
+          const feeds = (yield* Effect.forEach(
+            sources.all,
+            (source) =>
+              source.live.pipe(
+                Effect.retry(Schedule.spaced(Duration.seconds(5))),
+              ),
+            { concurrency: "unbounded" },
+          )).flat();
 
           const directory = yield* fs.makeTempDirectoryScoped({
             prefix: "kestrel-",
@@ -118,7 +132,7 @@ export class Video extends Context.Service<
           yield* fs.remove(file).pipe(Effect.ignore);
 
           yield* Effect.logInfo(
-            `go2rtc is serving ${feeds.length} channels on port ${port}`,
+            `go2rtc is serving ${feeds.length} cameras on port ${port}`,
           );
 
           const code = yield* handle.exitCode;
@@ -132,15 +146,7 @@ export class Video extends Context.Service<
 
       yield* Effect.forkScoped(run);
 
-      return Video.of({
-        port,
-        sources: recorder.live.pipe(
-          Effect.map((feeds) => ({
-            path: `${basePath}/`,
-            streams: feeds.map((feed) => feed.stream),
-          })),
-        ),
-      });
+      return Video.of({ port });
     }),
   );
 }

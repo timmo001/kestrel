@@ -1,0 +1,122 @@
+/**
+ * What a source kind implements, such as the Raysharp recorder: its
+ * connection, its cameras and where go2rtc reads their live streams, and
+ * the capabilities only some sources have, each optional: recordings,
+ * events, and details such as a recorder's device and status. A camera is
+ * named by its id within the source here, such as `3` for `swann/3`.
+ *
+ * @module
+ */
+import type { Effect, Redacted, Stream } from "effect";
+import type {
+  CameraId,
+  Connection,
+  DeviceInfo,
+  LocalTime,
+  NoRecordings,
+  ReceivedEvent,
+  RecordedDay,
+  RecorderStatus,
+  Recording,
+  SourceId,
+  SourceUnavailable,
+  UnknownCamera,
+} from "./Domain.ts";
+
+/** One frame of recorded H.264 video. */
+export interface RecordedFrame {
+  /** A key frame, which starts with its SPS, PPS and SEI. */
+  readonly key: boolean;
+  /**
+   * When it was recorded, in microseconds since 1970, on the recorder's own
+   * clock: local time with no zone, so read it as if it were UTC.
+   */
+  readonly time: number;
+  readonly width: number;
+  readonly height: number;
+  /** The frame rate the stream was recorded at. */
+  readonly fps: number;
+  /** The frame in Annex B form, with start codes. */
+  readonly data: Uint8Array;
+}
+
+/** A camera as its source describes it; the server adds its stream names. */
+export interface CameraInfo {
+  readonly id: CameraId;
+  readonly name: string;
+  /** A recorder's channel number; `null` for a camera that isn't one. */
+  readonly channel: number | null;
+  /** Whether it has a picture now; `null` when the source can't tell. */
+  readonly signal: boolean | null;
+  readonly live: boolean;
+  readonly recordings: boolean;
+  readonly events: boolean;
+}
+
+/**
+ * Where go2rtc reads a camera's live streams: the full one and, where it
+ * has one, the small sub stream. They can hold a login, so they stay
+ * redacted.
+ */
+export interface LiveFeed {
+  readonly camera: CameraId;
+  readonly main: Redacted.Redacted;
+  readonly sub: Redacted.Redacted | null;
+}
+
+/** Recordings, for a source that keeps them. */
+export interface SourceRecordings {
+  /** Days with recordings on any of its cameras in a month, such as `2026-11`. */
+  readonly days: (
+    month: string,
+  ) => Effect.Effect<Array<RecordedDay>, SourceUnavailable>;
+  /** A camera's recordings on one day, such as `2026-11-11`. */
+  readonly list: (
+    camera: string,
+    date: string,
+  ) => Effect.Effect<Array<Recording>, SourceUnavailable | UnknownCamera>;
+  /**
+   * What a camera recorded between two times, as its frames; or with
+   * `every`, key frames only, one per that many seconds. Fails up front
+   * when nothing was recorded then.
+   */
+  readonly video: (options: {
+    readonly camera: string;
+    readonly begin: LocalTime;
+    readonly end: LocalTime;
+    readonly stream: "main" | "sub";
+    readonly every?: number | undefined;
+  }) => Effect.Effect<
+    Stream.Stream<RecordedFrame, SourceUnavailable>,
+    SourceUnavailable | NoRecordings | UnknownCamera
+  >;
+}
+
+/** Events, for a source that reports them. */
+export interface SourceEvents {
+  /** The newest, newest first. */
+  readonly recent: Effect.Effect<ReadonlyArray<ReceivedEvent>>;
+  /** Each as it arrives. */
+  readonly live: Stream.Stream<ReceivedEvent>;
+}
+
+/** A device and its status, for a source that has them, such as a recorder. */
+export interface SourceDetails {
+  readonly device: Effect.Effect<DeviceInfo, SourceUnavailable>;
+  readonly status: Effect.Effect<RecorderStatus, SourceUnavailable>;
+}
+
+export interface Source {
+  readonly id: SourceId;
+  /** Which kind of source, such as `raysharp`. */
+  readonly kind: string;
+  readonly name: string;
+  readonly connection: Effect.Effect<Connection>;
+  /** Its cameras. Fails until it knows them, such as before a recorder's first login. */
+  readonly cameras: Effect.Effect<ReadonlyArray<CameraInfo>, SourceUnavailable>;
+  /** Where go2rtc reads each camera's live streams; fails as `cameras` does. */
+  readonly live: Effect.Effect<ReadonlyArray<LiveFeed>, SourceUnavailable>;
+  readonly recordings?: SourceRecordings;
+  readonly events?: SourceEvents;
+  readonly details?: SourceDetails;
+}

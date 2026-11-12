@@ -6,10 +6,13 @@
  * browser. The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { ChannelStatus, LiveStream } from "@timmo001/kestrel-core/domain";
+import type { Camera } from "@timmo001/kestrel-core/domain";
+import { go2rtcPath } from "@timmo001/kestrel-server/api";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
-import { call } from "./api.ts";
+import { Option, Schema } from "effect";
+import { SavedCamera } from "./addresses.ts";
+import { cameraLabel, fileName } from "./cameras.ts";
 import {
   phCamera,
   phCaretLeft,
@@ -74,29 +77,39 @@ const layoutsFor = (cameras: number) => {
   return layouts.filter((size) => size <= cameras || size === all);
 };
 
-/** Past four at once, the small sub stream: the main one is more than a small tile shows. */
-const streamFor = (stream: LiveStream, layout: number) =>
-  layout > 4 ? stream.sub : stream.main;
+/** A camera that plays live, with its go2rtc stream names. */
+interface LiveCamera extends Camera {
+  readonly live: NonNullable<Camera["live"]>;
+}
+
+/**
+ * Past four at once, the small sub stream where there is one: the main one
+ * is more than a small tile shows.
+ */
+const streamFor = (camera: LiveCamera, layout: number) =>
+  layout > 4 ? (camera.live.sub ?? camera.live.main) : camera.live.main;
 
 const storageKey = "kestrel.live";
+
+const decodeSavedCamera = Schema.decodeUnknownOption(SavedCamera);
 
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {
   const values = keptAt(storageKey);
   const layout = Number(values?.["layout"]);
   const page = Number(values?.["page"]);
-  const picked = Number(values?.["picked"]);
 
   return {
     layout: layouts.includes(layout) ? layout : 4,
     page: Number.isInteger(page) && page >= 0 ? page : 0,
-    picked: Number.isInteger(picked) && picked >= 1 ? picked : undefined,
+    // Kept before camera ids, the recorder's channel by number
+    picked: Option.getOrUndefined(decodeSavedCamera(values?.["picked"])),
   };
 };
 
 /** A camera on the page: its tile, player and held frame. */
 interface Tile {
-  readonly stream: LiveStream;
+  readonly stream: LiveCamera;
   readonly figure: HTMLElement;
   readonly player: LivePlayer;
   readonly hold: HTMLCanvasElement;
@@ -112,8 +125,8 @@ const fileTime = () => {
 };
 
 export interface LivePage {
-  /** Shows the cameras with a signal, once the page is the one shown. */
-  readonly show: (channels: ReadonlyArray<ChannelStatus>) => Promise<void>;
+  /** Shows the cameras that play live and have a signal, once the page is the one shown. */
+  readonly show: (cameras: ReadonlyArray<Camera>) => Promise<void>;
   /** Takes the players off the page, which closes their streams. */
   readonly stop: () => void;
   /** Gives the cameras the focus, so the keyboard controls work at once. */
@@ -141,8 +154,7 @@ export const livePage = (): LivePage => {
   /** Where to go back to from one camera alone, by Enter or a double click. */
   let solo: { readonly layout: number; readonly page: number } | undefined;
   let paused = false;
-  let path = "";
-  let streams: ReadonlyArray<LiveStream> = [];
+  let streams: ReadonlyArray<LiveCamera> = [];
   let tiles: ReadonlyArray<Tile> = [];
 
   // The placeholders take the kept layout's shape from the first paint
@@ -218,10 +230,7 @@ export const livePage = (): LivePage => {
 
   const showPicked = () => {
     for (const tile of tiles) {
-      tile.figure.toggleAttribute(
-        "data-picked",
-        tile.stream.channel === picked,
-      );
+      tile.figure.toggleAttribute("data-picked", tile.stream.id === picked);
     }
   };
 
@@ -238,7 +247,7 @@ export const livePage = (): LivePage => {
     );
 
     tile.player.src = new URL(
-      `${path}api/ws?src=${encodeURIComponent(streamFor(tile.stream, layout))}`,
+      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream, layout))}`,
       location.origin,
     ).href;
   };
@@ -271,17 +280,17 @@ export const livePage = (): LivePage => {
         figure.append(
           player,
           hold,
-          element("figcaption", `Ch ${stream.channel}`),
+          element("figcaption", cameraLabel(stream.id)),
         );
 
         figure.addEventListener("click", () => {
-          picked = stream.channel;
+          picked = stream.id;
           keepPlace();
           showPicked();
         });
 
         figure.addEventListener("dblclick", () => {
-          picked = stream.channel;
+          picked = stream.id;
           toggleSolo();
         });
 
@@ -335,14 +344,14 @@ export const livePage = (): LivePage => {
       ({ layout, page } = solo);
       solo = undefined;
     } else {
-      const index = streams.findIndex((stream) => stream.channel === picked);
+      const index = streams.findIndex((stream) => stream.id === picked);
       const at = index === -1 ? page * layout : index;
       const camera = streams[at];
 
       if (camera === undefined) return;
 
       solo = { layout, page };
-      picked = camera.channel;
+      picked = camera.id;
       layout = 1;
       page = at;
     }
@@ -380,8 +389,7 @@ export const livePage = (): LivePage => {
   /** Saves a still of the picked camera, or the first shown. */
   const capture = () => {
     const tile =
-      tiles.find((shownTile) => shownTile.stream.channel === picked) ??
-      tiles[0];
+      tiles.find((shownTile) => shownTile.stream.id === picked) ?? tiles[0];
 
     if (tile === undefined) return;
 
@@ -414,7 +422,7 @@ export const livePage = (): LivePage => {
         const link = element("a");
 
         link.href = href;
-        link.download = `channel-${tile.stream.channel}_live_${fileTime()}.jpg`;
+        link.download = `${fileName(tile.stream.id)}_live_${fileTime()}.jpg`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(href), 10_000);
       },
@@ -502,20 +510,13 @@ export const livePage = (): LivePage => {
   showControls();
 
   return {
-    show: async (channels) => {
-      const sources = await call((api) => api.video.sources());
+    show: async (cameras) => {
+      await definePlayer(go2rtcPath);
 
-      await definePlayer(sources.path);
-
-      const withSignal = new Set(
-        channels.flatMap((status) =>
-          status.videoLoss ? [] : [status.channel],
-        ),
-      );
-
-      path = sources.path;
-      streams = sources.streams.filter((stream) =>
-        withSignal.has(stream.channel),
+      // Where the source can't tell whether there's a picture, it's tried
+      streams = cameras.filter(
+        (camera): camera is LiveCamera =>
+          camera.live !== null && camera.signal !== false,
       );
 
       // A layout bigger than there are cameras for falls back to the one

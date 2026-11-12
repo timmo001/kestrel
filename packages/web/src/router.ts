@@ -8,9 +8,10 @@
  *
  * @module
  */
-import { LocalDate, LocalTime } from "@timmo001/kestrel-core/domain";
+import { CameraId, LocalDate, LocalTime } from "@timmo001/kestrel-core/domain";
 import { Option, Schema, SchemaGetter } from "effect";
 import { Atom } from "effect/reactivity";
+import { newAddress } from "./addresses.ts";
 
 /** What a route's search params encode to: optional strings by name. */
 type SearchEncoded = { readonly [key: string]: string | undefined };
@@ -36,14 +37,9 @@ const route = <P, S>(
   search: Schema.Codec<S, SearchEncoded>,
 ): RouteDefinition<P, S> => ({ path, params, search });
 
-const ChannelNumber = Schema.NumberFromString.check(
-  Schema.isInt(),
-  Schema.isGreaterThanOrEqualTo(1),
-);
-
-/** Channels as a comma list, such as `1,3,4`. */
-const ChannelList = Schema.String.pipe(
-  Schema.decodeTo(Schema.Array(ChannelNumber), {
+/** Cameras as a comma list, such as `swann/1,swann/3`. */
+const CameraList = Schema.String.pipe(
+  Schema.decodeTo(Schema.Array(CameraId), {
     decode: SchemaGetter.transform((text: string) => text.split(",")),
     encode: SchemaGetter.transform((parts: ReadonlyArray<string>) =>
       parts.join(","),
@@ -52,13 +48,13 @@ const ChannelList = Schema.String.pipe(
 );
 
 /**
- * The Recordings page: the picked channel and the others played with it, a
- * day, and a recorder time to play from. Without `channels`, the picked
- * channel plays alone.
+ * The Recordings page: the picked camera and the others played with it, a
+ * day, and a time to play from. Without `cameras`, the picked camera plays
+ * alone.
  */
 export const RecordingsSearch = Schema.Struct({
-  channel: Schema.optional(ChannelNumber),
-  channels: Schema.optional(ChannelList),
+  camera: Schema.optional(CameraId),
+  cameras: Schema.optional(CameraList),
   date: Schema.optional(LocalDate),
   at: Schema.optional(LocalTime),
 });
@@ -442,12 +438,6 @@ const makeRouter = <const R extends AnyRoutes>(
 const pageNames = new Set(Object.keys(routes));
 
 export const { href, navigate, currentLocation } = makeRouter(routes, {
-  // The pages used to be hash addresses, such as `/#recordings`
-  redirect: (url) => {
-    const name = url.hash.slice(1);
-
-    return url.pathname === "/" && pageNames.has(name) && name !== "live"
-      ? `/${name}`
-      : undefined;
-  },
+  // Old addresses, such as `/#recordings` or `channel=3`, still land
+  redirect: (url) => newAddress(url, pageNames),
 });

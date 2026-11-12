@@ -8,33 +8,46 @@ OpenAPI document is at `/api/openapi.json`. Recorder times have no time zone:
 they're the recorder's own clock, as it keeps them, such as
 `2026-11-11T22:24:31`.
 
-| Endpoint                               | Returns                                                         |
-| -------------------------------------- | --------------------------------------------------------------- |
-| `GET /api/connection`                  | Whether the server is logged in, since when, and the last error |
-| `GET /api/attention`                   | What needs you, each an `alert` or `passive`                    |
-| `GET /api/device`                      | The recorder's name, firmware, MAC and channel count            |
-| `GET /api/status`                      | Its clock, disks and each channel's state                       |
-| `GET /api/recordings?channel=1&date=…` | A channel's recordings on one day, such as `2026-11-11`         |
-| `GET /api/recordings/video?…`          | Recorded video as MP4; see below                                |
-| `GET /api/days?month=…`                | The days with recordings in a month, such as `2026-11`          |
-| `GET /api/events/`                     | The last 200 alarm reports, newest first                        |
-| `GET /api/events/live`                 | Alarm reports as server-sent events                             |
-| `GET /api/video/sources`               | Where go2rtc is served, and each channel's stream names         |
-| `GET /api/health`                      | 204 while the server is up                                      |
+It serves **sources**, such as the recorder, and their **cameras**. A
+camera's id is its source's id and its own, such as `swann/3` for the
+recorder's channel 3, and its routes take the two as path segments.
+
+| Endpoint                                             | Returns                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------- |
+| `GET /api/sources`                                   | Each source: its kind, name and whether it's connected        |
+| `GET /api/sources/:source/device`                    | A recorder's name, firmware, MAC and channel count            |
+| `GET /api/sources/:source/status`                    | Its clock, disks and each channel's state                     |
+| `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source |
+| `GET /api/cameras`                                   | Each camera: its id, name and what it can do                  |
+| `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`        |
+| `GET /api/cameras/:source/:camera/video?…`           | Recorded video as MP4; see below                              |
+| `GET /api/days?month=…`                              | The days with recordings on any camera in a month             |
+| `GET /api/events/`                                   | The last 200 events from each source, newest first            |
+| `GET /api/events/live`                               | Events as server-sent events                                  |
+| `GET /api/health`                                    | 204 while the server is up                                    |
+
+A camera in `/api/cameras` says what it can do: `live` has its go2rtc stream
+names, or is `null` for a camera with no live view; `recordings` and `events`
+say whether it has them; `signal` is whether it has a picture now, or `null`
+when its source can't tell. A source that isn't connected yet leaves its
+cameras out until it knows them.
 
 `/api/attention` is the status source the CLI's `status`, the page and push
-read. Alerts are what needs you: the recorder can't be reached, a disk is bad
-or unformatted, or a camera that had a signal while the server ran has lost
-it. A full disk is passive, since the recorder records over its oldest
+read. Alerts are what needs you: a source can't be reached, a disk is bad or
+unformatted, or a camera that had a signal while the server ran has lost it.
+A full disk is passive, since the recorder records over its oldest
 recordings; the page shows it in the Disks card.
 
-Every endpoint that needs the recorder returns 503 with a
-`RecorderUnavailable` error while the server isn't logged in.
+Every endpoint that needs a source returns 503 with a `SourceUnavailable`
+error while it isn't connected. An id that names no source or camera returns
+404 with `UnknownSource` or `UnknownCamera`, and asking for something a
+source can't do, such as a stream's recordings, returns 404 with
+`NotSupported`.
 
 ## Recorded video
 
-`GET /api/recordings/video?channel=1&begin=2026-11-11T21:46:00&end=2026-11-11T21:48:00`
-sends what a channel recorded between two recorder times as fragmented MP4,
+`GET /api/cameras/swann/1/video?begin=2026-11-11T21:46:00&end=2026-11-11T21:48:00`
+sends what a camera recorded between two recorder times as fragmented MP4,
 H.264 with no audio, which plays as it arrives. Add `stream=sub` for the small
 sub stream, and `download=true` to have a browser save it as a file rather
 than play it. `speedUp=2`, up to 4, shortens each frame so it plays that many
@@ -66,9 +79,9 @@ is about 250 MB.
 
 The server serves go2rtc under `/go2rtc/`, its WebSocket included, so live
 video plays from the same address as the page, through a proxy or over HTTPS.
-`/api/video/sources` names two streams for each channel: `chNN` for the main
-stream and `chNN_sub` for the sub stream. Play one with
-`/go2rtc/stream.html?src=ch01_sub`.
+Each camera's `live` in `/api/cameras` names its streams, from its id: such
+as `swann_1` for the main stream and `swann_1_sub` for the sub stream. Play
+one with `/go2rtc/stream.html?src=swann_1_sub`.
 
 The DVR8-4575 offers an audio track on every stream but sends nothing on it,
 and an MSE player that asks for audio waits for it forever. The page plays

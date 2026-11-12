@@ -6,9 +6,9 @@
  * the recorder sends far faster than it plays.
  */
 
-/** A stretch of one channel's recording, in recorder times. */
+/** A stretch of one camera's recording, in recorder times. */
 export interface Clip {
-  readonly channel: number;
+  readonly camera: string;
   readonly begin: string;
   readonly end: string;
 }
@@ -21,7 +21,7 @@ export const fromSeconds = (seconds: number) =>
   new Date(seconds * 1000).toISOString().slice(0, 19);
 
 /**
- * Which of a channel's streams a clip plays from, how many times faster
+ * Which of a camera's streams a clip plays from, how many times faster
  * than it was recorded the server makes it, and whether it's key frames
  * only, one per `every` seconds of recording. Browsers play no faster than
  * 16 times, and the full stream downloads at about 17, so faster speeds come
@@ -43,9 +43,9 @@ export const sameView = (a: View, b: View) =>
 
 /** The server's MP4 of a clip, to play or, with `download`, to save as a file. */
 export const clipUrl = (clip: Clip, download = false, view = fullView) => {
-  const url = new URL("api/recordings/video", location.origin);
+  // The camera's id is its route's two path segments, such as `swann/3`
+  const url = new URL(`api/cameras/${clip.camera}/video`, location.origin);
 
-  url.searchParams.set("channel", String(clip.channel));
   url.searchParams.set("begin", clip.begin);
   url.searchParams.set("end", clip.end);
 

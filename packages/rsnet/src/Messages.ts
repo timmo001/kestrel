@@ -7,12 +7,12 @@
 import type {
   AlarmEvent,
   AlarmKind,
+  ChannelRecording,
   DeviceInfo,
   DiskState,
   LocalTime,
   RecordedDay,
   RecorderStatus,
-  Recording,
   RecordingMode,
   RecordingReason,
 } from "@timmo001/kestrel-core/domain";
@@ -363,8 +363,8 @@ const eachRecord = (
 export const parseRecordings = (
   bytes: Uint8Array,
   channel: number,
-): Array<Recording> => {
-  const recordings: Array<Recording> = [];
+): Array<ChannelRecording> => {
+  const recordings: Array<ChannelRecording> = [];
   eachRecord(bytes, 24, (body, offset, size) => {
     const begin = readTime(body, offset + 4);
     const end = readTime(body, offset + 12);

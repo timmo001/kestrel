@@ -3,23 +3,25 @@ title: Agents
 description: The kestrel CLI, its Code Mode manifest and MCP server, and the skill that tells an agent how to use them.
 ---
 
-The `kestrel` CLI in `packages/cli` reads the recorder through the
-server's [API](/api). Every command takes `--json`. They only read from the
-recorder; `download` also writes the file it saves.
+The `kestrel` CLI in `packages/cli` reads your cameras through the server's
+[API](/api). Every command takes `--json`. They only read from the sources;
+`download` also writes the file it saves.
 
-| Command                                          | Returns                                                    |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| `kestrel status`                                 | The connection, the recorder's clock, disks and channels   |
-| `kestrel device`                                 | Its name, firmware and channel count                       |
-| `kestrel recordings -c 1 -d <day>`               | A channel's recordings on one day, today by default        |
-| `kestrel download -c 1 -d <day> --from … --to …` | Saves that stretch as an MP4, across recordings            |
-| `kestrel days -m <month>`                        | The days with recordings in a month, this month by default |
-| `kestrel events`                                 | The newest alarm reports                                   |
-| `kestrel video`                                  | Where go2rtc is served, and each channel's stream names    |
+| Command                                                | Returns                                                     |
+| ------------------------------------------------------ | ----------------------------------------------------------- |
+| `kestrel status`                                       | What needs you, each source's connection and its state      |
+| `kestrel device`                                       | The recorder's name, firmware and channel count             |
+| `kestrel cameras`                                      | Each camera's id, name and what it can do                   |
+| `kestrel recordings -c swann/1 -d <day>`               | A camera's recordings on one day, today by default          |
+| `kestrel download -c swann/1 -d <day> --from … --to …` | Saves that stretch as an MP4, across recordings             |
+| `kestrel days -m <month>`                              | The days with recordings in a month, this month by default  |
+| `kestrel events`                                       | The newest events                                           |
 
-`download` takes times of day on `--date`, such as `21:46` or `21:46:30`, or
-full ones such as `2026-11-11T21:46:30`. `--sub` saves the small sub stream,
-and `-o` names the file; by default it's named after the channel and start.
+`-c` takes a camera's id, such as `swann/1`; while there's one source, its
+camera's own id, such as `1`, is enough. `download` takes times of day on
+`--date`, such as `21:46` or `21:46:30`, or full ones such as
+`2026-11-11T21:46:30`. `--sub` saves the small sub stream, and `-o` names the
+file; by default it's named after the camera and start.
 
 It talks to `KESTREL_SERVER`, `http://127.0.0.1:7380` by default. Run it
 from the repository with `bun packages/cli/src/cli.ts`.

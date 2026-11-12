@@ -1,14 +1,16 @@
 /**
- * Several channels' players on one clock, for the Recordings page. Each
- * ticked channel has a tile with its own video and player. At each moment,
- * the channels that recorded then play their recording from that point, and
+ * Several cameras' players on one clock, for the Recordings page. Each
+ * ticked camera has a tile with its own video and player. At each moment,
+ * the cameras that recorded then play their recording from that point, and
  * the rest show a placeholder until their next recording starts. One
- * channel's video keeps the time: the picked one when it recorded then, or
+ * camera's video keeps the time: the picked one when it recorded then, or
  * else the first that did. The others are put back on its time when they
  * drift. With nothing recorded on any of them, it runs on to the next
  * recording on any. It answers what the page asks of one player, so the page
- * drives one channel or several the same way.
+ * drives one camera or several the same way.
  */
+import type { CameraId } from "@timmo001/kestrel-core/domain";
+import { cameraLabel } from "./cameras.ts";
 import { momentAt, nextMoment, type Track } from "./moments.ts";
 import {
   fullView,
@@ -20,31 +22,31 @@ import {
 } from "./player.ts";
 import { element } from "./shared.ts";
 
-/** One channel's tile: its figure, video and player. */
+/** One camera's tile: its figure, video and player. */
 interface Tile {
-  readonly channel: number;
+  readonly camera: CameraId;
   readonly figure: HTMLElement;
   readonly video: HTMLVideoElement;
   readonly player: Player;
 }
 
 export interface GroupEvents {
-  /** Why video stopped coming, with the channel when several play. */
+  /** Why video stopped coming, with the camera when several play. */
   readonly onProblem: (message: string) => void;
   /** The time moved on. */
   readonly onTime: () => void;
-  /** It played, paused or stopped, or another channel keeps the time. */
+  /** It played, paused or stopped, or another camera keeps the time. */
   readonly onState: () => void;
-  /** A tile other than the picked channel's was clicked. */
-  readonly onPick: (channel: number) => void;
+  /** A tile other than the picked camera's was clicked. */
+  readonly onPick: (camera: CameraId) => void;
 }
 
 export interface Group extends Player {
-  /** The channels to play, in order, and the picked one, which comes first and largest. */
-  readonly setChannels: (tracks: ReadonlyArray<Track>, picked: number) => void;
+  /** The cameras to play, in order, and the picked one, which comes first and largest. */
+  readonly setCameras: (tracks: ReadonlyArray<Track>, picked: CameraId) => void;
   /** The video that keeps the time, for a still, a held frame and the frame step. */
   readonly video: () => HTMLVideoElement | undefined;
-  /** The picked channel's video, which the zoom acts on. */
+  /** The picked camera's video, which the zoom acts on. */
   readonly lead: () => HTMLVideoElement | undefined;
   readonly paused: () => boolean;
   readonly resume: () => void;
@@ -55,17 +57,17 @@ export interface Group extends Player {
   readonly step: (seconds: number) => void;
 }
 
-/** How many channels the layouts take at once. */
-export const mostChannels = 4;
+/** How many cameras the layouts take at once. */
+export const mostCameras = 4;
 
 const isPlaying = (video: HTMLVideoElement) =>
   !video.paused && video.readyState >= 3;
 
-/** Plays several channels' recordings in `grid`, as one. */
+/** Plays several cameras' recordings in `grid`, as one. */
 export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
-  const tiles = new Map<number, Tile>();
+  const tiles = new Map<CameraId, Tile>();
   let tracks: ReadonlyArray<Track> = [];
-  let picked = 0;
+  let picked: CameraId = "";
   /** The tile whose video keeps the time. */
   let driver: Tile | undefined;
   /** Whether it should be playing, rather than paused or stopped. */
@@ -96,7 +98,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     if (moment.driver === undefined) {
       const next = nextMoment(tracks, at);
 
-      // Nothing on any channel until the end of the day: stop there
+      // Nothing on any camera until the end of the day: stop there
       if (next === undefined) {
         playing = false;
 
@@ -116,8 +118,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
     driver = keeper;
 
-    for (const { channel, recording } of moment.shown) {
-      const tile = tiles.get(channel);
+    for (const { camera, recording } of moment.shown) {
+      const tile = tiles.get(camera);
 
       if (tile === undefined) continue;
 
@@ -157,12 +159,13 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     return started;
   };
 
-  const makeTile = (channel: number): Tile => {
+  const makeTile = (camera: CameraId): Tile => {
     const figure = element("figure");
     const video = element("video");
+    const label = cameraLabel(camera);
 
     figure.className = "player-tile";
-    figure.dataset.channel = String(channel);
+    figure.dataset.camera = camera;
     video.className = "player-video";
     video.muted = true;
     video.playsInline = true;
@@ -170,13 +173,11 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     video.playbackRate = playbackRate;
     // Each camera prints its own channel on the picture; an empty tile says
     // which it is
-    figure.append(video, element("p", `Ch ${channel}: nothing recorded`));
+    figure.append(video, element("p", `${label}: nothing recorded`));
 
     const player = playerFor(video, {
       onProblem: (message) =>
-        events.onProblem(
-          tiles.size > 1 ? `Ch ${channel}: ${message}` : message,
-        ),
+        events.onProblem(tiles.size > 1 ? `${label}: ${message}` : message),
       // The clock runs on from the end of the recording keeping it; a
       // follower's end only shows its placeholder
       onEnded: (ended) => {
@@ -189,7 +190,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       },
     });
 
-    const tile = { channel, figure, video, player };
+    const tile = { camera, figure, video, player };
 
     player.view(view);
 
@@ -210,7 +211,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     }
 
     figure.addEventListener("click", () => {
-      if (channel !== picked) events.onPick(channel);
+      if (camera !== picked) events.onPick(camera);
     });
 
     return tile;
@@ -228,45 +229,45 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   };
 
   return {
-    setChannels: (next, pickedChannel) => {
+    setCameras: (next, pickedCamera) => {
       const at = now();
-      const wanted = new Set(next.map((track) => track.channel));
+      const wanted = new Set(next.map((track) => track.camera));
 
-      for (const [channel, tile] of tiles) {
-        if (!wanted.has(channel)) {
+      for (const [camera, tile] of tiles) {
+        if (!wanted.has(camera)) {
           tile.player.stop();
           tile.figure.remove();
-          tiles.delete(channel);
+          tiles.delete(camera);
 
           if (tile === driver) driver = undefined;
         }
       }
 
       tracks = next;
-      picked = pickedChannel;
+      picked = pickedCamera;
 
-      // The picked channel first, so it's the large one in three
+      // The picked camera first, so it's the large one in three
       const order = [
-        ...next.filter((track) => track.channel === picked),
-        ...next.filter((track) => track.channel !== picked),
+        ...next.filter((track) => track.camera === picked),
+        ...next.filter((track) => track.camera !== picked),
       ];
 
       for (const track of order) {
-        if (!tiles.has(track.channel)) {
-          tiles.set(track.channel, makeTile(track.channel));
+        if (!tiles.has(track.camera)) {
+          tiles.set(track.camera, makeTile(track.camera));
         }
       }
 
       grid.replaceChildren(
-        ...order.flatMap((track) => tiles.get(track.channel)?.figure ?? []),
+        ...order.flatMap((track) => tiles.get(track.camera)?.figure ?? []),
       );
       grid.dataset.layout = String(Math.max(order.length, 1));
 
       for (const tile of tiles.values()) {
-        tile.figure.toggleAttribute("data-picked", tile.channel === picked);
+        tile.figure.toggleAttribute("data-picked", tile.camera === picked);
       }
 
-      // Channels joining part way through come in at the clock's time
+      // Cameras joining part way through come in at the clock's time
       if (at !== undefined) void Promise.all(align(at, false));
     },
     play: async (clip: Clip, from = 0, autoplay = true) => {
@@ -281,8 +282,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       }
 
       // A stretch none of the lists has, such as a kept position from
-      // before they loaded: its own channel plays it alone
-      const tile = tiles.get(clip.channel) ?? tiles.values().next().value;
+      // before they loaded: its own camera plays it alone
+      const tile = tiles.get(clip.camera) ?? tiles.values().next().value;
 
       if (tile === undefined) return;
 

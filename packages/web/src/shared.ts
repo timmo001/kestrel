@@ -5,6 +5,7 @@
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core/domain";
 import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
+import { cameraLabel } from "./cameras.ts";
 import { phDownloadSimple, phPlay } from "./icons.ts";
 import { clipUrl, type Clip } from "./player.ts";
 
@@ -169,8 +170,9 @@ export const reasonChips = (row: TableRow) => {
  * it, and `from` and `to` keep the full times for playing it.
  */
 export const recordingRow = (recording: Recording): TableRow => ({
-  key: `${recording.channel}-${recording.begin}`,
-  channel: recording.channel,
+  key: `${recording.camera}-${recording.begin}`,
+  camera: recording.camera,
+  cameraLabel: cameraLabel(recording.camera),
   begin: clock(recording.begin),
   end: clock(recording.end),
   from: recording.begin,
@@ -182,7 +184,7 @@ export const recordingRow = (recording: Recording): TableRow => ({
 });
 
 export const rowClip = (row: TableRow): Clip => ({
-  channel: Number(row.channel),
+  camera: String(row.camera),
   begin: String(row.from),
   end: String(row.to),
 });

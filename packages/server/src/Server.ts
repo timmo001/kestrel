@@ -1,11 +1,18 @@
 /**
- * The HTTP server: the API the web client reads, over the recorder session.
+ * The HTTP server: the API the web client and the CLI read, over the
+ * sources.
  *
  * @module
  */
 import { BunHttpServer } from "@effect/platform-bun";
-import { Recorder } from "@timmo001/kestrel-core";
-import * as Raysharp from "@timmo001/kestrel-source-raysharp";
+import type {
+  Camera,
+  LiveFeed,
+  RecordedDay,
+  RecordingReason,
+  Source,
+  SourceInfo,
+} from "@timmo001/kestrel-core";
 import { Effect, FileSystem, Layer, Path, Stream } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
@@ -14,35 +21,146 @@ import { Attention } from "./Attention.ts";
 import * as Go2rtc from "./Go2rtc.ts";
 import { Push } from "./Push.ts";
 import { toMp4 } from "./Recordings.ts";
-import { Video } from "./Video.ts";
+import { capability, Sources } from "./Sources.ts";
+import { streamNames, Video } from "./Video.ts";
 
-const RecorderHandlers = HttpApiBuilder.group(
+/** Days from several sources as one list, by date, each with every reason. */
+export const mergeDays = (
+  days: ReadonlyArray<RecordedDay>,
+): Array<RecordedDay> => {
+  const byDate = new Map<string, Set<RecordingReason>>();
+
+  for (const day of days) {
+    const reasons = byDate.get(day.date) ?? new Set();
+
+    for (const reason of day.reasons) reasons.add(reason);
+    byDate.set(day.date, reasons);
+  }
+
+  return [...byDate]
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([date, reasons]) => ({ date, reasons: [...reasons] }));
+};
+
+const SourcesHandlers = HttpApiBuilder.group(
   Api,
-  "recorder",
+  "sources",
   Effect.fn(function* (handlers) {
-    const recorder = yield* Recorder;
+    const sources = yield* Sources;
     const attention = yield* Attention;
 
+    const details = (id: string) =>
+      sources
+        .find(id)
+        .pipe(
+          Effect.flatMap((source) =>
+            capability(source, source.details, "device details"),
+          ),
+        );
+
     return handlers
-      .handle("connection", () => recorder.connection)
+      .handle("list", () =>
+        Effect.forEach(sources.all, (source) =>
+          source.connection.pipe(
+            Effect.map((connection): SourceInfo => ({
+              id: source.id,
+              kind: source.kind,
+              name: source.name,
+              connection,
+              details: source.details !== undefined,
+            })),
+          ),
+        ),
+      )
       .handle("attention", () => attention.list)
-      .handle("device", () => recorder.device)
-      .handle("status", () => recorder.status)
-      .handle("recordings", ({ query }) =>
-        recorder.recordings(query.channel, query.date),
+      .handle("device", ({ params }) =>
+        details(params.source).pipe(Effect.flatMap((each) => each.device)),
+      )
+      .handle("status", ({ params }) =>
+        details(params.source).pipe(Effect.flatMap((each) => each.status)),
+      );
+  }),
+);
+
+/** Every source's cameras, with their stream names; a source that isn't ready yet has none. */
+const camerasOf = (source: Source) =>
+  Effect.gen(function* () {
+    const cameras = yield* source.cameras;
+
+    const feeds = yield* source.live.pipe(
+      Effect.orElseSucceed((): ReadonlyArray<LiveFeed> => []),
+    );
+
+    return cameras.map((camera): Camera => {
+      const feed = feeds.find((each) => each.camera === camera.id);
+
+      return {
+        id: camera.id,
+        source: source.id,
+        name: camera.name,
+        channel: camera.channel,
+        signal: camera.signal,
+        live:
+          camera.live && feed !== undefined
+            ? streamNames(camera.id, feed.sub !== null)
+            : null,
+        recordings: camera.recordings && source.recordings !== undefined,
+        events: camera.events && source.events !== undefined,
+      };
+    });
+  }).pipe(Effect.orElseSucceed((): ReadonlyArray<Camera> => []));
+
+const CamerasHandlers = HttpApiBuilder.group(
+  Api,
+  "cameras",
+  Effect.fn(function* (handlers) {
+    const sources = yield* Sources;
+
+    const recordingsOf = (id: string) =>
+      sources
+        .find(id)
+        .pipe(
+          Effect.flatMap((source) =>
+            capability(source, source.recordings, "recordings"),
+          ),
+        );
+
+    return handlers
+      .handle("list", () =>
+        Effect.forEach(sources.all, camerasOf, {
+          concurrency: "unbounded",
+        }).pipe(Effect.map((lists) => lists.flat())),
+      )
+      .handle("recordings", ({ params, query }) =>
+        recordingsOf(params.source).pipe(
+          Effect.flatMap((recordings) =>
+            recordings.list(params.camera, query.date),
+          ),
+        ),
+      )
+      .handle("days", ({ query }) =>
+        Effect.forEach(
+          sources.all.flatMap((source) =>
+            source.recordings === undefined ? [] : [source.recordings],
+          ),
+          (recordings) => recordings.days(query.month),
+          { concurrency: "unbounded" },
+        ).pipe(Effect.map((lists) => mergeDays(lists.flat()))),
       )
       .handle(
         "video",
-        Effect.fnUntraced(function* ({ query }) {
-          const frames = yield* recorder.recorded({
-            channel: query.channel,
+        Effect.fnUntraced(function* ({ params, query }) {
+          const recordings = yield* recordingsOf(params.source);
+
+          const frames = yield* recordings.video({
+            camera: params.camera,
             begin: query.begin,
             end: query.end,
             stream: query.stream ?? "main",
             every: query.every,
           });
 
-          const name = `channel-${query.channel}_${query.begin.replaceAll(":", "-")}.mp4`;
+          const name = `${params.source}-${params.camera}_${query.begin.replaceAll(":", "-")}.mp4`;
 
           const disposition =
             query.download === "true" ? "attachment" : "inline";
@@ -62,8 +180,7 @@ const RecorderHandlers = HttpApiBuilder.group(
             },
           });
         }),
-      )
-      .handle("days", ({ query }) => recorder.recordedDays(query.month));
+      );
   }),
 );
 
@@ -71,21 +188,31 @@ const EventsHandlers = HttpApiBuilder.group(
   Api,
   "events",
   Effect.fn(function* (handlers) {
-    const recorder = yield* Recorder;
+    const sources = yield* Sources;
+
+    const events = sources.all.flatMap((source) =>
+      source.events === undefined ? [] : [source.events],
+    );
 
     return handlers
-      .handle("recent", () => recorder.recentEvents)
-      .handle("live", () => Effect.succeed(recorder.events));
-  }),
-);
-
-const VideoHandlers = HttpApiBuilder.group(
-  Api,
-  "video",
-  Effect.fn(function* (handlers) {
-    const video = yield* Video;
-
-    return handlers.handle("sources", () => video.sources);
+      .handle("recent", () =>
+        Effect.forEach(events, (each) => each.recent).pipe(
+          // Newest first across every source
+          Effect.map((lists) =>
+            lists
+              .flat()
+              .toSorted((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
+          ),
+        ),
+      )
+      .handle("live", () =>
+        Effect.succeed(
+          Stream.mergeAll(
+            events.map((each) => each.live),
+            { concurrency: "unbounded" },
+          ),
+        ),
+      );
   }),
 );
 
@@ -97,14 +224,14 @@ const SystemHandlers = HttpApiBuilder.group(Api, "system", (handlers) =>
   ),
 );
 
-/** The API's routes, needing the `Recorder` and `Video`. */
+/** The API's routes, needing the `Sources` and `Attention`. */
 export const routes = HttpApiBuilder.layer(Api, {
   openapiPath: "/api/openapi.json",
 }).pipe(
   Layer.provide([
-    RecorderHandlers,
+    SourcesHandlers,
+    CamerasHandlers,
     EventsHandlers,
-    VideoHandlers,
     SystemHandlers,
   ]),
 );
@@ -161,7 +288,6 @@ export interface ServeOptions {
   readonly web: string;
 }
 
-/** Serves the API and the web client over plain HTTP, with the recorder session behind it. */
 /** go2rtc under `/go2rtc/`, at the port the `Video` service runs it on. */
 const go2rtc = Layer.unwrap(
   Effect.gen(function* () {
@@ -178,6 +304,7 @@ const push = Layer.unwrap(
   }),
 );
 
+/** Serves the API and the web client over plain HTTP, with the sources behind it. */
 export const layer = (options: ServeOptions) =>
   HttpRouter.serve(
     Layer.mergeAll(routes, go2rtc, push, webClient(options.web)),
@@ -187,6 +314,6 @@ export const layer = (options: ServeOptions) =>
     ),
     Layer.provide([Video.layer, Attention.layer]),
     Layer.provide(Push.layer),
-    // Last, so the routes and the video share one recorder session.
-    Layer.provide(Raysharp.layer),
+    // Last, so the routes and the video share one session with each source.
+    Layer.provide(Sources.layer),
   );
