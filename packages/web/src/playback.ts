@@ -37,6 +37,7 @@ import {
 import {
   clipUrl,
   fullView,
+  sameView,
   playerFor,
   toSeconds,
   type Clip,
@@ -87,13 +88,15 @@ const browserFastest = 16;
 
 /**
  * What a speed plays from. Up to the browser's fastest, the full stream at
- * that rate. Past it, the sub stream sped up by the server, which downloads
- * fast enough where the full one can't keep up, at a rate the browser can.
+ * that rate. Past it, the recorder's own fast forward: every key frame of
+ * the full stream, one a second, which comes about 58 times faster than
+ * real time where the whole stream comes at 17, sped up by the server to a
+ * rate the browser can play.
  */
 const viewFor = (speed: number): View => {
   const speedUp = Math.ceil(speed / browserFastest);
 
-  return speedUp > 1 ? { stream: "sub", speedUp } : fullView;
+  return speedUp > 1 ? { stream: "main", speedUp, every: 1 } : fullView;
 };
 
 const isSpeed = (speed: number) =>
@@ -543,8 +546,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
         clip === undefined
           ? ""
           : `Channel ${clip.channel} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
-              // Past the browser's fastest, it's the sub stream
-              Number(speed) > browserFastest ? " · sub stream" : ""
+              // Past the browser's fastest, it's key frames only
+              Number(speed) > browserFastest ? " · key frames" : ""
             }`;
     }
 
@@ -619,10 +622,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     }
 
     // Another view loads the clip again, from the other stream
-    if (
-      view.stream !== shownView.stream ||
-      view.speedUp !== shownView.speedUp
-    ) {
+    if (!sameView(view, shownView)) {
       beforeLoad();
       shownView = view;
     }

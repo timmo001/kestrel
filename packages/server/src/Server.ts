@@ -38,6 +38,7 @@ const RecorderHandlers = HttpApiBuilder.group(
             begin: query.begin,
             end: query.end,
             stream: query.stream ?? "main",
+            every: query.every,
           });
 
           const name = `channel-${query.channel}_${query.begin.replaceAll(":", "-")}.mp4`;

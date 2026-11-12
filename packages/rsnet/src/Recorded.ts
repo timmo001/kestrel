@@ -31,12 +31,17 @@ export interface DecodedRecording {
   readonly frames: Array<RecordedFrame>;
   readonly ended: boolean;
   readonly problem?: string;
+  /** The ack, when the recorder turned the request down. */
+  readonly refused?: number;
 }
 
 const packHeaderSize = 12;
 
-/** PackHead.Type: a piece of a frame, and the end of a downloaded file. */
-const PackType = { frame: 0, fileEnd: 3 } as const;
+/**
+ * PackHead.Type: a piece of a frame, no recording after this point (the end
+ * of a playback), and the end of a downloaded file.
+ */
+const PackType = { frame: 0, noData: 2, fileEnd: 3 } as const;
 
 const frameHeaderSize = 40;
 
@@ -76,9 +81,9 @@ export const parseFrame = (bytes: Uint8Array): RecordedFrame | undefined => {
 };
 
 /**
- * Reads a download's connection: feed it each chunk as it arrives. It reads
- * the reply first, then joins each frame's packs and parses it, and reports
- * the end of the file.
+ * Reads a download's or a playback's connection: feed it each chunk as it
+ * arrives. It reads the reply first, then joins each frame's packs and
+ * parses it, and reports the end of the file or of the recordings.
  */
 export const recordingDecoder = () => {
   let pending = new Uint8Array(0);
@@ -107,7 +112,8 @@ export const recordingDecoder = () => {
         return {
           frames,
           ended,
-          problem: `The recorder turned the download down: ${reason}`,
+          problem: `The recorder turned the request down: ${reason}`,
+          refused: reply.ack,
         };
       }
 
@@ -134,7 +140,7 @@ export const recordingDecoder = () => {
 
       pending = pending.subarray(start + size);
 
-      if (type === PackType.fileEnd) {
+      if (type === PackType.fileEnd || type === PackType.noData) {
         ended = true;
       } else if (type === PackType.frame) {
         if (frame?.number !== number) frame = { number, packs, parts: [] };

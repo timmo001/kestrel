@@ -128,13 +128,25 @@ export class RecorderGroup extends HttpApiGroup.make("recorder")
         /**
          * Plays this many times faster than it was recorded, each frame
          * shortened to match. Browsers stop at 16 times, so this goes past
-         * it; with the sub stream, which downloads fastest.
+         * it; with key frames only (`every`), which come fastest.
          */
         speedUp: Schema.optional(
           Schema.NumberFromString.check(
             Schema.isInt(),
             Schema.isGreaterThanOrEqualTo(1),
             Schema.isLessThanOrEqualTo(4),
+          ),
+        ),
+        /**
+         * Key frames only, one per this many seconds of recording, from the
+         * recorder's own fast forward: full resolution, far faster than the
+         * full stream downloads.
+         */
+        every: Schema.optional(
+          Schema.NumberFromString.check(
+            Schema.isInt(),
+            Schema.isGreaterThanOrEqualTo(1),
+            Schema.isLessThanOrEqualTo(60),
           ),
         ),
       },

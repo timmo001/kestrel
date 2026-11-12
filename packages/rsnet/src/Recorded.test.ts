@@ -101,6 +101,6 @@ test("packs split across chunks join into frames, up to the end of the file", ()
 
 test("a refused download says why", () => {
   expect(recordingDecoder()(reply(50)).problem).toBe(
-    "The recorder turned the download down: Not allowed for this user",
+    "The recorder turned the request down: Not allowed for this user",
   );
 });

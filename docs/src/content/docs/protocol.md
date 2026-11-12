@@ -25,6 +25,9 @@ body, is scrambled with a fixed bit permutation that needs no key.
 | 111  | 101     | Recordings on one channel between two times             |
 | 111  | 102     | Days with recordings on a set of channels               |
 | 131  | 0       | Download a stretch of recording, on its own connection  |
+| 121  | 0       | Play recordings, on its own connection                  |
+| 122  | 121     | Ask a playback for more data                            |
+| 124  | step    | Key frames only, one per `step` seconds of recording    |
 | 896  | 196     | Subscribe to alarm reports                              |
 | 891  | various | Alarm reports, sent by the recorder once subscribed     |
 
@@ -73,6 +76,27 @@ types, size unknown". SRV7.1.0 handles ranges in its own way:
   next, a range ending on the join gets the next file, from that file's start.
   The client ends those ranges a second early; the last key frame group still
   runs to the file's end.
+
+## Fast forward
+
+Playback, message 121, takes a 68-byte request on its own connection: the
+user key, the channel from 0, the type (all), the begin and end times at 12
+and 20, and the stream at 28. The recorder sends data as the client asks for
+it with 122/121, in the same packs as a download's. SRV7.1.0 ignores the end
+and plays to the end of the file, where pack type 2 marks the end of the
+recording, so the client stops at the end itself and asks for each file in
+turn.
+
+The play control message, 124, carries its setting in the subtype. On
+SRV7.1.0 a subtype from 1 up is a step in seconds: the recorder then sends
+only key frames, one per step of recording. With a step of 1 that's every key
+frame of the main stream, at about 58 times real time where the whole stream
+downloads at about 17, which is how the page plays past 16 times in full
+resolution. Message 404, the SDK's key frame request, gets no answer.
+
+The recorder runs one playback or download at a time. Another one meanwhile
+is turned down with ack 322, and the recorder lets go of the last one a few
+seconds after its connection closes.
 
 ## Alarm reports
 

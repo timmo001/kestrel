@@ -23,6 +23,9 @@ export const MessageType = {
   login: 31,
   heartbeat: 32,
   queryRecord: 111,
+  recordPlay: 121,
+  recordPlayFeedback: 122,
+  recordPlayControl: 124,
   downloadRecordFile: 131,
   status: 890,
   alarmReport: 891,
@@ -33,6 +36,8 @@ export const MessageType = {
 export const Subtype = {
   recordDetail: 101,
   recordDayOutline: 102,
+  /** Playback feedback: send more. */
+  recordDataInsufficient: 121,
   /** Comes back blank on firmware SRV7.1.0; 614 fills the same layout. */
   allStatus: 610,
   statusOnly: 614,
@@ -61,7 +66,11 @@ export const ackReasons: ReadonlyMap<number, string> = new Map([
   [50, "Not allowed for this user"],
   [51, "Bad parameter"],
   [66, "Too many users"],
+  [322, "Another playback or download is running on the recorder"],
 ]);
+
+/** The ack a playback gets while another playback or download is running. */
+export const playbackBusy = 322;
 
 /** The two bytes at offset 6 of a login reply that mark a Raysharp device ("RS"). */
 const raysharpMark = 0x5253;
@@ -292,6 +301,30 @@ export const downloadRequest = (options: {
   writeTime(body, 36, timeParts(options.end));
   body.u32(44, allTypes);
   body.u32(48, 0);
+
+  return body.bytes;
+};
+
+/**
+ * A playback (RecordPlayReq, 68 bytes): the user key, the channel (from 0
+ * on the wire), the type, the range and the stream at 28. With a key frame
+ * step set through the play control message (see `Session.keyFrames`) it
+ * sends key frames only.
+ */
+export const playRequest = (options: {
+  readonly userKey: number;
+  readonly channel: number;
+  readonly stream: RecordedStream;
+  readonly begin: LocalTime;
+  readonly end: LocalTime;
+}): Uint8Array => {
+  const body = writer(68);
+  body.u32(0, options.userKey);
+  body.u32(4, options.channel - 1);
+  body.u32(8, allTypes);
+  writeTime(body, 12, timeParts(options.begin));
+  writeTime(body, 20, timeParts(options.end));
+  body.u8(28, options.stream === "sub" ? 1 : 0);
 
   return body.bytes;
 };

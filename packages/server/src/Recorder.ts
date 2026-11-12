@@ -39,6 +39,31 @@ import { fromSeconds, stretches, toSeconds } from "./Recordings.ts";
 /** How many alarm reports the server keeps for a page that opens later. */
 const keptEvents = 200;
 
+/** How many times, a second apart, to wait for the recorder to finish another playback. */
+const busyTries = 15;
+
+/**
+ * Opens a recorded stream again while the recorder is busy with another
+ * playback or download; it lets go of the last a few seconds after it
+ * closes, such as when the player changes speed. Busy only comes before the
+ * first frame, so opening again repeats nothing.
+ */
+const whenFree = (
+  open: () => Stream.Stream<Recorded.RecordedFrame, Session.SessionError>,
+  tries = busyTries,
+): Stream.Stream<Recorded.RecordedFrame, Session.SessionError> =>
+  open().pipe(
+    Stream.catchTag("RecorderBusy", (busy) =>
+      tries <= 1
+        ? Stream.fail(busy)
+        : Stream.unwrap(
+            Effect.sleep(Duration.seconds(1)).pipe(
+              Effect.as(whenFree(open, tries - 1)),
+            ),
+          ),
+    ),
+  );
+
 const retry = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
   Schedule.spaced(Duration.seconds(30)),
@@ -61,7 +86,8 @@ export class Recorder extends Context.Service<
     ) => Effect.Effect<Array<RecordedDay>, RecorderUnavailable>;
     /**
      * What a channel (from 1) recorded between two recorder times, as its
-     * frames, downloaded one file at a time. Fails up front when nothing was
+     * frames, downloaded one file at a time; or with `every`, key frames
+     * only, one per that many seconds. Fails up front when nothing was
      * recorded then.
      */
     readonly recorded: (options: {
@@ -69,6 +95,7 @@ export class Recorder extends Context.Service<
       readonly begin: LocalTime;
       readonly end: LocalTime;
       readonly stream: "main" | "sub";
+      readonly every?: number | undefined;
     }) => Effect.Effect<
       Stream.Stream<Recorded.RecordedFrame, RecorderUnavailable>,
       RecorderUnavailable | NoRecordings
@@ -236,14 +263,27 @@ export class Recorder extends Context.Service<
             });
           }
 
+          const every = options.every;
+
+          // A file at a time, whole or key frames only
           return Stream.fromIterable(parts).pipe(
             Stream.flatMap((part) =>
-              opened.download({
-                channel: options.channel,
-                stream: options.stream,
-                begin: part.begin,
-                end: part.end,
-              }),
+              whenFree(() =>
+                every === undefined
+                  ? opened.download({
+                      channel: options.channel,
+                      stream: options.stream,
+                      begin: part.begin,
+                      end: part.end,
+                    })
+                  : opened.keyFrames({
+                      channel: options.channel,
+                      stream: options.stream,
+                      begin: part.begin,
+                      end: part.end,
+                      every,
+                    }),
+              ),
             ),
             Stream.mapError(
               (error) => new RecorderUnavailable({ message: error.message }),

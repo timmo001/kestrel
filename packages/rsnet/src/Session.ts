@@ -43,7 +43,10 @@ import {
   parseRecordings,
   parseStatus,
   parseUserKey,
+  playbackBusy,
+  playRequest,
   recordQuery,
+  timeParts,
   statusMinimumSize,
   type RecordedStream,
 } from "./Messages.ts";
@@ -100,12 +103,26 @@ export class ConnectionClosed extends Schema.TaggedError<ConnectionClosed>()(
   },
 ) {}
 
+/**
+ * The recorder turned a playback down while another playback or download
+ * runs; it lets go of one a few seconds after its connection closes.
+ */
+export class RecorderBusy extends Schema.TaggedError<RecorderBusy>()(
+  "RecorderBusy",
+  {},
+) {
+  override get message() {
+    return "Another playback or download is running on the recorder";
+  }
+}
+
 export type SessionError =
   | LoginRefused
   | NotRaysharp
   | ProtocolError
   | RequestTimedOut
-  | ConnectionClosed;
+  | ConnectionClosed
+  | RecorderBusy;
 
 /** A reply to a request. Some replies carry ack 1 and still hold good data, so the ack is left to the caller. */
 export type Reply = Frame;
@@ -151,6 +168,19 @@ export interface Session {
     readonly channel: number;
     readonly begin: LocalTime;
     readonly end: LocalTime;
+    readonly stream?: RecordedStream | undefined;
+  }) => Stream.Stream<RecordedFrame, SessionError>;
+  /**
+   * Key frames only, one per `every` seconds of recording, from `begin` to
+   * `end` inside one recorded file, on a connection of its own: the
+   * recorder's own fast forward. Firmware SRV7.1.0 sends every key frame of
+   * the main stream, one a second, at about 58 times real time.
+   */
+  readonly keyFrames: (options: {
+    readonly channel: number;
+    readonly begin: LocalTime;
+    readonly end: LocalTime;
+    readonly every: number;
     readonly stream?: RecordedStream | undefined;
   }) => Stream.Stream<RecordedFrame, SessionError>;
   /** Alarm reports, when the session asked for them. Ends when the connection closes. */
@@ -298,12 +328,25 @@ export const make = Effect.fnUntraced(function* (
   const device = parseLogin(login.body);
   const userKey = parseUserKey(login.body);
 
-  const download: Session["download"] = (search) =>
+  /**
+   * Recorded frames from a request on a connection of its own: a download
+   * or a playback. `requests` go out in order after it opens, and `more`, if
+   * given, before each read, as a playback asks for data as it goes.
+   */
+  const recordedStream = (options: {
+    readonly type: number;
+    readonly requests: ReadonlyArray<{
+      readonly type: number;
+      readonly subtype: number;
+      readonly body: Uint8Array;
+    }>;
+    readonly more?: { readonly type: number; readonly subtype: number };
+  }): Stream.Stream<RecordedFrame, SessionError> =>
     Stream.unwrap(
       Effect.gen(function* () {
         if (openAnother === undefined) {
           return yield* new ConnectionClosed({
-            message: "This session can't open a connection for downloads",
+            message: "This session can't open a connection for recordings",
           });
         }
 
@@ -314,24 +357,16 @@ export const make = Effect.fnUntraced(function* (
         );
 
         const writer = yield* connection.writer;
+        let sent = 0;
 
-        yield* writer
-          .write(
-            encodeFrame({
-              mode,
-              type: MessageType.downloadRecordFile,
-              subtype: 0,
-              sequence: 1,
-              body: downloadRequest({
-                userKey,
-                channel: search.channel,
-                stream: search.stream ?? "main",
-                begin: search.begin,
-                end: search.end,
-              }),
-            }),
-          )
-          .pipe(Effect.mapError(closedBy));
+        const sendOn = (type: number, subtype: number, body: Uint8Array) =>
+          writer
+            .write(encodeFrame({ mode, type, subtype, sequence: ++sent, body }))
+            .pipe(Effect.mapError(closedBy));
+
+        for (const message of options.requests) {
+          yield* sendOn(message.type, message.subtype, message.body);
+        }
 
         const decode = recordingDecoder();
         let ended = false;
@@ -339,6 +374,10 @@ export const make = Effect.fnUntraced(function* (
         const next = Effect.gen(function* () {
           for (;;) {
             if (ended) return yield* Cause.done();
+
+            if (options.more !== undefined) {
+              yield* sendOn(options.more.type, options.more.subtype, empty);
+            }
 
             const chunks = yield* pull.pipe(
               // A close is the end of what the recorder will send, even
@@ -351,10 +390,7 @@ export const make = Effect.fnUntraced(function* (
                 duration: timeout,
                 orElse: () =>
                   Effect.fail(
-                    new RequestTimedOut({
-                      type: MessageType.downloadRecordFile,
-                      subtype: 0,
-                    }),
+                    new RequestTimedOut({ type: options.type, subtype: 0 }),
                   ),
               }),
             );
@@ -367,6 +403,10 @@ export const make = Effect.fnUntraced(function* (
               const decoded = decode(chunk);
 
               frames.push(...decoded.frames);
+
+              if (decoded.refused === playbackBusy) {
+                return yield* new RecorderBusy();
+              }
 
               if (decoded.problem !== undefined) {
                 return yield* new ProtocolError({ message: decoded.problem });
@@ -382,6 +422,63 @@ export const make = Effect.fnUntraced(function* (
         return Stream.fromPull(Effect.succeed(next));
       }),
     );
+
+  const download: Session["download"] = (search) =>
+    recordedStream({
+      type: MessageType.downloadRecordFile,
+      requests: [
+        {
+          type: MessageType.downloadRecordFile,
+          subtype: 0,
+          body: downloadRequest({
+            userKey,
+            channel: search.channel,
+            stream: search.stream ?? "main",
+            begin: search.begin,
+            end: search.end,
+          }),
+        },
+      ],
+    });
+
+  // The play control's subtype is the step between key frames, in seconds:
+  // with one set, the recorder sends key frames only. SRV7.1.0 ignores the
+  // request's end and plays to the end of the file, so the stream stops
+  // after the second at `end` itself
+  const keyFrames: Session["keyFrames"] = (search) => {
+    const t = timeParts(search.end);
+
+    const until =
+      (Date.UTC(t.year, t.month - 1, t.day, t.hour, t.minute, t.second) +
+        1000) *
+      1000;
+
+    return recordedStream({
+      type: MessageType.recordPlay,
+      requests: [
+        {
+          type: MessageType.recordPlay,
+          subtype: 0,
+          body: playRequest({
+            userKey,
+            channel: search.channel,
+            stream: search.stream ?? "main",
+            begin: search.begin,
+            end: search.end,
+          }),
+        },
+        {
+          type: MessageType.recordPlayControl,
+          subtype: Math.max(1, Math.round(search.every)),
+          body: empty,
+        },
+      ],
+      more: {
+        type: MessageType.recordPlayFeedback,
+        subtype: Subtype.recordDataInsufficient,
+      },
+    }).pipe(Stream.takeWhile((frame) => frame.time < until));
+  };
 
   yield* Effect.suspend(() =>
     send(nextSequence(), MessageType.heartbeat, 0, empty),
@@ -427,6 +524,7 @@ export const make = Effect.fnUntraced(function* (
         recordQuery({ kind: "outline", ...search }),
       ).pipe(Effect.map((reply) => parseRecordedDays(reply.body))),
     download,
+    keyFrames,
     alarms: Stream.fromPubSub(alarms),
     closed: Deferred.await(closed),
   } satisfies Session;

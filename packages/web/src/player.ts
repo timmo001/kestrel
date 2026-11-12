@@ -21,18 +21,25 @@ export const fromSeconds = (seconds: number) =>
   new Date(seconds * 1000).toISOString().slice(0, 19);
 
 /**
- * Which of a channel's streams a clip plays from, and how many times faster
- * than it was recorded the server makes it. Browsers play no faster than
- * 16 times, so faster speeds come from the small sub stream, which
- * downloads fast enough, sped up by the server.
+ * Which of a channel's streams a clip plays from, how many times faster
+ * than it was recorded the server makes it, and whether it's key frames
+ * only, one per `every` seconds of recording. Browsers play no faster than
+ * 16 times, and the full stream downloads at about 17, so faster speeds come
+ * from the recorder's own fast forward, key frames only, sped up by the
+ * server.
  */
 export interface View {
   readonly stream: "main" | "sub";
   readonly speedUp: number;
+  readonly every?: number | undefined;
 }
 
 /** The full stream, at the speed it was recorded. */
 export const fullView: View = { stream: "main", speedUp: 1 };
+
+/** Whether two views load the same video. */
+export const sameView = (a: View, b: View) =>
+  a.stream === b.stream && a.speedUp === b.speedUp && a.every === b.every;
 
 /** The server's MP4 of a clip, to play or, with `download`, to save as a file. */
 export const clipUrl = (clip: Clip, download = false, view = fullView) => {
@@ -45,6 +52,10 @@ export const clipUrl = (clip: Clip, download = false, view = fullView) => {
   if (view.stream !== "main") url.searchParams.set("stream", view.stream);
 
   if (view.speedUp !== 1) url.searchParams.set("speedUp", String(view.speedUp));
+
+  if (view.every !== undefined) {
+    url.searchParams.set("every", String(view.every));
+  }
 
   if (download) url.searchParams.set("download", "true");
 
@@ -384,7 +395,7 @@ export const playerFor = (
       video.currentTime = (to - base) / view.speedUp;
     },
     view: (next) => {
-      if (next.stream === view.stream && next.speedUp === view.speedUp) return;
+      if (sameView(next, view)) return;
 
       const clip = current;
       const at = clip === undefined ? 0 : offset();
