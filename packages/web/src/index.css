@@ -502,6 +502,22 @@ gw-page {
   justify-content: space-between;
 }
 
+/* A part of a source's card on the Settings page, such as its cameras */
+.settings-group {
+  display: grid;
+  gap: var(--gw-space-3);
+  margin-block-start: var(--gw-space-4);
+}
+
+.settings-group h4,
+.settings-group p {
+  margin: 0;
+}
+
+.settings-group > div > p {
+  color: var(--gw-color-text-secondary);
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

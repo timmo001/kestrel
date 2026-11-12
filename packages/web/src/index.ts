@@ -36,6 +36,7 @@ import {
   phBellRinging,
   phDotsThreeVertical,
   phFilmStrip,
+  phGear,
   phHardDrives,
   phVideoCamera,
 } from "./icons.ts";
@@ -43,6 +44,7 @@ import { livePage } from "./live.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import { find } from "./shared.ts";
+import { settingsPage } from "./settings.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
 import {
   pickerOptions,
@@ -165,6 +167,28 @@ const events = eventsPage({
 
 const sources = sourcesPage();
 
+/** Shows the cameras again after a save, with their new names, and any new ones. */
+const reloadCameras = async () => {
+  const known = await loadCameras().catch(() => cameras ?? []);
+
+  cameras = known;
+  recordings.start(
+    today,
+    known.filter((camera) => camera.recordings),
+  );
+
+  const list = await showConnection();
+
+  if (list !== null) await showSources(list);
+
+  if (currentPage === "live") await live.show(known);
+};
+
+// Settings: started on its own, so a source that can't connect can be fixed
+const settings = settingsPage({ onSaved: reloadCameras });
+
+void settings.start();
+
 /** Today on the first source's clock where there's one, or the browser's. */
 let today = "";
 
@@ -184,7 +208,14 @@ const showSources = async (list: ReadonlyArray<SourceInfo>) => {
 type Page = Location["name"];
 
 const isPage = Schema.is(
-  Schema.Literals(["live", "recordings", "events", "sources", "notFound"]),
+  Schema.Literals([
+    "live",
+    "recordings",
+    "events",
+    "sources",
+    "settings",
+    "notFound",
+  ]),
 );
 
 const pageTitles: Record<Page, string> = {
@@ -192,6 +223,7 @@ const pageTitles: Record<Page, string> = {
   recordings: "Recordings",
   events: "Events",
   sources: "Sources",
+  settings: "Settings",
   notFound: "Page not found",
 };
 
@@ -205,6 +237,7 @@ const pageIcons: Record<Page, string> = {
   recordings: phFilmStrip,
   events: phBellRinging,
   sources: phHardDrives,
+  settings: phGear,
   notFound: phVideoCamera,
 };
 

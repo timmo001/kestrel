@@ -34,6 +34,9 @@
       <a class="nav-link" href="/sources" data-page="sources"
         ><span>Sources</span></a
       >
+      <a class="nav-link" href="/settings" data-page="settings"
+        ><span>Settings</span></a
+      >
       <!-- Reset is left out: Base and Auto are picked like any other -->
       <gw-theme-picker slot="actions" no-import no-reset></gw-theme-picker>
       <!-- The overflow: notifications, hidden where the browser can't push -->
@@ -380,6 +383,28 @@
         <section class="page" data-page="sources" hidden>
           <gw-page-header heading="Sources" level="2"></gw-page-header>
           <gw-stack class="source-list">
+            <gw-card heading="Sources" loading lines="4"></gw-card>
+          </gw-stack>
+        </section>
+
+        <!-- Settings: each source's settings and cameras, and the names you
+             give cameras, saved to the server's sources file -->
+        <section class="page" data-page="settings" hidden>
+          <gw-page-header
+            heading="Settings"
+            description="Where the cameras come from, and what they're called."
+            level="2"
+          >
+            <gw-menu-button
+              slot="actions"
+              class="settings-add"
+              label="Add source"
+              appearance="outlined"
+            ></gw-menu-button>
+            <gw-button slot="actions" class="settings-save">Save</gw-button>
+          </gw-page-header>
+          <gw-alert class="settings-notice" hidden></gw-alert>
+          <gw-stack class="settings-list">
             <gw-card heading="Sources" loading lines="4"></gw-card>
           </gw-stack>
         </section>

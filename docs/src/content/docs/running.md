@@ -20,6 +20,12 @@ Windows, or the folder `KESTREL_CONFIG` names. The server writes it when you
 save from the Settings page, readable only by you, and you can edit it by
 hand too; restart the server after a hand edit.
 
+The Settings page, in the app bar, lists each source with the settings its
+kind takes. Add source picks a kind, Remove takes one out, and a `stream`
+source lists its cameras with their addresses. Under each source, name its
+cameras: the name shows across the app in place of "Ch 3" or the source's own
+name for it. Save restarts only the sources whose settings changed.
+
 ```json
 {
   "sources": [

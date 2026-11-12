@@ -68,6 +68,7 @@ export const routes = {
   recordings: route("/recordings", NoParams, RecordingsSearch),
   events: route("/events", NoParams, NoSearch),
   sources: route("/sources", NoParams, NoSearch),
+  settings: route("/settings", NoParams, NoSearch),
 } as const;
 
 // oxlint-disable-next-line typescript/no-explicit-any -- each route keeps its own param and search types
