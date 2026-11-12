@@ -284,6 +284,13 @@
                   ></gw-button>
                   <span class="controls-divider" aria-hidden="true"></span>
                   <span class="player-clock">--:--:--</span>
+                  <!-- The picked camera's zoom, as on the Live page -->
+                  <gw-segmented
+                    class="control-fit"
+                    label="Zoom"
+                    labels="hide"
+                    value="fit"
+                  ></gw-segmented>
                   <gw-button
                     class="control-zoom-out"
                     label="Zoom out"
@@ -325,10 +332,15 @@
                       <dd>Previous or next recording</dd>
                       <dt><kbd>[</kbd> <kbd>]</kbd></dt>
                       <dd>Slower or faster</dd>
+                      <dt><kbd>Z</kbd></dt>
+                      <dd>Fit the picture whole, or fill its tile</dd>
                       <dt><kbd>−</kbd> <kbd>+</kbd> <kbd>0</kbd></dt>
-                      <dd>Zoom out, in, or fit</dd>
+                      <dd>Zoom out, in, or back to the whole picture</dd>
                       <dt><kbd>Ctrl</kbd> + scroll, or pinch</dt>
-                      <dd>Zoom at the pointer</dd>
+                      <dd>
+                        Zoom at the pointer, and a drag moves around. The zoom
+                        lasts until you leave the page
+                      </dd>
                       <dt><kbd>C</kbd></dt>
                       <dd>Cut: the clip's start, then its end</dd>
                       <dt><kbd>S</kbd></dt>

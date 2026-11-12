@@ -486,8 +486,8 @@ gw-page {
   outline: none;
 }
 
-/* Zoomed in, a drag pans the picture */
-.player-screen[data-zoomed] .player-video {
+/* Filled or zoomed past its tile, a drag moves around the picture */
+.player-tile[data-movable] .player-video {
   cursor: grab;
 }
 

@@ -16,12 +16,6 @@ export const typingTargets =
 /** Controls that move between their own parts with the arrow keys. */
 const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
 
-/** How far a picture zooms in, 25% at a time up to 800%, on Live and Recordings. */
-export const pictureZooms = Array.from(
-  { length: 29 },
-  (_, index) => 1 + index / 4,
-);
-
 /**
  * Wires a page's keys popover to its button, both opening it when it's shut
  * and shutting it when it's open. Returns the toggle, for the `?` key.

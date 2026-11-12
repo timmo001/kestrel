@@ -18,8 +18,6 @@ import { Option, Schema } from "effect";
 import { SavedCamera } from "./addresses.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
-  phArrowsInSimple,
-  phArrowsOutSimple,
   phCamera,
   phCaretLeft,
   phCaretRight,
@@ -36,9 +34,9 @@ import {
   element,
   find,
   helpToggle,
-  pictureZooms,
   typingTargets,
 } from "./shared.ts";
+import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 /** go2rtc's player element, as far as the page uses it. */
 interface LivePlayer extends HTMLElement {
@@ -137,9 +135,6 @@ const drawnSize = (width: number, height: number, ratio: number | null) => ({
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
 
-/** How near two zooms are to count as the same, such as Fill and 100%. */
-const zoomSlack = 0.01;
-
 /** A camera's still picture now; the time makes each one new to the browser. */
 const stillAddress = (camera: Camera) =>
   new URL(`api/cameras/${camera.id}/still?at=${Date.now()}`, location.origin)
@@ -220,16 +215,6 @@ interface Tile {
   readonly ratio: number | null;
 }
 
-/**
- * A picture's zoom: `"fill"` to cover its tile, else a scale of it fitted
- * whole, and how far it's been dragged off centre, as a share of its tile,
- * so it holds the same place in a tile of another size.
- */
-interface View {
-  level: number | "fill";
-  pan: { x: number; y: number };
-}
-
 /** The local time as a file name's part, such as `2026-11-12T10-30-05`. */
 const fileTime = () => {
   const now = new Date();
@@ -280,9 +265,12 @@ export const livePage = (): LivePage => {
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
 
+  /** Set below: shows each picture at its zoom, and the controls to match. */
+  let showZoom: () => void = () => undefined;
+
   /** Each camera's zoom from a views kept, by camera id. */
   const viewsFrom = (kept: typeof saved.views) =>
-    new Map<string, View>(
+    new Map<string, PictureView>(
       Object.entries(kept).map(([id, view]) => [
         id,
         { level: view.level, pan: { x: view.x, y: view.y } },
@@ -303,7 +291,7 @@ export const livePage = (): LivePage => {
   const viewsNow = () => (size() === 1 ? views.single : views.tiles);
 
   /** Each camera's zoom that isn't its whole picture, to keep. */
-  const keptOf = (shown: ReadonlyMap<string, View>) =>
+  const keptOf = (shown: ReadonlyMap<string, PictureView>) =>
     Object.fromEntries(
       [...shown].flatMap(([id, view]) =>
         view.level === 1 && view.pan.x === 0 && view.pan.y === 0
@@ -408,7 +396,6 @@ export const livePage = (): LivePage => {
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
-  fitToggle?.setAttribute("aria-keyshortcuts", "z");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
   helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
@@ -458,23 +445,6 @@ export const livePage = (): LivePage => {
             };
       });
       pageSelect.value = String(page);
-    }
-
-    if (fitToggle !== null) {
-      fitToggle.options = [
-        {
-          value: "fit",
-          label: "Fit",
-          icon: phArrowsInSimple,
-          hint: "Fit: the picked camera's whole picture (Z)",
-        },
-        {
-          value: "fill",
-          label: "Fill",
-          icon: phArrowsOutSimple,
-          hint: "Fill: the picked camera zoomed to its tile (Z)",
-        },
-      ];
     }
 
     setIcon(
@@ -607,13 +577,6 @@ export const livePage = (): LivePage => {
         }
 
         figure.append(hold, element("figcaption", cameraLabel(stream.id)));
-
-        // Fill and the zoom's reach follow the picture's size, known once
-        // its first frame does. Media events don't bubble, so the tile
-        // listens as they pass down
-        for (const type of ["loadedmetadata", "resize"]) {
-          figure.addEventListener(type, () => showZoom(), { capture: true });
-        }
 
         figure.addEventListener("click", () => pick(stream.id));
 
@@ -898,42 +861,6 @@ export const livePage = (): LivePage => {
 
   helpToggle(shortcutsPopover, helpButton);
 
-  /**
-   * Fills the picked camera's tile with its picture, or fits it whole, from
-   * the middle. Every other camera keeps its own zoom.
-   */
-  const setFill = (next: boolean) => {
-    const tile = zoomed();
-
-    if (tile === undefined) return;
-
-    viewsNow().set(tile.stream.id, {
-      level: next ? "fill" : 1,
-      pan: { x: 0, y: 0 },
-    });
-    keepViews();
-    showZoom();
-  };
-
-  /**
-   * Whether the picked camera covers its tile: filled, or zoomed in as far
-   * or further. Whole, a picture the tile's own shape only fits it.
-   */
-  const filled = () => {
-    const tile = zoomed();
-
-    if (tile === undefined) return false;
-
-    const { scale, fillScale } = placeOf(tile);
-    const zoomedIn = viewOf(tile).level === "fill" || scale > 1 + zoomSlack;
-
-    return zoomedIn && scale > fillScale - zoomSlack;
-  };
-
-  if (fitToggle !== null) {
-    on(fitToggle, "change", () => setFill(fitToggle.value === "fill"));
-  }
-
   if (pageSelect !== null) {
     on(pageSelect, "change", () => {
       goTo(Number(pageSelect.value));
@@ -941,253 +868,45 @@ export const livePage = (): LivePage => {
     });
   }
 
-  // Zoom, each camera's its own and kept, once in tiles and once alone:
-  // fitted whole, filling its tile,
-  // or zoomed on from either, the picked camera by Z and in steps from the
-  // buttons and keys, or the one under the pointer with Ctrl and the wheel
-  // or a pinch. A picture bigger than its tile, filled or zoomed, moves
-  // around by dragging, as on the Recordings page
-  const zoomed = () => tiles.find((tile) => tile.stream.id === picked);
+  // Zoom, each camera's its own and kept, once in tiles and once alone, as
+  // on the Recordings page. A drag or the wheel on a camera picks it
+  const zoomTileOf = (tile: Tile): ZoomTile => ({
+    id: tile.stream.id,
+    figure: tile.figure,
+    parts: [tile.player, tile.picture, tile.hold].flatMap((part) =>
+      part === null ? [] : [part],
+    ),
+    size: () => {
+      const source =
+        tile.picture ?? tile.player?.querySelector("video") ?? null;
 
-  const viewOf = (tile: Tile) => {
-    const found = viewsNow().get(tile.stream.id);
+      const size = source === null ? { width: 0, height: 0 } : sizeOf(source);
 
-    if (found !== undefined) return found;
-
-    // Each picture starts whole
-    const view: View = { level: 1, pan: { x: 0, y: 0 } };
-
-    viewsNow().set(tile.stream.id, view);
-
-    return view;
-  };
-
-  /**
-   * Where a tile's picture sits: its tile, its scale from fitted whole, and
-   * how far it reaches past the tile each way, as a share of the tile, so
-   * how far it can move. Its reach is only known once its picture is.
-   */
-  const placeOf = (tile: Tile) => {
-    const box = tile.figure.getBoundingClientRect();
-    const source = tile.picture ?? tile.player?.querySelector("video") ?? null;
-    const size = source === null ? { width: 0, height: 0 } : sizeOf(source);
-
-    // A squeezed stream's frame is drawn at the picture's own shape
-    const picture =
-      source instanceof HTMLVideoElement
+      // A squeezed stream's frame is drawn at the picture's own shape
+      return source instanceof HTMLVideoElement
         ? drawnSize(size.width, size.height, tile.ratio)
         : size;
-
-    const known =
-      picture.width > 0 &&
-      picture.height > 0 &&
-      box.width > 0 &&
-      box.height > 0;
-
-    const across = known ? box.width / picture.width : 1;
-    const down = known ? box.height / picture.height : 1;
-    const fitted = Math.min(across, down);
-    const fillScale = Math.max(across, down) / fitted;
-    const { level } = viewOf(tile);
-    const scale = level === "fill" ? fillScale : level;
-
-    return {
-      box,
-      scale,
-      /** The scale that covers the tile, one of the zoom's steps. */
-      fillScale,
-      known,
-      reachX: known ? Math.max(0, (fitted * scale) / across - 1) / 2 : 0,
-      reachY: known ? Math.max(0, (fitted * scale) / down - 1) / 2 : 0,
-    };
-  };
-
-  const showZoom = () => {
-    for (const tile of tiles) {
-      const view = viewOf(tile);
-      const { box, scale, known, reachX, reachY } = placeOf(tile);
-
-      // Until its picture's known, a kept place waits rather than resets
-      if (known) {
-        view.pan = {
-          x: Math.min(Math.max(view.pan.x, -reachX), reachX),
-          y: Math.min(Math.max(view.pan.y, -reachY), reachY),
-        };
-      }
-
-      const x = view.pan.x * box.width;
-      const y = view.pan.y * box.height;
-
-      const transform =
-        scale === 1 ? "" : `translate(${x}px, ${y}px) scale(${scale})`;
-
-      for (const part of [tile.player, tile.picture, tile.hold]) {
-        if (part !== null) part.style.transform = transform;
-      }
-
-      // Less than a pixel to move isn't worth a drag
-      tile.figure.toggleAttribute(
-        "data-movable",
-        reachX * box.width >= 1 || reachY * box.height >= 1,
-      );
-    }
-
-    const tile = zoomed();
-    const scale = tile === undefined ? 1 : placeOf(tile).scale;
-
-    if (fitToggle !== null) fitToggle.value = filled() ? "fill" : "fit";
-
-    if (zoomFitButton !== null) {
-      zoomFitButton.textContent = `${Math.round(scale * 100)}%`;
-      zoomFitButton.disabled = scale <= 1;
-    }
-
-    if (zoomOutButton !== null) zoomOutButton.disabled = scale <= 1;
-
-    if (zoomInButton !== null) {
-      zoomInButton.disabled =
-        tile === undefined || scale >= (pictureZooms.at(-1) ?? 1);
-    }
-  };
-
-  /**
-   * Zooms a picture to `next`, keeping the point at `at` (from its tile's
-   * middle, as a share of it) where it is.
-   */
-  const zoomTo = (
-    tile: Tile | undefined,
-    next: number | "fill",
-    at = { x: 0, y: 0 },
-  ) => {
-    if (tile === undefined) return;
-
-    const view = viewOf(tile);
-    const { scale, fillScale } = placeOf(tile);
-    const to = next === "fill" ? fillScale : next;
-
-    view.pan = {
-      x: at.x - ((at.x - view.pan.x) / scale) * to,
-      y: at.y - ((at.y - view.pan.y) / scale) * to,
-    };
-    view.level = next;
-    showZoom();
-    keepViews();
-  };
-
-  /**
-   * Zooms a picture a step in or out from where it is. Filling its tile is
-   * one of the steps, so Z and the zoom go through the same levels.
-   */
-  const zoomStep = (
-    tile: Tile | undefined,
-    by: -1 | 1,
-    at?: { x: number; y: number },
-  ) => {
-    if (tile === undefined) return;
-
-    const { scale, fillScale } = placeOf(tile);
-
-    const scaleOf = (step: number | "fill") =>
-      step === "fill" ? fillScale : step;
-
-    // Fill's a step of its own where it isn't the whole picture
-    const steps = [...pictureZooms, "fill" as const]
-      .filter((each) => each !== "fill" || fillScale > 1 + zoomSlack)
-      .toSorted((a, b) => scaleOf(a) - scaleOf(b));
-
-    const next =
-      by > 0
-        ? steps.find((each) => scaleOf(each) > scale + zoomSlack)
-        : steps.filter((each) => scaleOf(each) < scale - zoomSlack).at(-1);
-
-    if (next !== undefined) zoomTo(tile, next, at);
-  };
-
-  zoomInButton?.addEventListener("click", () => zoomStep(zoomed(), 1));
-  zoomOutButton?.addEventListener("click", () => zoomStep(zoomed(), -1));
-  zoomFitButton?.addEventListener("click", () => zoomTo(zoomed(), 1));
-
-  /** The tile a pointer event is on. */
-  const tileAt = (event: Event) =>
-    tiles.find((tile) => event.composedPath().includes(tile.figure));
-
-  /** A pointer's place from the middle of a tile, as a share of it. */
-  const fromMiddle = (event: MouseEvent, tile: Tile) => {
-    const box = tile.figure.getBoundingClientRect();
-
-    return {
-      x: (event.clientX - box.left) / box.width - 0.5,
-      y: (event.clientY - box.top) / box.height - 0.5,
-    };
-  };
-
-  // Only Ctrl with the wheel, or a trackpad pinch, which browsers send as
-  // that, zooms; a plain scroll scrolls the page. The small events of a
-  // notch or a pinch add up to a step at a time
-  const wheelStep = 50;
-  let wheeled = 0;
-
-  grid?.addEventListener(
-    "wheel",
-    (event) => {
-      const tile = tileAt(event);
-
-      if (!event.ctrlKey || tile === undefined) return;
-
-      event.preventDefault();
-      pick(tile.stream.id);
-      wheeled += event.deltaY;
-
-      if (Math.abs(wheeled) < wheelStep) return;
-
-      zoomStep(tile, wheeled < 0 ? 1 : -1, fromMiddle(event, tile));
-      wheeled = 0;
     },
-    { passive: false },
-  );
-
-  // A drag on a picture bigger than its tile moves it around, and picks it
-  let drag:
-    | { tile: Tile; x: number; y: number; pan: { x: number; y: number } }
-    | undefined;
-
-  grid?.addEventListener("pointerdown", (event) => {
-    const tile = tileAt(event);
-
-    if (tile === undefined || !tile.figure.hasAttribute("data-movable")) {
-      return;
-    }
-
-    drag = { tile, x: event.clientX, y: event.clientY, pan: viewOf(tile).pan };
-    pick(tile.stream.id);
   });
 
-  // The window follows the drag, so it goes on past the tile, while clicks
-  // still land on the tile for a double click
-  window.addEventListener("pointermove", (event) => {
-    if (drag === undefined) return;
+  const zoom = pictureZoom({
+    area: grid,
+    tiles: () => tiles.map(zoomTileOf),
+    picked: () => {
+      const tile = tiles.find((shownTile) => shownTile.stream.id === picked);
 
-    const box = drag.tile.figure.getBoundingClientRect();
-
-    viewOf(drag.tile).pan = {
-      x: drag.pan.x + (event.clientX - drag.x) / box.width,
-      y: drag.pan.y + (event.clientY - drag.y) / box.height,
-    };
-    showZoom();
+      return tile === undefined ? undefined : zoomTileOf(tile);
+    },
+    views: viewsNow,
+    zoomOut: zoomOutButton,
+    zoomFit: zoomFitButton,
+    zoomIn: zoomInButton,
+    fit: fitToggle,
+    onPick: (tile) => pick(tile.id),
+    onChange: keepViews,
   });
 
-  for (const type of ["pointerup", "pointercancel"]) {
-    window.addEventListener(type, () => {
-      if (drag === undefined) return;
-
-      drag = undefined;
-      keepViews();
-    });
-  }
-
-  // The tiles' size changed, so how much Fill zooms and how far a picture
-  // reaches did too
-  window.addEventListener("resize", () => showZoom());
+  showZoom = zoom.show;
 
   const keys = new Map<string, () => void>([
     [" ", togglePause],
@@ -1201,12 +920,12 @@ export const livePage = (): LivePage => {
     ["Enter", toggleSolo],
     ["Escape", () => (solo === undefined ? unpick() : leaveSolo())],
     ["Backspace", leaveSolo],
-    ["+", () => zoomStep(zoomed(), 1)],
-    ["=", () => zoomStep(zoomed(), 1)],
-    ["-", () => zoomStep(zoomed(), -1)],
-    ["0", () => zoomTo(zoomed(), 1)],
+    ["+", () => zoom.step(1)],
+    ["=", () => zoom.step(1)],
+    ["-", () => zoom.step(-1)],
+    ["0", zoom.whole],
     ["s", capture],
-    ["z", () => setFill(!filled())],
+    ["z", zoom.toggleFill],
     ["f", () => fullscreenButton?.click()],
     ["?", () => helpButton?.click()],
     // A digit key for each count up to 9, and A for All

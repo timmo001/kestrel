@@ -5,7 +5,8 @@
  * Stop, a frame at a time, the recordings either side, speed, Cut for a
  * clip, Capture for a still and Download, then the recorder's clock, zoom
  * and full screen. The cameras and day come from the address; where it was,
- * its speed and both zooms are kept in this browser for next time.
+ * its speed and the timeline's zoom are kept in this browser for next time,
+ * and the picture's zoom only while the page is open.
  */
 import {
   cameraParts,
@@ -39,7 +40,7 @@ import {
   phSkipForward,
   phStop,
 } from "./icons.ts";
-import { mostCameras, playerGroup } from "./player-group.ts";
+import { mostCameras, playerGroup, type GroupTile } from "./player-group.ts";
 import { nextMoment, previousMoment, type Track } from "./moments.ts";
 import {
   clipUrl,
@@ -60,7 +61,6 @@ import {
   helpToggle,
   isoDay,
   localDate,
-  pictureZooms,
   reasonChips,
   reasonTones,
   recordingRow,
@@ -69,6 +69,7 @@ import {
   typingTargets,
 } from "./shared.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
+import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 // Phosphor's regular icons, as Upkeep uses
 const icons = {
@@ -177,7 +178,6 @@ const kept = () => {
   const date = values?.["date"];
   const speed = values?.["speed"];
   const timelineZoom = values?.["timelineZoom"];
-  const pictureZoom = Number(values?.["pictureZoom"]);
 
   return {
     camera,
@@ -189,7 +189,6 @@ const kept = () => {
       timelineZooms.some((zoom) => zoom.value === timelineZoom)
         ? timelineZoom
         : "86400",
-    pictureZoom: pictureZooms.includes(pictureZoom) ? pictureZoom : 1,
     position:
       position === undefined || positionCamera === undefined
         ? undefined
@@ -254,6 +253,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const zoomOutButton = find("gw-button", "control-zoom-out");
   const zoomFitButton = find("gw-button", "control-zoom-fit");
   const zoomInButton = find("gw-button", "control-zoom-in");
+  const fitToggle = find("gw-segmented", "control-fit");
   const fullscreenButton = find("gw-button", "control-fullscreen");
   const helpButton = find("gw-button", "control-help");
   const hold = find("canvas", "player-hold");
@@ -775,112 +775,41 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     );
   });
 
-  // Zoom: in steps from the buttons, or at the pointer with the wheel, and
-  // panned by dragging the picture. It acts on the picked camera's picture.
-  // The level is kept; the pan isn't
-  let zoom = saved.pictureZoom;
-  let pan = { x: 0, y: 0 };
+  // The zoom, as on the Live page, but only for this visit: each camera's
+  // starts whole next time
+  const views = new Map<string, PictureView>();
 
-  /** The box the zoomed picture sits in: the picked camera's tile. */
-  const zoomBox = () =>
-    (player?.lead()?.parentElement ?? screen)?.getBoundingClientRect();
+  const zoomTileOf = (tile: GroupTile): ZoomTile => ({
+    id: tile.camera,
+    figure: tile.figure,
+    parts: [tile.video],
+    // The sub stream's squeezed picture is stretched to fill its tile
+    size: () =>
+      grid?.dataset.stream === "sub"
+        ? tile.figure.getBoundingClientRect()
+        : { width: tile.video.videoWidth, height: tile.video.videoHeight },
+  });
 
-  const showZoom = () => {
-    const box = zoomBox();
-    const reachX = ((zoom - 1) * (box?.width ?? 0)) / 2;
-    const reachY = ((zoom - 1) * (box?.height ?? 0)) / 2;
+  const zoom = pictureZoom({
+    area: grid,
+    tiles: () => (player?.tiles() ?? []).map(zoomTileOf),
+    picked: () => {
+      const tile = player?.tiles().find((each) => each.camera === camera);
 
-    pan = {
-      x: Math.min(Math.max(pan.x, -reachX), reachX),
-      y: Math.min(Math.max(pan.y, -reachY), reachY),
-    };
-
-    const lead = player?.lead();
-
-    for (const tileVideo of grid?.querySelectorAll("video") ?? []) {
-      tileVideo.style.transform =
-        tileVideo !== lead || zoom === 1
-          ? ""
-          : `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
-    }
-
-    screen?.toggleAttribute("data-zoomed", zoom > 1);
-
-    if (zoomFitButton !== null) {
-      zoomFitButton.textContent = `${Math.round(zoom * 100)}%`;
-      zoomFitButton.disabled = zoom === 1;
-    }
-
-    if (zoomOutButton !== null) zoomOutButton.disabled = zoom === 1;
-
-    if (zoomInButton !== null) {
-      zoomInButton.disabled = zoom === pictureZooms.at(-1);
-    }
-  };
-
-  /** Zooms to `next`, keeping the point at `at` (from the picture's centre) where it is. */
-  const zoomTo = (next: number, at = { x: 0, y: 0 }) => {
-    pan = {
-      x: at.x - ((at.x - pan.x) / zoom) * next,
-      y: at.y - ((at.y - pan.y) / zoom) * next,
-    };
-    zoom = next;
-    keep(storageKey, { pictureZoom: zoom });
-    showZoom();
-  };
-
-  const zoomStep = (step: -1 | 1, at?: { x: number; y: number }) => {
-    const index = pictureZooms.indexOf(zoom) + step;
-
-    const next =
-      pictureZooms[Math.min(Math.max(index, 0), pictureZooms.length - 1)];
-
-    if (next !== undefined && next !== zoom) zoomTo(next, at);
-  };
-
-  zoomInButton?.addEventListener("click", () => zoomStep(1));
-  zoomOutButton?.addEventListener("click", () => zoomStep(-1));
-  zoomFitButton?.addEventListener("click", () => zoomTo(1));
-
-  /** A pointer's place from the picture's centre. */
-  const fromCentre = (event: MouseEvent) => {
-    const box = zoomBox();
-
-    return {
-      x: event.clientX - ((box?.left ?? 0) + (box?.width ?? 0) / 2),
-      y: event.clientY - ((box?.top ?? 0) + (box?.height ?? 0) / 2),
-    };
-  };
-
-  // Only Ctrl with the wheel, or a trackpad pinch, which browsers send as
-  // that, zooms; a plain scroll scrolls the page. A notch or a pinch comes as
-  // a run of small events, so they add up to a step at a time rather than
-  // each taking one
-  const wheelStep = 50;
-  let wheeled = 0;
-
-  screen?.addEventListener(
-    "wheel",
-    (event) => {
-      if (!event.ctrlKey || player?.clip() === undefined) return;
-
-      event.preventDefault();
-      wheeled += event.deltaY;
-
-      if (Math.abs(wheeled) < wheelStep) return;
-
-      zoomStep(wheeled < 0 ? 1 : -1, fromCentre(event));
-      wheeled = 0;
+      return tile === undefined ? undefined : zoomTileOf(tile);
     },
-    { passive: false },
-  );
+    views: () => views,
+    zoomOut: zoomOutButton,
+    zoomFit: zoomFitButton,
+    zoomIn: zoomInButton,
+    fit: fitToggle,
+  });
 
-  // A press that doesn't move plays or pauses; a drag pans a zoomed picture
-  let press:
-    { x: number; y: number; pan: typeof pan; moved: boolean } | undefined;
+  // A press that doesn't move plays or pauses; a drag moves a zoomed picture
+  let press: { x: number; y: number; moved: boolean } | undefined;
 
   screen?.addEventListener("pointerdown", (event) => {
-    press = { x: event.clientX, y: event.clientY, pan, moved: false };
+    press = { x: event.clientX, y: event.clientY, moved: false };
     screen.setPointerCapture(event.pointerId);
   });
 
@@ -891,11 +820,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     const y = event.clientY - press.y;
 
     if (Math.hypot(x, y) > 4) press.moved = true;
-
-    if (press.moved && zoom > 1) {
-      pan = { x: press.pan.x + x, y: press.pan.y + y };
-      showZoom();
-    }
   });
 
   screen?.addEventListener("pointerup", (event) => {
@@ -939,10 +863,10 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     );
 
     // The picture's size changed, so the pan's reach did too
-    requestAnimationFrame(showZoom);
+    requestAnimationFrame(zoom.show);
   });
 
-  showZoom();
+  zoom.show();
 
   showTime = () => {
     const time = player?.time();
@@ -1035,7 +959,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       })),
     );
     showSpeed();
-    showZoom();
+    zoom.show();
     showPlayhead();
     showClip();
     showState();
@@ -1257,7 +1181,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       camera = wanted.camera;
       keep(storageKey, { camera });
       player?.setCameras(tracks, camera);
-      showZoom();
+      zoom.show();
       showState();
     }
 
@@ -1326,10 +1250,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["p", () => skip(-1)],
     ["[", () => stepSpeed(-1)],
     ["]", () => stepSpeed(1)],
-    ["+", () => zoomStep(1)],
-    ["=", () => zoomStep(1)],
-    ["-", () => zoomStep(-1)],
-    ["0", () => zoomTo(1)],
+    ["+", () => zoom.step(1)],
+    ["=", () => zoom.step(1)],
+    ["-", () => zoom.step(-1)],
+    ["0", zoom.whole],
+    ["z", zoom.toggleFill],
     ["f", () => fullscreenButton?.click()],
     ["c", () => cutButton?.click()],
     ["s", () => captureButton?.click()],

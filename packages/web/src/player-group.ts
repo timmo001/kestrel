@@ -22,11 +22,15 @@ import {
 } from "./recording-player.ts";
 import { element } from "./shared.ts";
 
-/** One camera's tile: its figure, video and player. */
-interface Tile {
+/** A camera's tile, as the page sees it. */
+export interface GroupTile {
   readonly camera: CameraId;
   readonly figure: HTMLElement;
   readonly video: HTMLVideoElement;
+}
+
+/** One camera's tile: its figure, video and player. */
+interface Tile extends GroupTile {
   readonly player: Player;
 }
 
@@ -46,8 +50,10 @@ export interface Group extends Player {
   readonly setCameras: (tracks: ReadonlyArray<Track>, picked: CameraId) => void;
   /** The video that keeps the time, for a still, a held frame and the frame step. */
   readonly video: () => HTMLVideoElement | undefined;
-  /** The picked camera's video, which the zoom acts on. */
+  /** The picked camera's video. */
   readonly lead: () => HTMLVideoElement | undefined;
+  /** Each camera's tile and video, for the zoom. */
+  readonly tiles: () => ReadonlyArray<GroupTile>;
   readonly paused: () => boolean;
   readonly resume: () => void;
   readonly pause: () => void;
@@ -321,6 +327,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     time: () => driver?.player.time(),
     video: () => driver?.video,
     lead: () => tiles.get(picked)?.video,
+    tiles: () => [...tiles.values()],
     paused: () => driver === undefined || driver.video.paused,
     resume: () => {
       playing = true;
