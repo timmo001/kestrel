@@ -78,7 +78,7 @@ const icons = {
 };
 
 /** The speeds on the toggle; any other is typed in beside it. */
-const speeds = ["0.5", "1", "2", "4", "8", "16", "32"];
+const speeds = ["0.5", "1", "2", "4", "8", "16", "24", "32"];
 
 const slowest = 0.1;
 const fastest = 32;
@@ -775,15 +775,17 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     };
   };
 
-  // A wheel's notch or a trackpad's swipe comes as a run of small events, so
-  // they add up to a step at a time rather than each taking one
-  const wheelStep = 100;
+  // Only Ctrl with the wheel, or a trackpad pinch, which browsers send as
+  // that, zooms; a plain scroll scrolls the page. A notch or a pinch comes as
+  // a run of small events, so they add up to a step at a time rather than
+  // each taking one
+  const wheelStep = 50;
   let wheeled = 0;
 
   screen?.addEventListener(
     "wheel",
     (event) => {
-      if (player?.clip() === undefined) return;
+      if (!event.ctrlKey || player?.clip() === undefined) return;
 
       event.preventDefault();
       wheeled += event.deltaY;
