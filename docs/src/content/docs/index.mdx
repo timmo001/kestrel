@@ -22,9 +22,15 @@ The plan is tracked in
   signal, recording mode and motion.
 - **Recordings:** which days have recordings, and each day's clips on a
   channel, with why they were recorded (motion, PIR, alarm or normal) and
-  their size. A timeline draws the day's recordings, and a click plays from
-  that moment. Playback runs on from one recording into the next, at up to 8
-  times speed, and any stretch of a day saves as an MP4, across clips.
+  their size. The player is laid out as the recorder's own client lays out
+  playback: the video, its controls (stop, a frame at a time, speed up to 16
+  times, the recordings either side, cut, a still, download, zoom and full
+  screen), then a timeline of the day that zooms to ten minutes, where a
+  click plays from that moment. Playback runs on from one recording into the
+  next, any stretch of a day saves as an MP4, and the page remembers where it
+  was, its speed and its zoom in the browser.
+- **Pages:** Live, Recordings, Events and Recorder each have an address of
+  their own, such as `/recordings?channel=1&date=2026-11-11`.
 - **Events:** motion, PIR, video loss and disk reports as the recorder sends
   them, and today's motion and PIR clips found by search.
 - **Live view:** each channel's sub stream through go2rtc.

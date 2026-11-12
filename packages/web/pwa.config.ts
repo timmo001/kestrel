@@ -9,7 +9,8 @@ export default definePwaConfig({
   shortName: "DVR",
   description: "Recorder health, recordings and events from your DVR",
   shortcuts: [
-    { name: "Recordings", url: "./#recordings" },
-    { name: "Events", url: "./#events" },
+    { name: "Recordings", url: "./recordings" },
+    { name: "Events", url: "./events" },
+    { name: "Recorder", url: "./recorder" },
   ],
 });

@@ -57,14 +57,22 @@ const isQuotaError = (error: Error) =>
 
 export interface Player {
   /**
-   * Plays a clip, from `from` seconds in (its start by default), in place of
-   * whatever was playing.
+   * Loads a clip, from `from` seconds in (its start by default), in place of
+   * whatever was playing, and plays it unless `autoplay` is false.
    */
-  readonly play: (clip: Clip, from?: number) => Promise<void>;
+  readonly play: (
+    clip: Clip,
+    from?: number,
+    autoplay?: boolean,
+  ) => Promise<void>;
   /** Stops and lets go of the video. */
   readonly stop: () => void;
+  /** Moves to `to` seconds into the playing clip. */
+  readonly seek: (to: number) => void;
   /** What's playing, if anything. */
   readonly clip: () => Clip | undefined;
+  /** Seconds into the playing clip at the playhead. */
+  readonly offset: () => number | undefined;
   /** The recorder time at the playhead. */
   readonly time: () => string | undefined;
 }
@@ -89,6 +97,8 @@ export const playerFor = (
   let buffer: SourceBuffer | undefined;
   let loading: AbortController | undefined;
   let loadingFrom = 0;
+  /** Where the video's time 0 is in the clip: 0, unless the browser plays the MP4 directly from a later start. */
+  let base = 0;
   let objectUrl = "";
 
   const ranges = () => {
@@ -267,30 +277,38 @@ export const playerFor = (
     objectUrl = "";
   };
 
-  const play = async (clip: Clip, from = 0) => {
+  const play = async (clip: Clip, from = 0, autoplay = true) => {
     stop();
 
-    const start = Math.max(0, Math.floor(from));
+    // Inside the clip, even from a position kept for a longer one
+    const length = toSeconds(clip.end) - toSeconds(clip.begin);
+
+    const start = Math.min(
+      Math.max(0, Math.floor(from)),
+      Math.max(length - 2, 0),
+    );
+
+    current = clip;
 
     // Without Media Source Extensions, such as on an iPhone, the browser
-    // plays the MP4 as it arrives, seeking only within what has loaded. It
-    // starts at `from`, so the clip does too, to keep its times right
+    // plays the MP4 as it arrives, seeking only within what has loaded. The
+    // MP4 starts at `from`, so the video's time runs from there
     if (
       typeof MediaSource === "undefined" ||
       !MediaSource.isTypeSupported(mimeType)
     ) {
-      current = {
+      base = start;
+      video.src = clipUrl({
         ...clip,
         begin: fromSeconds(toSeconds(clip.begin) + start),
-      };
+      });
 
-      video.src = clipUrl(current);
-      await video.play().catch(() => undefined);
+      if (autoplay) await video.play().catch(() => undefined);
 
       return;
     }
 
-    current = clip;
+    base = 0;
 
     const media = new MediaSource();
 
@@ -309,16 +327,36 @@ export const playerFor = (
     if (start > 0) video.currentTime = start;
 
     void load(start);
-    await video.play().catch(() => undefined);
+
+    if (autoplay) await video.play().catch(() => undefined);
   };
+
+  /** Seconds into the clip at the playhead. */
+  const offset = () => base + video.currentTime;
 
   return {
     play,
     stop,
+    seek: (to) => {
+      const clip = current;
+
+      if (clip === undefined) return;
+
+      // Before where the MP4 starts there's nothing to seek to, so it
+      // starts again from there
+      if (to < base) {
+        void play(clip, to);
+
+        return;
+      }
+
+      video.currentTime = to - base;
+    },
     clip: () => current,
+    offset: () => (current === undefined ? undefined : offset()),
     time: () =>
       current === undefined
         ? undefined
-        : fromSeconds(toSeconds(current.begin) + Math.floor(video.currentTime)),
+        : fromSeconds(toSeconds(current.begin) + Math.floor(offset())),
   };
 };

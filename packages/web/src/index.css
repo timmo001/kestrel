@@ -15,26 +15,68 @@ body {
   align-items: center;
   color: var(--gw-color-text-strong);
   font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .brand img {
   border-radius: var(--gw-radius-sm, 4px);
 }
 
+/* The pages in the app bar, or in its menu when they don't fit. The script
+   reckons that width from this padding */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--gw-space-2) 0.75rem;
+  border-radius: var(--gw-radius-pill);
+  color: var(--gw-color-text-secondary);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--gw-motion-fast) var(--gw-motion-easing);
+}
+
+.nav-link:hover {
+  background: var(--gw-color-fill-neutral-hovered);
+  color: var(--gw-color-text-strong);
+}
+
+.nav-link[aria-current="page"] {
+  background: var(--gw-color-fill-neutral-selected);
+  color: var(--gw-color-text-strong);
+}
+
+.nav-link:focus-visible {
+  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
+  outline-offset: var(--gw-focus-offset, 2px);
+}
+
 gw-page {
   padding-block: var(--gw-space-5);
+}
+
+.page[hidden] {
+  display: none;
+}
+
+.page {
+  display: grid;
+  gap: var(--gw-space-4);
 }
 
 /* Two cameras across, even in a half-width window; one across on a phone */
 .live-grid {
   --live-gap: var(--gw-space-3);
-  /* The app bar, the page's padding and the Live heading above the grid,
-     and the padding below it */
-  --live-chrome: 8.5rem;
+  /* The app bar and the page's padding above the grid, and below it */
+  --live-chrome: 6rem;
 
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--live-gap);
+  /* The page's width from the start, rather than its tiles': the empty
+     placeholders would otherwise draw it small until the players arrive */
+  width: 100%;
   /* Narrow enough that both rows of 16:9 tiles fit in the window */
   max-width: calc(
     (100dvh - var(--live-chrome) - var(--live-gap)) * 16 / 9 + var(--live-gap)
@@ -97,7 +139,8 @@ gw-page {
   }
 }
 
-.live-tile figcaption {
+.live-tile figcaption,
+.player-caption {
   position: absolute;
   inset-block-start: var(--gw-space-2);
   /* Top right, clear of the camera's own channel and clock overlays */
@@ -111,6 +154,7 @@ gw-page {
 }
 
 .recording-filters {
+  flex-wrap: wrap;
   align-items: end;
 }
 
@@ -133,7 +177,162 @@ gw-page {
 
 .recorded-days {
   flex-wrap: wrap;
-  margin-block: var(--gw-space-3);
+  gap: var(--gw-space-1);
+}
+
+/* The top of the Recordings page fills the window under the app bar: its
+   heading and days, the video and its controls, and the timeline. The video
+   takes whatever height is left, so the clip and the table start below the
+   window whatever its size */
+.playback-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gw-space-2);
+  /* The app bar and the page's padding above, and the gap to the clip below,
+     which then starts at the window's bottom edge */
+  height: calc(
+    100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5) -
+      var(--gw-space-4)
+  );
+  min-height: 28rem;
+}
+
+/* The video and its controls as one dark panel, as the recorder's own
+   client draws it */
+.player-stage {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-height: 12rem;
+  overflow: hidden;
+  border-radius: var(--gw-radius-md, 8px);
+  background: #000;
+}
+
+.player-screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* Zoomed in, a drag pans the picture */
+.player-screen[data-zoomed] .player-video {
+  cursor: grab;
+}
+
+/* Pinned to the screen's box: left to size itself, a 16:9 video outgrows
+   it and paints over the controls */
+.player-video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.player-idle {
+  position: absolute;
+  margin: 0;
+  padding: var(--gw-space-4);
+  color: rgb(255 255 255 / 70%);
+  text-align: center;
+}
+
+.player-stage:not([data-idle]) .player-idle {
+  display: none;
+}
+
+/* Their own band under the picture, stacked above it, so the video never
+   draws over them */
+.player-controls {
+  position: relative;
+  z-index: 1;
+  /* Three parts, as System Bridge's media controls: the start, the
+     transport kept in the middle, and the end */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--gw-space-1) var(--gw-space-3);
+  align-items: center;
+  padding: var(--gw-space-1) var(--gw-space-2);
+  /* The controls stay readable on the black, in any theme */
+  background: color-mix(in oklab, var(--gw-color-surface-raised) 92%, #000);
+  border-block-start: 1px solid var(--gw-color-border-quiet);
+}
+
+.controls-start,
+.controls-transport,
+.controls-end {
+  flex-wrap: wrap;
+  gap: var(--gw-space-1);
+  align-items: center;
+}
+
+.controls-end {
+  justify-content: flex-end;
+}
+
+/* Narrow, the transport goes first, across, and the rest under it */
+@media (width < 60rem) {
+  .player-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .controls-transport {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-content: center;
+  }
+}
+
+/* The day's chips and the day and channel, in one row */
+.playback-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gw-space-2) var(--gw-space-4);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.control-speed-other {
+  width: 7.5rem;
+}
+
+.controls-divider {
+  width: 1px;
+  height: 1.25rem;
+  margin-inline: var(--gw-space-1);
+  background: var(--gw-color-border-normal);
+}
+
+.player-clock {
+  padding-inline: var(--gw-space-2);
+  color: var(--gw-color-text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Full screen: the picture takes the screen, with the controls under it */
+.player-stage:fullscreen {
+  grid-template-rows: 1fr auto;
+  border-radius: 0;
+}
+
+/* The timeline and its legend keep their height; the video gives way */
+.playback-view > :not(.player-stage) {
+  flex: none;
 }
 
 /* The day's timeline: a recording's colour says why it was made, as its
@@ -141,13 +340,6 @@ gw-page {
 .timeline {
   display: grid;
   gap: var(--gw-space-1);
-  margin-block-end: var(--gw-space-3);
-  /* Clear of the sticky app bar, with room for the time above the bar */
-  scroll-margin-block-start: calc(var(--gw-space-5) + 5rem);
-}
-
-.timeline[hidden] {
-  display: none;
 }
 
 .timeline-track {
@@ -157,33 +349,54 @@ gw-page {
   background: var(--gw-color-surface-raised);
   box-shadow: inset 0 0 0 1px var(--gw-color-border-quiet);
   cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
 }
 
-.timeline-segments {
+.timeline-spans {
   position: absolute;
   inset: 0;
   overflow: hidden;
   border-radius: inherit;
 }
 
-.timeline-segment {
+.timeline-span {
   position: absolute;
   inset-block: 0.5rem;
   /* A five-second clip is far under a pixel across a day */
   min-width: 2px;
+}
+
+/* A recording's colour, on the bar and on the legend's swatches */
+.timeline-span,
+.timeline-legend span::before {
   background: var(--gw-color-border-loud);
 }
 
-.timeline-segment[data-tone="info"] {
+.timeline-span[data-tone="info"],
+.timeline-legend span[data-tone="info"]::before {
   background: var(--gw-color-info);
 }
 
-.timeline-segment[data-tone="warning"] {
+.timeline-span[data-tone="warning"],
+.timeline-legend span[data-tone="warning"]::before {
   background: var(--gw-color-warning);
 }
 
-.timeline-segment[data-tone="important"] {
+.timeline-span[data-tone="important"],
+.timeline-legend span[data-tone="important"]::before {
   background: var(--gw-color-important);
+}
+
+/* The clip Cut marks, over the recordings */
+.timeline-clip {
+  position: absolute;
+  inset-block: 0.25rem;
+  min-width: 2px;
+  border: 1px solid var(--gw-color-text-strong);
+  border-radius: var(--gw-radius-sm, 4px);
+  background: color-mix(in oklab, var(--gw-color-text-strong) 18%, transparent);
+  pointer-events: none;
 }
 
 .timeline-playhead,
@@ -203,6 +416,12 @@ gw-page {
   background: var(--gw-color-text-secondary);
 }
 
+.timeline-clip[hidden],
+.timeline-playhead[hidden],
+.timeline-hover[hidden] {
+  display: none;
+}
+
 /* The time under the pointer, above the bar */
 .timeline-hover::after {
   content: attr(data-time);
@@ -219,66 +438,55 @@ gw-page {
   box-shadow: 0 0 0 1px var(--gw-color-border-normal);
 }
 
-.timeline-hours {
+.timeline-ticks {
   position: relative;
   height: 1rem;
+  overflow: hidden;
   color: var(--gw-color-text-secondary);
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
 }
 
-.timeline-hours span {
+.timeline-ticks span {
   position: absolute;
   translate: -50% 0;
 }
 
-.timeline-hours span:first-child {
+.timeline-ticks span[data-edge="start"] {
   translate: 0 0;
 }
 
-.timeline-hours span:last-child {
+.timeline-ticks span[data-edge="end"] {
   translate: -100% 0;
 }
 
-/* The recordings player, bounded to the window's height like the live grid */
-.player {
-  display: grid;
-  gap: var(--gw-space-3);
-  margin-block-end: var(--gw-space-4);
-  /* Clear of the sticky app bar when a row scrolls it into view */
-  scroll-margin-block-start: calc(var(--gw-space-5) + 4rem);
-}
-
-.player[hidden] {
-  display: none;
-}
-
-.player-bar,
-.player-clip {
+.timeline-foot {
   flex-wrap: wrap;
-  align-items: end;
+  align-items: center;
+  justify-content: space-between;
 }
 
-.player-bar {
+.timeline-legend {
+  flex-wrap: wrap;
+  gap: var(--gw-space-3);
+  color: var(--gw-color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.timeline-legend span {
+  display: inline-flex;
+  gap: var(--gw-space-1);
   align-items: center;
 }
 
-.player-clock {
-  color: var(--gw-color-text-secondary);
-  font-variant-numeric: tabular-nums;
+.timeline-legend span::before {
+  content: "";
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
 }
 
-.player-close {
-  margin-inline-start: auto;
-}
-
-.player-video {
-  display: block;
-  width: 100%;
-  /* Room for the app bar, the timeline, the player's own rows and the
-     page's padding */
-  max-height: calc(100dvh - 21rem);
-  aspect-ratio: 16 / 9;
-  border-radius: var(--gw-radius-md, 8px);
-  background: #000;
+.player-clip {
+  flex-wrap: wrap;
+  align-items: end;
 }
