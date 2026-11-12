@@ -65,6 +65,8 @@ login is planned for when remote access arrives, in
   recorders' control protocol
 - [`packages/source-raysharp`](packages/source-raysharp): Raysharp recorders
   as a source, over that protocol and their RTSP streams
+- [`packages/source-stream`](packages/source-stream): cameras you list by
+  their stream addresses, such as RTSP, or a still picture, for live view
 - [`packages/server`](packages/server): the server, with the API and go2rtc
 - [`packages/web`](packages/web): the web client, installable on a phone
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and

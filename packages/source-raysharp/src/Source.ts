@@ -453,6 +453,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           channel,
           signal: state === undefined ? null : !state.videoLoss,
           live: true,
+          still: false,
           recordings: true,
           events: true,
         };

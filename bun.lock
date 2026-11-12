@@ -92,6 +92,7 @@
         "@timmo001/groundwork-pwa": "0.24.0",
         "@timmo001/kestrel-core": "workspace:*",
         "@timmo001/kestrel-source-raysharp": "workspace:*",
+        "@timmo001/kestrel-source-stream": "workspace:*",
         "effect": "4.1.4",
         "mediabunny": "1.65.2",
         "web-push": "4.0.0",
@@ -113,6 +114,23 @@
       "dependencies": {
         "@timmo001/kestrel-core": "workspace:*",
         "@timmo001/kestrel-protocol-raysharp": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
+    "packages/source-stream": {
+      "name": "@timmo001/kestrel-source-stream",
+      "version": "0.0.0",
+      "dependencies": {
+        "@timmo001/kestrel-core": "workspace:*",
         "effect": "4.1.4",
       },
       "devDependencies": {
@@ -802,6 +820,8 @@
     "@timmo001/kestrel-server": ["@timmo001/kestrel-server@workspace:packages/server"],
 
     "@timmo001/kestrel-source-raysharp": ["@timmo001/kestrel-source-raysharp@workspace:packages/source-raysharp"],
+
+    "@timmo001/kestrel-source-stream": ["@timmo001/kestrel-source-stream@workspace:packages/source-stream"],
 
     "@timmo001/kestrel-web": ["@timmo001/kestrel-web@workspace:packages/web"],
 

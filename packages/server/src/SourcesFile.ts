@@ -222,13 +222,13 @@ export const problems = (
               ? []
               : [`${source.name} has more than one camera ${id}`]
             : [
-                `${source.name}'s camera ${at + 1} needs an id of lower-case letters, digits and dashes`,
+                `${source.name}: camera ${at + 1} needs an id of lower-case letters, digits and dashes`,
               ];
 
         return [
           ...own,
           ...missing(cameraFields, camera).map(
-            (label) => `${source.name}'s camera ${at + 1} needs its ${label}`,
+            (label) => `${source.name}: camera ${at + 1} needs its ${label}`,
           ),
         ];
       }),

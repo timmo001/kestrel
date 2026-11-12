@@ -27,6 +27,8 @@ export const Camera = Schema.Struct({
   /** Whether it has a picture now; `null` when its source can't tell. */
   signal: Schema.NullOr(Schema.Boolean),
   live: Schema.NullOr(LiveStreams),
+  /** Whether it has a still picture, at `/api/cameras/:source/:camera/still`, for a camera with no video. */
+  still: Schema.Boolean,
   recordings: Schema.Boolean,
   events: Schema.Boolean,
 });

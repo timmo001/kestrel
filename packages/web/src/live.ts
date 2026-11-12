@@ -6,7 +6,7 @@
  * browser. The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { Camera } from "@timmo001/kestrel-core";
+import type { Camera, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
@@ -77,17 +77,35 @@ const layoutsFor = (cameras: number) => {
   return layouts.filter((size) => size <= cameras || size === all);
 };
 
-/** A camera that plays live, with its go2rtc stream names. */
-interface LiveCamera extends Camera {
-  readonly live: NonNullable<Camera["live"]>;
-}
-
 /**
  * Past four at once, the small sub stream where there is one: the main one
  * is more than a small tile shows.
  */
-const streamFor = (camera: LiveCamera, layout: number) =>
-  layout > 4 ? (camera.live.sub ?? camera.live.main) : camera.live.main;
+const streamFor = (live: LiveStreams, layout: number) =>
+  layout > 4 ? (live.sub ?? live.main) : live.main;
+
+/** How often a camera with only a still picture shows a new one. */
+const stillEvery = 5000;
+
+/** A camera's still picture now; the time makes each one new to the browser. */
+const stillAddress = (camera: Camera) =>
+  new URL(`api/cameras/${camera.id}/still?at=${Date.now()}`, location.origin)
+    .href;
+
+/** The size of what a still is saved from. */
+const sizeOf = (
+  source: HTMLVideoElement | HTMLImageElement | HTMLCanvasElement,
+) => {
+  if (source instanceof HTMLVideoElement) {
+    return { width: source.videoWidth, height: source.videoHeight };
+  }
+
+  if (source instanceof HTMLImageElement) {
+    return { width: source.naturalWidth, height: source.naturalHeight };
+  }
+
+  return { width: source.width, height: source.height };
+};
 
 const storageKey = "kestrel.live";
 
@@ -107,11 +125,14 @@ const kept = () => {
   };
 };
 
-/** A camera on the page: its tile, player and held frame. */
+/** A camera on the page: its tile, its player or still picture, and held frame. */
 interface Tile {
-  readonly stream: LiveCamera;
+  readonly stream: Camera;
   readonly figure: HTMLElement;
-  readonly player: LivePlayer;
+  /** Its player, for a camera that plays live. */
+  readonly player: LivePlayer | null;
+  /** Its picture, for a camera with only a still one. */
+  readonly picture: HTMLImageElement | null;
   readonly hold: HTMLCanvasElement;
 }
 
@@ -154,7 +175,7 @@ export const livePage = (): LivePage => {
   /** Where to go back to from one camera alone, by Enter or a double click. */
   let solo: { readonly layout: number; readonly page: number } | undefined;
   let paused = false;
-  let streams: ReadonlyArray<LiveCamera> = [];
+  let streams: ReadonlyArray<Camera> = [];
   let tiles: ReadonlyArray<Tile> = [];
 
   // The placeholders take the kept layout's shape from the first paint
@@ -235,6 +256,14 @@ export const livePage = (): LivePage => {
   };
 
   const connect = (tile: Tile) => {
+    if (tile.picture !== null) {
+      tile.picture.src = stillAddress(tile.stream);
+
+      return;
+    }
+
+    if (tile.player === null || tile.stream.live === null) return;
+
     // Its first frames end the shimmer, or the held frame after a pause.
     // Media events don't bubble, so the tile listens as they pass down
     tile.figure.addEventListener(
@@ -247,10 +276,20 @@ export const livePage = (): LivePage => {
     );
 
     tile.player.src = new URL(
-      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream, layout))}`,
+      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, layout))}`,
       location.origin,
     ).href;
   };
+
+  // A camera with only a still picture shows a new one every few seconds,
+  // while the page shows and isn't paused
+  setInterval(() => {
+    if (paused || !shown()) return;
+
+    for (const tile of tiles) {
+      if (tile.picture !== null) connect(tile);
+    }
+  }, stillEvery);
 
   /** Puts the page's worth of cameras in the grid, and starts them unless paused. */
   const render = () => {
@@ -266,22 +305,36 @@ export const livePage = (): LivePage => {
       .slice(page * layout, page * layout + layout)
       .map((stream) => {
         const figure = element("figure");
-        const player = document.createElement("dvr-live");
         const hold = element("canvas");
+
+        const player =
+          stream.live === null ? null : document.createElement("dvr-live");
+
+        const picture = player === null ? element("img") : null;
 
         figure.className = "live-tile";
         figure.dataset.loading = "";
         hold.className = "live-hold";
         hold.setAttribute("aria-hidden", "true");
-        player.mode = "mse,hls";
-        // Video only: the recorder offers an audio track but sends nothing
-        // on it, and a player waiting for that audio never starts
-        player.media = "video";
-        figure.append(
-          player,
-          hold,
-          element("figcaption", cameraLabel(stream.id)),
-        );
+
+        if (player !== null) {
+          player.mode = "mse,hls";
+          // Video only: the recorder offers an audio track but sends nothing
+          // on it, and a player waiting for that audio never starts
+          player.media = "video";
+          figure.append(player);
+        }
+
+        if (picture !== null) {
+          picture.className = "live-still";
+          picture.alt = "";
+          picture.addEventListener("load", () => {
+            delete figure.dataset.loading;
+          });
+          figure.append(picture);
+        }
+
+        figure.append(hold, element("figcaption", cameraLabel(stream.id)));
 
         figure.addEventListener("click", () => {
           picked = stream.id;
@@ -294,7 +347,7 @@ export const livePage = (): LivePage => {
           toggleSolo();
         });
 
-        return { stream, figure, player, hold };
+        return { stream, figure, player, picture, hold };
       });
 
     if (streams.length === 0) {
@@ -307,7 +360,7 @@ export const livePage = (): LivePage => {
     // On the page each player makes its video: the page's controls stand in
     // for the video's own
     for (const tile of tiles) {
-      const video = tile.player.querySelector("video");
+      const video = tile.player?.querySelector("video") ?? null;
 
       if (video !== null) video.controls = false;
 
@@ -366,9 +419,12 @@ export const livePage = (): LivePage => {
     paused = !paused;
 
     for (const tile of tiles) {
-      const video = tile.player.querySelector("video");
+      const video = tile.player?.querySelector("video") ?? null;
 
-      if (paused) {
+      // A still picture stays as it is while paused
+      if (tile.player === null) {
+        if (!paused) connect(tile);
+      } else if (paused) {
         // The last frame stays up while the stream is closed
         if (video !== null && video.readyState >= 2) {
           tile.hold.width = video.videoWidth;
@@ -393,19 +449,17 @@ export const livePage = (): LivePage => {
 
     if (tile === undefined) return;
 
-    const video = tile.player.querySelector("video");
+    const video = tile.player?.querySelector("video") ?? null;
 
-    // Paused, the held frame is the picture
+    // Paused, the held frame is the picture; a camera with only a still
+    // saves the one it shows
     const source =
-      tile.hold.hasAttribute("data-shown") || video === null
+      tile.picture ??
+      (tile.hold.hasAttribute("data-shown") || video === null
         ? tile.hold
-        : video;
+        : video);
 
-    const width =
-      source instanceof HTMLVideoElement ? source.videoWidth : source.width;
-
-    const height =
-      source instanceof HTMLVideoElement ? source.videoHeight : source.height;
+    const { width, height } = sizeOf(source);
 
     if (width === 0) return;
 
@@ -513,10 +567,11 @@ export const livePage = (): LivePage => {
     show: async (cameras) => {
       await definePlayer(go2rtcPath);
 
-      // Where the source can't tell whether there's a picture, it's tried
+      // Where the source can't tell whether there's a picture, it's tried;
+      // a camera with only a still picture shows that
       streams = cameras.filter(
-        (camera): camera is LiveCamera =>
-          camera.live !== null && camera.signal !== false,
+        (camera) =>
+          (camera.live !== null || camera.still) && camera.signal !== false,
       );
 
       // A layout bigger than there are cameras for falls back to the one

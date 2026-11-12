@@ -23,14 +23,16 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/cameras`                                   | Each camera: its id, name and what it can do                  |
 | `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`        |
 | `GET /api/cameras/:source/:camera/video?…`           | Recorded video as MP4; see below                              |
+| `GET /api/cameras/:source/:camera/still`             | A camera's still picture now, for one with `still`            |
 | `GET /api/recordings/days?month=…`                   | The days with recordings on any camera in a month             |
 | `GET /api/events/`                                   | The last 200 events from each source, newest first            |
 | `GET /api/events/live`                               | Events as server-sent events                                  |
 | `GET /api/health`                                    | 204 while the server is up                                    |
 
 A camera in `/api/cameras` says what it can do: `live` has its go2rtc stream
-names, or is `null` for a camera with no live view; `recordings` and `events`
-say whether it has them; `signal` is whether it has a picture now, or `null`
+names, or is `null` for a camera with no live view; `still` says whether it
+has a still picture, which the page shows in place of video for a camera with
+no live view; `recordings` and `events` say whether it has them; `signal` is whether it has a picture now, or `null`
 when its source can't tell. A source that isn't connected yet leaves its
 cameras out until it knows them.
 

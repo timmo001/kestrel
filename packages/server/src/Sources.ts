@@ -22,6 +22,7 @@ import {
   type SourceSettings,
 } from "@timmo001/kestrel-core";
 import * as Raysharp from "@timmo001/kestrel-source-raysharp";
+import * as Streams from "@timmo001/kestrel-source-stream";
 import {
   Context,
   Effect,
@@ -39,7 +40,7 @@ import { configFolder } from "./Folders.ts";
 import * as SourcesFile from "./SourcesFile.ts";
 
 /** Every kind of source the server can run. */
-const kinds: ReadonlyArray<Kind> = [Raysharp.kind];
+const kinds: ReadonlyArray<Kind> = [Raysharp.kind, Streams.kind];
 
 const kindInfos = kinds.map((kind) => kind.info);
 

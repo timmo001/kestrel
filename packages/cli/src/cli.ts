@@ -205,6 +205,7 @@ const cameras = Command.make(
     for (const each of list) {
       const can = [
         each.live === null ? [] : ["live"],
+        each.still ? ["still"] : [],
         each.recordings ? ["recordings"] : [],
         each.events ? ["events"] : [],
       ].flat();

@@ -30,4 +30,6 @@ export type {
   Source,
   SourceEvents,
   SourceRecordings,
+  SourceStills,
+  StillPicture,
 } from "./Source.ts";

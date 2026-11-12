@@ -223,8 +223,20 @@ gw-page {
   transition: opacity 200ms ease-out;
 }
 
-.live-tile video {
+.live-tile video,
+.live-still {
   object-fit: contain;
+}
+
+.live-still {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: opacity 200ms ease-out;
+}
+
+.live-tile[data-loading] .live-still {
+  opacity: 0;
 }
 
 /* The last frame, held while paused */

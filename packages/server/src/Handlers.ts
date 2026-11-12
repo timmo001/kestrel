@@ -16,7 +16,7 @@ import {
   type SourceInfo,
 } from "@timmo001/kestrel-core";
 import { Effect, Layer, Stream } from "effect";
-import { HttpMiddleware } from "effect/http";
+import { HttpMiddleware, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
 import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
@@ -113,6 +113,7 @@ const camerasOf = (source: Source, labels: ReadonlyArray<CameraLabel>) =>
           camera.live && feed !== undefined
             ? streamNames(camera.id, feed.sub !== null)
             : null,
+        still: camera.still && source.stills !== undefined,
         recordings: camera.recordings && source.recordings !== undefined,
         events: camera.events && source.events !== undefined,
       };
@@ -189,6 +190,23 @@ const CamerasHandlers = HttpApiBuilder.group(
             },
           });
         }),
+      )
+      .handle("still", ({ params }) =>
+        sources.find(params.source).pipe(
+          Effect.flatMap((found) =>
+            capability(found, found.stills, "still pictures"),
+          ),
+          Effect.flatMap((stills) =>
+            stills.still(cameraId(params.source, params.camera)),
+          ),
+          // The picture's own type, which needn't be JPEG
+          Effect.map((picture) =>
+            HttpServerResponse.uint8Array(picture.data, {
+              contentType: picture.contentType,
+              headers: { "cache-control": "no-store" },
+            }),
+          ),
+        ),
       );
   }),
 );

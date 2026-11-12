@@ -28,11 +28,38 @@ hand too; restart the server after a hand edit.
       "kind": "raysharp",
       "name": "Swann recorder",
       "settings": { "host": "192.0.2.10", "username": "admin", "password": "…" }
+    },
+    {
+      "id": "garden",
+      "kind": "stream",
+      "name": "Garden cameras",
+      "settings": {},
+      "cameras": [
+        {
+          "id": "porch",
+          "name": "Porch",
+          "main": "rtsp://user:…@192.0.2.20:554/stream1",
+          "sub": "rtsp://user:…@192.0.2.20:554/stream2"
+        },
+        {
+          "id": "shed",
+          "name": "Shed",
+          "still": "http://192.0.2.21/snapshot.jpg"
+        }
+      ]
     }
   ],
   "cameras": [{ "camera": "swann/1", "label": "Front door" }]
 }
 ```
+
+A `raysharp` source is a Raysharp-made recorder, such as a Swann DVR, with
+live view, recordings, events and its disks; each channel is a camera. A
+`stream` source is cameras you list yourself, each with an `id`, a `name`
+and a `main` stream address, any that go2rtc plays (RTSP, RTMP, HLS, MJPEG
+and more), with an optional `sub` stream for small tiles. A camera with only
+a `still` address shows that picture on the Live page, a new one every few
+seconds. Streams have live view only: no recordings or events.
 
 A source's `id` names its cameras, such as `swann/3`, so links and labels
 keep working as long as it stays the same. It holds logins, so keep it to
@@ -87,10 +114,13 @@ run serve:server:logs` follows its log.
 
 The server listens on `127.0.0.1:7380`. go2rtc only listens on
 `127.0.0.1:1984`, and the server passes it through under `/go2rtc/`; it
-starts go2rtc again whenever the cameras' streams change. Set `KESTREL_HOST`
+starts go2rtc again whenever the cameras' streams change. go2rtc's RTSP
+server stays on `127.0.0.1:1985`, since its ffmpeg sources hand their output
+back through it. Set `KESTREL_HOST`
 to listen on another address, such as your machine's address on your network
-to use it from a phone, and `KESTREL_PORT` and `KESTREL_GO2RTC_PORT` for
-other ports. The server doesn't ask for a login, so only listen where everyone
+to use it from a phone, and `KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and
+`KESTREL_GO2RTC_RTSP_PORT` for other ports. The server doesn't ask for a
+login, so only listen where everyone
 who can reach it should see the cameras and change its sources.
 
 After changing the server, restart it with `mise run serve:server:restart`.
@@ -99,12 +129,13 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable              | Default                  | What it sets                                  |
-| --------------------- | ------------------------ | --------------------------------------------- |
-| `KESTREL_HOST`        | `127.0.0.1`              | The address the server listens on             |
-| `KESTREL_PORT`        | `7380`                   | The server's port (`PORT` too, for Pitchfork) |
-| `KESTREL_GO2RTC_PORT` | `1984`                   | go2rtc's port                                 |
-| `KESTREL_GO2RTC`      | `go2rtc`                 | The go2rtc binary                             |
-| `KESTREL_WEB`         | `packages/web/dist`      | The built web client                          |
-| `KESTREL_CONFIG`      | `~/.config/kestrel`      | Where `sources.json` is kept                  |
-| `KESTREL_STATE`       | `~/.local/state/kestrel` | Where push subscriptions are kept             |
+| Variable                   | Default                  | What it sets                                  |
+| -------------------------- | ------------------------ | --------------------------------------------- |
+| `KESTREL_HOST`             | `127.0.0.1`              | The address the server listens on             |
+| `KESTREL_PORT`             | `7380`                   | The server's port (`PORT` too, for Pitchfork) |
+| `KESTREL_GO2RTC_PORT`      | `1984`                   | go2rtc's port                                 |
+| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                   | go2rtc's RTSP port, on 127.0.0.1 only         |
+| `KESTREL_GO2RTC`           | `go2rtc`                 | The go2rtc binary                             |
+| `KESTREL_WEB`              | `packages/web/dist`      | The built web client                          |
+| `KESTREL_CONFIG`           | `~/.config/kestrel`      | Where `sources.json` is kept                  |
+| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions are kept             |

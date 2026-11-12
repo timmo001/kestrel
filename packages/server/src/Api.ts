@@ -154,6 +154,14 @@ export class CamerasGroup extends HttpApiGroup.make("cameras")
       ),
       error: [...cameraErrors, NoRecordings],
     }),
+    /** A camera's still picture now, as its source sends it, such as a JPEG. */
+    HttpApiEndpoint.get("still", "/:source/:camera/still", {
+      params: cameraParams,
+      success: Schema.Uint8Array.pipe(
+        HttpApiSchema.asUint8Array({ contentType: "image/jpeg" }),
+      ),
+      error: cameraErrors,
+    }),
   )
   .prefix("/api/cameras") {}
 

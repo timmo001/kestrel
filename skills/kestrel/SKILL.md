@@ -18,8 +18,11 @@ for the recorder's channel 3.
    `connection.error` and stop: its cameras don't answer until it is. Its
    `details` give each connected source's clock, storage and each camera's
    state; `details` alone gives one source's, with its facts.
-2. `cameras` lists each camera's id, name and what it can do: `live`,
-   `recordings` and `events`, and `signal` for whether it has a picture now.
+2. `cameras` lists each camera's id, name (or the `label` you gave it) and
+   what it can do: `live`, `still`, `recordings` and `events`, and `signal`
+   for whether it has a picture now (`null` when its source can't tell).
+   A camera with `still` has a picture at
+   `<server>/api/cameras/<source>/<camera>/still`.
 3. For what was recorded, use `days` for a month, then `recordings` for a
    camera and a day. Each recording's `reasons` say why it was made: `PIR`
    and `motion` are events, `normal` is continuous recording.

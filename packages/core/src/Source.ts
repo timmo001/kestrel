@@ -2,7 +2,7 @@
  * What a source kind implements, such as the Raysharp recorder: its
  * connection and what needs you about it, its cameras and where go2rtc
  * reads their live streams, and the capabilities only some sources have,
- * each optional: recordings, events and details. Cameras are named by their
+ * each optional: recordings, events, still pictures and details. Cameras are named by their
  * full id, such as `swann/3`.
  *
  * @module
@@ -46,8 +46,25 @@ export interface CameraInfo {
   /** Whether it has a picture now; `null` when the source can't tell. */
   readonly signal: boolean | null;
   readonly live: boolean;
+  /** Whether it has a still picture of its own, for a camera with no video. */
+  readonly still: boolean;
   readonly recordings: boolean;
   readonly events: boolean;
+}
+
+/** A camera's still picture, as its source sent it. */
+export interface StillPicture {
+  readonly data: Uint8Array;
+  /** Its type, such as `image/jpeg`. */
+  readonly contentType: string;
+}
+
+/** Still pictures, for a source with cameras that have them. */
+export interface SourceStills {
+  /** A camera's picture now. */
+  readonly still: (
+    camera: CameraId,
+  ) => Effect.Effect<StillPicture, SourceUnavailable | UnknownCamera>;
 }
 
 /**
@@ -111,6 +128,7 @@ export interface Source {
   readonly live: Effect.Effect<ReadonlyArray<LiveFeed>, SourceUnavailable>;
   readonly recordings?: SourceRecordings;
   readonly events?: SourceEvents;
+  readonly stills?: SourceStills;
   /** What it shows about itself, such as a recorder's device, disks and channels. */
   readonly details?: Effect.Effect<Details, SourceUnavailable>;
 }
