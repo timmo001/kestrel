@@ -11,6 +11,54 @@ import { Schema } from "effect";
 import { phDownloadSimple, phPlay } from "./icons.ts";
 import { clipUrl, type Clip } from "./player.ts";
 
+/** Fields that take text: a toggle's radios don't, so keys pass them by. */
+export const typingTargets =
+  "input:not([type=radio], [type=checkbox], [type=button], [type=range]), textarea, select, [contenteditable], gw-input, gw-select";
+
+/** Controls that move between their own parts with the arrow keys. */
+const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
+
+/**
+ * The key a page's keyboard controls act on, such as `k`, `F` lowered to
+ * `f`, or `Shift+ArrowLeft`; or undefined where it belongs to what has the
+ * focus: a field being typed in, a toggle's arrows, or Space on a button.
+ */
+export const controlKey = (event: KeyboardEvent): string | undefined => {
+  if (
+    event.ctrlKey ||
+    event.metaKey ||
+    event.altKey ||
+    event.defaultPrevented
+  ) {
+    return undefined;
+  }
+
+  const path = event
+    .composedPath()
+    .filter((target) => target instanceof Element);
+
+  if (path.some((target) => target.matches(typingTargets))) return undefined;
+
+  if (
+    event.key.startsWith("Arrow") &&
+    path.some((target) => target.matches(ownsArrows))
+  ) {
+    return undefined;
+  }
+
+  // Space on a focused button presses that button, as it should
+  if (
+    event.key === " " &&
+    path.some((target) => target.matches("button, a, gw-button, [role=radio]"))
+  ) {
+    return undefined;
+  }
+
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+
+  return event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key;
+};
+
 /** The first `tag` element with `className`, or null. */
 export const find = <K extends keyof HTMLElementTagNameMap>(
   tag: K,

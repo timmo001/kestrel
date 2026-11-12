@@ -47,6 +47,7 @@ import type { RecordingsSearch } from "./router.ts";
 import {
   actionsColumn,
   clock,
+  controlKey,
   dayFormat,
   element,
   find,
@@ -57,6 +58,7 @@ import {
   recordingRow,
   seconds,
   timeFormat,
+  typingTargets,
 } from "./shared.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
 
@@ -1157,52 +1159,10 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     ["s", () => captureButton?.click()],
   ]);
 
-  /** Where a key belongs to what has the focus rather than the player. */
-  // Inputs that take text: a toggle's radios don't, so keys pass them by
-  const typing =
-    "input:not([type=radio], [type=checkbox], [type=button], [type=range]), textarea, select, [contenteditable], gw-input, gw-select";
-
-  const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
-
   document.addEventListener("keydown", (event) => {
-    if (
-      page?.hidden !== false ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      event.defaultPrevented
-    ) {
-      return;
-    }
+    if (page?.hidden !== false) return;
 
-    const path = event
-      .composedPath()
-      .filter((target) => target instanceof Element);
-
-    if (path.some((target) => target.matches(typing))) return;
-
-    if (
-      event.key.startsWith("Arrow") &&
-      path.some((target) => target.matches(ownsArrows))
-    ) {
-      return;
-    }
-
-    // Space on a focused button presses that button, as it should
-    if (
-      event.key === " " &&
-      path.some((target) =>
-        target.matches("button, a, gw-button, [role=radio]"),
-      )
-    ) {
-      return;
-    }
-
-    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-
-    const action = keys.get(
-      event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key,
-    );
+    const action = keys.get(controlKey(event) ?? "");
 
     if (action === undefined) return;
 
@@ -1245,7 +1205,9 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       .composedPath()
       .filter((target) => target instanceof Element);
 
-    if (path.some((target) => target.matches(`${typing}, gw-popover`))) return;
+    if (path.some((target) => target.matches(`${typingTargets}, gw-popover`))) {
+      return;
+    }
 
     requestAnimationFrame(focusPlayer);
   });
