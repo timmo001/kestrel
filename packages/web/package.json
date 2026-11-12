@@ -19,9 +19,9 @@
     "@fontsource-variable/mona-sans": "5.3.0",
     "@timmo001/kestrel-core": "workspace:*",
     "@timmo001/kestrel-server": "workspace:*",
-    "@timmo001/groundwork-pwa": "0.25.0",
-    "@timmo001/groundwork-tokens": "0.25.0",
-    "@timmo001/groundwork-ui": "0.25.0",
+    "@timmo001/groundwork-pwa": "0.26.0",
+    "@timmo001/groundwork-tokens": "0.26.0",
+    "@timmo001/groundwork-ui": "0.26.0",
     "effect": "4.1.4"
   },
   "devDependencies": {

@@ -14,7 +14,7 @@ import {
   type SettingField,
   type Settings,
 } from "@timmo001/kestrel-core";
-import { on, type MenuItem } from "@timmo001/groundwork-ui";
+import { DirtyState, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { call } from "./api.ts";
 import { ownLabel } from "./cameras.ts";
@@ -157,6 +157,23 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   /** The source whose panel is open, kept across redraws. */
   let opened: Draft | undefined;
 
+  /** The settings as the server last sent them, which leaving without saving goes back to. */
+  let saved: Settings | undefined;
+
+  // Save stays off until something changes, and leaving with changes asks first
+  const dirty = new DirtyState<Settings>({
+    discard: () => {
+      if (saved === undefined) return;
+
+      show(saved);
+      render();
+    },
+  });
+
+  dirty.subscribe((changed) => {
+    if (saveButton !== null) saveButton.disabled = !changed;
+  });
+
   const say = (message: string, tone: "danger" | "success") => {
     if (notice === null) return;
 
@@ -166,6 +183,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   };
 
   const show = (settings: Settings) => {
+    saved = settings;
     drafts = settings.sources.map((source) => ({
       id: source.id,
       kind: source.kind,
@@ -378,6 +396,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
         ? [element("p", "No sources yet. Add one to see its cameras.")]
         : drafts.map(sourceCard)),
     );
+
+    // Adding or removing a source or a camera is a change too
+    dirty.update(payload());
   };
 
   const addSource = (kind: KindInfo) => {
@@ -449,15 +470,16 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     if (saveButton !== null) saveButton.loading = true;
 
     try {
-      const saved = await call((api) =>
+      const stored = await call((api) =>
         api.sources.save({ payload: payload() }),
       );
 
-      show(saved);
+      show(stored);
       say("Saved. The sources you changed are starting again.", "success");
       await options.onSaved();
       cameras = await loadCameras();
       render();
+      dirty.start(payload());
     } catch (error) {
       say(error instanceof Error ? error.message : String(error), "danger");
     } finally {
@@ -467,12 +489,20 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
 
   if (saveButton !== null) {
     saveButton.setAttribute("icon", phFloppyDisk);
+    saveButton.disabled = true;
     saveButton.addEventListener("click", () => void save());
   }
 
   if (orderList !== null) {
     orderList.addEventListener("change", () => {
       order = orderList.items.map((item) => item.value);
+    });
+  }
+
+  // Each field's own listener writes its value first, then this compares
+  for (const type of ["input", "change"]) {
+    list?.closest(".page")?.addEventListener(type, () => {
+      dirty.update(payload());
     });
   }
 
@@ -497,6 +527,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       }
 
       render();
+      dirty.start(payload());
     } catch (error) {
       say(
         `The settings can't be loaded yet: ${error instanceof Error ? error.message : String(error)}`,

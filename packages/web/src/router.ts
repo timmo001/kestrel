@@ -8,6 +8,7 @@
  *
  * @module
  */
+import { confirmLeave, hasUnsavedChanges } from "@timmo001/groundwork-ui";
 import { CameraId, LocalDate, LocalTime } from "@timmo001/kestrel-core";
 import { Option, Schema, SchemaGetter } from "effect";
 import { Atom } from "effect/reactivity";
@@ -107,6 +108,12 @@ interface RouterOptions {
   readonly scrollKey?: string;
   /** A new address for an old one, so old links and bookmarks still land. */
   readonly redirect?: (url: URL) => string | undefined;
+  /**
+   * Asked before moving to another page, by a link, `navigate`, back or
+   * forward; `false` stays. Such as groundwork-ui's `confirmLeave`, which
+   * asks while a form has unsaved changes.
+   */
+  readonly beforeLeave?: () => boolean | Promise<boolean>;
 }
 
 const segments = (path: string) =>
@@ -332,18 +339,22 @@ const makeRouter = <const R extends AnyRoutes>(
     });
   };
 
-  /**
-   * Goes to a URL within the app without reloading. A new path scrolls to
-   * the top; changing only the search keeps the scroll position.
-   */
-  const navigate = (
-    url: string,
-    navigation: { readonly replace?: boolean } = {},
-  ) => {
-    const next = new URL(url, location.href);
+  /** The address of the page showing, which a held back or forward returns to; set once the location is first read. */
+  let shown = "";
 
-    if (next.href === location.href) return;
+  /** Runs `go` once `beforeLeave` agrees, at once when nothing asks. */
+  const leaving = (go: () => void) => {
+    const allowed = options.beforeLeave?.() ?? true;
 
+    if (allowed === true) go();
+    else if (allowed !== false) {
+      void allowed.then((leave) => {
+        if (leave) go();
+      });
+    }
+  };
+
+  const go = (next: URL, navigation: { readonly replace?: boolean }) => {
     const samePath = next.pathname === location.pathname;
 
     rememberScroll();
@@ -359,10 +370,29 @@ const makeRouter = <const R extends AnyRoutes>(
     window.dispatchEvent(new Event(navigationEvent));
   };
 
+  /**
+   * Goes to a URL within the app without reloading. A new path scrolls to
+   * the top; changing only the search keeps the scroll position. Moving to
+   * another page asks `beforeLeave` first.
+   */
+  const navigate = (
+    url: string,
+    navigation: { readonly replace?: boolean } = {},
+  ) => {
+    const next = new URL(url, location.href);
+
+    if (next.href === location.href) return;
+
+    if (next.pathname === location.pathname) go(next, navigation);
+    else leaving(() => go(next, navigation));
+  };
+
   const read = (): LocationIn<R> => {
     const target = options.redirect?.(new URL(location.href));
 
     if (target !== undefined) history.replaceState(null, "", target);
+
+    shown = location.href;
 
     return parse(new URL(location.href));
   };
@@ -402,9 +432,37 @@ const makeRouter = <const R extends AnyRoutes>(
   const currentLocation = Atom.readable((get) => {
     const update = () => get.setSelf(read());
 
-    const onPopState = () => {
+    const arrive = () => {
       update();
       restoreScroll();
+    };
+
+    const onPopState = () => {
+      const left =
+        shown !== "" && new URL(shown).pathname !== location.pathname;
+
+      const allowed = left ? (options.beforeLeave?.() ?? true) : true;
+
+      if (allowed === true) {
+        arrive();
+
+        return;
+      }
+
+      // A pop can't be cancelled, so the page showing is put back while
+      // `beforeLeave` asks, and swapped for where the pop went if it leaves
+      const target = location.href;
+
+      history.pushState(null, "", shown);
+
+      if (allowed === false) return;
+
+      void allowed.then((leave) => {
+        if (!leave) return;
+
+        history.replaceState(null, "", target);
+        arrive();
+      });
     };
 
     const onClick = (event: MouseEvent) => {
@@ -441,4 +499,6 @@ const pageNames = new Set(Object.keys(routes));
 export const { href, navigate, currentLocation } = makeRouter(routes, {
   // Old addresses, such as `/#recordings`, `/recorder` or `channel=3`, still land
   redirect: (url) => newAddress(url, pageNames),
+  // Settings asks before you leave it with changes you haven't saved
+  beforeLeave: () => !hasUnsavedChanges() || confirmLeave(),
 });
