@@ -50,14 +50,70 @@
       <gw-stack>
         <gw-stack class="attention" hidden></gw-stack>
 
-        <!-- Live: each camera with a signal, on its main stream -->
+        <!-- Live: the cameras with a signal, a layout's worth at a time, and
+             their controls under them, which go full screen together -->
         <section class="page" data-page="live">
-          <!-- Placeholders hold the grid's space until the cameras are known -->
-          <div class="live-grid" aria-busy="true">
-            <div class="live-tile" data-loading></div>
-            <div class="live-tile" data-loading></div>
-            <div class="live-tile" data-loading></div>
-            <div class="live-tile" data-loading></div>
+          <!-- Focusable, so the keyboard controls reach it after a click -->
+          <div class="live-stage" tabindex="-1">
+            <!-- The grid keeps its layout's shape, centred in the space -->
+            <div class="live-area">
+              <!-- Placeholders hold the grid's space until the cameras are known -->
+              <div class="live-grid" data-layout="4" aria-busy="true">
+                <div class="live-tile" data-loading></div>
+                <div class="live-tile" data-loading></div>
+                <div class="live-tile" data-loading></div>
+                <div class="live-tile" data-loading></div>
+              </div>
+            </div>
+            <div class="player-controls" role="toolbar" aria-label="Live view">
+              <gw-row class="controls-start">
+                <gw-segmented
+                  class="live-layout"
+                  label="Cameras at once"
+                  value="4"
+                ></gw-segmented>
+              </gw-row>
+              <gw-row
+                class="controls-transport"
+                role="group"
+                aria-label="Cameras"
+              >
+                <gw-button
+                  class="live-previous"
+                  label="Previous cameras"
+                ></gw-button>
+                <gw-button class="live-play" label="Pause"></gw-button>
+                <gw-button class="live-next" label="Next cameras"></gw-button>
+              </gw-row>
+              <gw-row class="controls-end">
+                <gw-button class="live-capture" label="Capture"></gw-button>
+                <gw-button
+                  class="live-help"
+                  label="Keyboard controls"
+                ></gw-button>
+                <gw-button
+                  class="live-fullscreen"
+                  label="Full screen"
+                ></gw-button>
+                <!-- The keys, opened from the help button -->
+                <gw-popover class="live-shortcuts" heading="Keyboard controls">
+                  <dl class="shortcut-list">
+                    <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
+                    <dd>Pause or play</dd>
+                    <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt>
+                    <dd>Cameras at once</dd>
+                    <dt><kbd>←</kbd> <kbd>→</kbd></dt>
+                    <dd>Previous or next cameras</dd>
+                    <dt><kbd>Enter</kbd> or a double click</dt>
+                    <dd>The picked camera alone, and back</dd>
+                    <dt><kbd>S</kbd></dt>
+                    <dd>Save a still of the picked camera</dd>
+                    <dt><kbd>F</kbd></dt>
+                    <dd>Full screen</dd>
+                  </dl>
+                </gw-popover>
+              </gw-row>
+            </div>
           </div>
         </section>
 

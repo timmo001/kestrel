@@ -1,8 +1,8 @@
 /**
  * The page script: Base's fonts, the theme CSS and the components, then the
  * app bar's pages (live view, recordings, events and the recorder's health),
- * one shown at a time from the address's hash. The service worker keeps the
- * shell so the app starts offline.
+ * one shown at a time from the address. Live and Recordings have modules of
+ * their own. The service worker keeps the shell so the app starts offline.
  */
 // Every theme's fonts; a browser only downloads the ones in use
 import "@fontsource-variable/mona-sans";
@@ -16,7 +16,6 @@ import "@timmo001/groundwork-ui";
 import type { ChannelStatus } from "@timmo001/dvr-revival-rsnet/domain";
 import type {
   Attention,
-  LiveStream,
   ReceivedEvent,
 } from "@timmo001/dvr-revival-server/api";
 import {
@@ -44,6 +43,7 @@ import {
   phHardDrives,
   phVideoCamera,
 } from "./icons.ts";
+import { livePage } from "./live.ts";
 import { playbackPage } from "./playback.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import {
@@ -235,97 +235,9 @@ const showRecorder = async () => {
   return status.channels;
 };
 
-// Live: a grid of each channel that has a signal, on its main stream. The
-// players only run while the page shows, so a hidden page streams nothing
-const liveGrid = find("div", "live-grid");
+// Live: its own module, with its layouts and controls
+const live = livePage();
 let liveChannels: ReadonlyArray<ChannelStatus> | undefined;
-
-/** go2rtc's player element, as far as the page sets it up. */
-interface LivePlayer extends HTMLElement {
-  /** How it plays: MSE over the WebSocket, falling back to HLS. */
-  mode: string;
-  /** The tracks it asks for. */
-  media: string;
-  /** The stream's WebSocket URL; setting it connects. */
-  src: string;
-}
-
-declare global {
-  interface HTMLElementTagNameMap {
-    "dvr-live": LivePlayer;
-  }
-}
-
-/** What the page uses from go2rtc's `video-rtc.js`. */
-interface VideoRtcModule {
-  readonly VideoRTC: CustomElementConstructor;
-}
-
-/**
- * Defines `dvr-live` from go2rtc's own `video-rtc.js`, served beside it, so
- * the player always matches the go2rtc that sends the stream.
- */
-const definePlayer = async (path: string) => {
-  if (customElements.get("dvr-live") !== undefined) return;
-
-  const url = new URL(`${path}video-rtc.js`, location.origin).href;
-
-  const { VideoRTC }: VideoRtcModule = await import(url);
-
-  if (customElements.get("dvr-live") === undefined) {
-    customElements.define("dvr-live", VideoRTC);
-  }
-};
-
-const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
-  const sources = await call((api) => api.video.sources());
-
-  await definePlayer(sources.path);
-
-  const withSignal = new Set(
-    channels.flatMap((status) => (status.videoLoss ? [] : [status.channel])),
-  );
-
-  const tiles = sources.streams.flatMap((stream: LiveStream) => {
-    if (!withSignal.has(stream.channel)) return [];
-
-    const figure = element("figure");
-    const player = document.createElement("dvr-live");
-
-    figure.className = "live-tile";
-    // Shimmers until the first frames play. Media events don't bubble, so
-    // the tile listens as they pass down to the player's video
-    figure.dataset.loading = "";
-    figure.addEventListener("playing", () => delete figure.dataset.loading, {
-      capture: true,
-      once: true,
-    });
-    player.mode = "mse,hls";
-    // Video only: the recorder offers an audio track but sends nothing on it,
-    // and a player waiting for that audio never starts
-    player.media = "video";
-    figure.append(player, element("figcaption", stream.name));
-
-    return [{ figure, player, stream }];
-  });
-
-  // The page may have been left while the sources loaded
-  if (currentPage !== "live") return;
-
-  liveGrid?.replaceChildren(...tiles.map(({ figure }) => figure));
-  liveGrid?.removeAttribute("aria-busy");
-
-  // Connect once they're on the page, where each player creates its video
-  for (const { player, stream } of tiles) {
-    player.src = new URL(
-      `${sources.path}api/ws?src=${encodeURIComponent(stream.main)}`,
-      location.origin,
-    ).href;
-  }
-};
-
-/** Takes the players off the page, which closes their streams. */
-const stopLive = () => liveGrid?.replaceChildren();
 
 // Recordings: its own module, as the recorder's client lays out playback.
 // Its channel, day and the time to play from live in the address
@@ -475,15 +387,17 @@ const showPage = (location: Location) => {
 
   document.title = `${pageTitles[page]} · DVR Revival`;
 
-  if (left === "live") stopLive();
+  if (left === "live") live.stop();
 
   if (left === "recordings") playback.pause();
 
-  // Arriving at Recordings, the keyboard controls work straight away
+  // Arriving at a player, the keyboard controls work straight away
   if (page === "recordings") requestAnimationFrame(playback.focus);
 
+  if (page === "live") requestAnimationFrame(live.focus);
+
   if (page === "live" && liveChannels !== undefined) {
-    void showLive(liveChannels);
+    void live.show(liveChannels);
   }
 };
 
@@ -608,7 +522,7 @@ const start = async () => {
 
   await Promise.all([
     showAttention(),
-    currentPage === "live" ? showLive(liveChannels) : undefined,
+    currentPage === "live" ? live.show(liveChannels) : undefined,
     showEvents(),
     showClips(),
   ]);

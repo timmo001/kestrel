@@ -75,45 +75,164 @@ gw-page {
   gap: var(--gw-space-4);
 }
 
-/* Two cameras across, even in a half-width window; one across on a phone */
-.live-grid {
-  --live-gap: var(--gw-space-3);
-  /* The app bar and the page's padding above the grid, and below it */
-  --live-chrome: 6rem;
-
+/* The cameras and their controls as one dark panel filling the window under
+   the app bar, as the Recordings player does, at its full size from the
+   first paint */
+.live-stage {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--live-gap);
-  /* The page's width from the start, rather than its tiles': the empty
-     placeholders would otherwise draw it small until the players arrive */
-  width: 100%;
-  /* Narrow enough that both rows of 16:9 tiles fit in the window */
-  max-width: calc(
-    (100dvh - var(--live-chrome) - var(--live-gap)) * 16 / 9 + var(--live-gap)
-  );
-  margin-inline: auto;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: calc(100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5));
+  min-height: 20rem;
+  overflow: hidden;
+  border-radius: var(--gw-radius-md, 8px);
+  background: #000;
 }
 
+.live-stage:focus {
+  outline: none;
+}
+
+.live-stage:fullscreen {
+  height: 100dvh;
+  border-radius: 0;
+}
+
+/* The space for the grid, which it measures itself against */
+.live-area {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  container-type: size;
+}
+
+/* A layout's worth of cameras, in the layout's own shape so each picture
+   fills its 16:9 cell, as big as fits and centred on black. Three is one
+   large and two stacked beside it */
+.live-grid {
+  --live-ratio: calc(16 / 9);
+
+  display: grid;
+  grid-template-columns: repeat(var(--live-columns, 2), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--live-rows, 2), minmax(0, 1fr));
+  gap: 2px;
+  width: min(100cqw, 100cqh * var(--live-ratio));
+  height: min(100cqh, 100cqw / var(--live-ratio));
+}
+
+.live-grid[data-layout="1"] {
+  --live-columns: 1;
+  --live-rows: 1;
+}
+
+.live-grid[data-layout="2"] {
+  --live-columns: 2;
+  --live-rows: 1;
+  --live-ratio: calc(32 / 9);
+}
+
+.live-grid[data-layout="3"] {
+  --live-ratio: calc(48 / 18);
+
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.live-grid[data-layout="3"] > :first-child {
+  grid-row: span 2;
+}
+
+.live-grid[data-layout="6"] {
+  --live-columns: 3;
+  --live-rows: 2;
+  --live-ratio: calc(48 / 18);
+}
+
+.live-grid[data-layout="9"] {
+  --live-columns: 3;
+  --live-rows: 3;
+}
+
+.live-grid[data-layout="16"] {
+  --live-columns: 4;
+  --live-rows: 4;
+}
+
+.live-empty {
+  display: grid;
+  place-items: center;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+  margin: 0;
+  color: rgb(255 255 255 / 70%);
+}
+
+/* On a phone, the cameras one under another at their own shape */
 @media (width < 40rem) {
-  .live-grid {
+  .live-stage {
+    height: auto;
+  }
+
+  .live-area {
+    display: block;
+    container-type: normal;
+  }
+
+  .live-grid,
+  .live-grid[data-layout] {
     grid-template-columns: minmax(0, 1fr);
-    max-width: none;
+    grid-template-rows: none;
+    width: auto;
+    height: auto;
+  }
+
+  .live-grid[data-layout="3"] > :first-child {
+    grid-row: auto;
+  }
+
+  .live-tile {
+    aspect-ratio: 16 / 9;
   }
 }
 
 .live-tile {
   position: relative;
+  min-height: 0;
   margin: 0;
   overflow: hidden;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--gw-radius-md, 8px);
   background: #000;
+  cursor: pointer;
+}
+
+/* The picked camera, which a still and Enter act on */
+.live-tile[data-picked]::after {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 0 2px var(--gw-color-accent, #4c8dff);
+  pointer-events: none;
+  content: "";
 }
 
 .live-tile dvr-live {
   display: block;
   height: 100%;
   transition: opacity 200ms ease-out;
+}
+
+.live-tile video {
+  object-fit: contain;
+}
+
+/* The last frame, held while paused */
+.live-hold {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.live-hold:not([data-shown]) {
+  display: none;
 }
 
 /* A shimmer until the camera's first frames play, then the video fades in */
