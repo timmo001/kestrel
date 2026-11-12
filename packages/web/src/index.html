@@ -456,6 +456,18 @@
             <gw-card loading lines="1"></gw-card>
             <gw-card loading lines="1"></gw-card>
           </gw-stack>
+          <!-- The order cameras show in, dragged or moved with the arrow keys -->
+          <gw-expansion
+            class="settings-order"
+            heading="Camera order"
+            description="The order cameras show in across the app"
+          >
+            <gw-sortable
+              class="settings-order-list"
+              label="Camera order"
+              empty-label="The cameras show here once their sources connect."
+            ></gw-sortable>
+          </gw-expansion>
         </section>
 
         <!-- An address that isn't one of the pages -->

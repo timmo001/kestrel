@@ -14,6 +14,7 @@ import {
   NotSupported,
   SourceUnavailable,
   UnknownSource,
+  type CameraId,
   type CameraLabel,
   type Kind,
   type KindInfo,
@@ -64,6 +65,7 @@ const firstSettings: Settings = {
     },
   ],
   cameras: [],
+  order: [],
 };
 
 /** A source that couldn't start, listed with the reason and nothing else. */
@@ -116,6 +118,8 @@ export class Sources extends Context.Service<
     readonly kinds: ReadonlyArray<KindInfo>;
     /** The labels you gave cameras. */
     readonly labels: Effect.Effect<ReadonlyArray<CameraLabel>>;
+    /** The order you gave cameras, by id; those it leaves out follow. */
+    readonly order: Effect.Effect<ReadonlyArray<CameraId>>;
     /** The settings as they're read back, with secrets left out. */
     readonly settings: Effect.Effect<Settings>;
     /**
@@ -278,6 +282,7 @@ export class Sources extends Context.Service<
           ),
         kinds: kindInfos,
         labels: current.pipe(Effect.map(({ settings }) => settings.cameras)),
+        order: current.pipe(Effect.map(({ settings }) => settings.order)),
         settings: current.pipe(
           Effect.map(({ settings }) => SourcesFile.shown(kindInfos, settings)),
         ),

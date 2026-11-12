@@ -25,7 +25,11 @@ to the settings its kind takes; opening one closes the one open before. Add
 source picks a kind, Remove takes one out, and a `stream` source lists its
 cameras with their addresses. Under each source, name its cameras: the name
 shows across the app in place of the source's own name for it, such as
-"Garden", or "Ch 3" for a recorder's numbered channel. Save restarts only
+"Garden", or "Ch 3" for a recorder's numbered channel. Camera order, below
+the sources, sets the order cameras show in across the app: drag one by its
+handle, or focus the handle and move it with the arrow keys, Home and End.
+Cameras left out of the order, such as a new source's, follow in the order
+their sources give them. Save restarts only
 the sources whose settings changed. If the settings changed since the page
 loaded them, such as from another tab, the save is refused: reload the page
 and make the change again.
@@ -59,7 +63,8 @@ and make the change again.
       ]
     }
   ],
-  "cameras": [{ "camera": "swann/1", "label": "Front door" }]
+  "cameras": [{ "camera": "swann/1", "label": "Front door" }],
+  "order": ["garden/porch", "swann/1"]
 }
 ```
 

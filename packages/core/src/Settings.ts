@@ -88,6 +88,13 @@ export const Settings = Schema.Struct({
   sources: Schema.Array(SourceSettings),
   cameras: Schema.Array(CameraLabel),
   /**
+   * The order cameras are shown in, by id. Cameras it leaves out follow, in
+   * the order their sources give them.
+   */
+  order: Schema.Array(CameraId).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  /**
    * Which version of the settings these are, as they're read back. A save
    * sends the one it read and is refused when they've changed since, so a
    * page left open can't undo a newer save.

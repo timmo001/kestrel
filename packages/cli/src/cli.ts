@@ -220,6 +220,10 @@ const sources = Command.make(
     for (const each of settings.cameras) {
       yield* Console.log(`${each.camera}  named ${each.label}`);
     }
+
+    if (settings.order.length > 0) {
+      yield* Console.log(`Camera order  ${settings.order.join(", ")}`);
+    }
   }),
 ).pipe(
   Command.withDescription(

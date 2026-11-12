@@ -1,6 +1,7 @@
 /**
  * The Settings page: each source with the settings its kind takes, the
- * cameras of a kind you list yourself, and the name you give each camera.
+ * cameras of a kind you list yourself, the name you give each camera and
+ * the order they show in.
  * Saving sends them all to the server, which keeps them in the sources file
  * and restarts the sources that changed. Secrets never come back from the
  * server: a saved one shows as saved, and stays as it is unless you type a
@@ -138,6 +139,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   const notice = find("gw-alert", "settings-notice");
   const addMenu = find("gw-menu-button", "settings-add");
   const saveButton = find("gw-button", "settings-save");
+  const orderList = find("gw-sortable", "settings-order-list");
 
   let kinds: ReadonlyArray<KindInfo> = [];
   let drafts: Array<Draft> = [];
@@ -148,6 +150,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
 
   /** The version of the settings the page read, sent back with a save. */
   let revision = "";
+
+  /** The order cameras show in, by id, as saved or as you dragged it. */
+  let order: ReadonlyArray<string> = [];
 
   /** The source whose panel is open, kept across redraws. */
   let opened: Draft | undefined;
@@ -171,6 +176,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       saved: true,
     }));
     labels = new Map(settings.cameras.map((each) => [each.camera, each.label]));
+    order = settings.order;
     revision = settings.revision ?? "";
     // The panel open before a save stays open after it
     opened = drafts.find((source) => source.id === opened?.id);
@@ -354,6 +360,17 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   };
 
   const render = () => {
+    if (orderList !== null) {
+      // The server lists cameras in their order already
+      orderList.items = cameras.map((camera) => ({
+        value: camera.id,
+        label: labels.get(camera.id)?.trim() || ownLabel(camera),
+        description:
+          drafts.find((source) => source.id === camera.source)?.name ??
+          camera.source,
+      }));
+    }
+
     if (list === null) return;
 
     list.replaceChildren(
@@ -413,6 +430,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     cameras: [...labels].flatMap(([camera, label]) =>
       label.trim() === "" ? [] : [{ camera, label: label.trim() }],
     ),
+    order,
     revision,
   });
 
@@ -450,6 +468,12 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   if (saveButton !== null) {
     saveButton.setAttribute("icon", phFloppyDisk);
     saveButton.addEventListener("click", () => void save());
+  }
+
+  if (orderList !== null) {
+    orderList.addEventListener("change", () => {
+      order = orderList.items.map((item) => item.value);
+    });
   }
 
   const start = async () => {

@@ -137,6 +137,7 @@ const CamerasHandlers = HttpApiBuilder.group(
       .handle("list", () =>
         Effect.gen(function* () {
           const labels = yield* sources.labels;
+          const order = yield* sources.order;
 
           const lists = yield* Effect.forEach(
             yield* sources.all,
@@ -144,7 +145,14 @@ const CamerasHandlers = HttpApiBuilder.group(
             { concurrency: "unbounded" },
           );
 
-          return lists.flat();
+          // Ordered ones first, the rest after in their sources' order
+          const placeOf = (camera: Camera) => {
+            const at = order.indexOf(camera.id);
+
+            return at === -1 ? order.length : at;
+          };
+
+          return lists.flat().toSorted((a, b) => placeOf(a) - placeOf(b));
         }),
       )
       .handle("recordings", ({ params, query }) =>

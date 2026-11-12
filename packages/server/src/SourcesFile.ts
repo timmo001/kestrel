@@ -105,6 +105,7 @@ const forFile = (settings: Settings) => ({
     cameras: source.cameras,
   })),
   cameras: settings.cameras,
+  order: settings.order,
 });
 
 /** Which version of the settings these are: a hash of them as the file keeps them. */
@@ -142,6 +143,7 @@ export const shown = (
     };
   }),
   cameras: settings.cameras,
+  order: settings.order,
   revision: revisionOf(settings),
 });
 
@@ -185,6 +187,9 @@ export const restored = (
     camera.label.trim() === ""
       ? []
       : [{ camera: camera.camera, label: camera.label.trim() }],
+  ),
+  order: incoming.order.filter(
+    (camera, index) => incoming.order.indexOf(camera) === index,
   ),
 });
 
