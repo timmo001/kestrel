@@ -20,13 +20,13 @@ const names = [
   "download-simple",
   "magnifying-glass-minus",
   "magnifying-glass-plus",
-  "pause-circle",
+  "pause",
   "play",
-  "play-circle",
   "scissors",
   "skip-back",
   "skip-forward",
   "stop",
+  "x",
 ];
 
 const exportName = (name: string) =>

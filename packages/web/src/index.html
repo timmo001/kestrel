@@ -118,10 +118,10 @@
                 <span class="player-caption" hidden></span>
               </div>
               <div class="player-controls" role="toolbar" aria-label="Playback">
-                <!-- As System Bridge's media controls: Stop and the speed
-                     first, the transport in the middle, the rest at the end -->
+                <!-- As System Bridge's media controls: the frame step and
+                     speed first, the transport in the middle, the rest at the
+                     end -->
                 <gw-row class="controls-start">
-                  <gw-button class="control-stop" label="Stop"></gw-button>
                   <gw-button
                     class="control-frame"
                     label="Next frame"
@@ -144,6 +144,12 @@
                     max="16"
                     step="0.1"
                   ></gw-input>
+                  <!-- Back to 1×, shown while a speed is typed in -->
+                  <gw-button
+                    class="control-speed-clear"
+                    label="Clear the speed"
+                    hidden
+                  ></gw-button>
                 </gw-row>
                 <gw-row
                   class="controls-transport"
@@ -159,6 +165,7 @@
                     class="control-next"
                     label="Next recording"
                   ></gw-button>
+                  <gw-button class="control-stop" label="Stop"></gw-button>
                 </gw-row>
                 <gw-row class="controls-end">
                   <gw-button

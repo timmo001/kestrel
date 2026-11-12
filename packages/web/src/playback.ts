@@ -26,12 +26,13 @@ import {
   phDownloadSimple,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
-  phPauseCircle,
-  phPlayCircle,
+  phPause,
+  phPlay,
   phScissors,
   phSkipBack,
   phSkipForward,
   phStop,
+  phX,
 } from "./icons.ts";
 import { clipUrl, playerFor, toSeconds, type Clip } from "./player.ts";
 import type { RecordingsSearch } from "./router.ts";
@@ -51,11 +52,10 @@ import {
 } from "./shared.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
 
-// Phosphor's regular icons, as Upkeep uses; Play and Pause are outlined
-// circles, as System Bridge draws them
+// Phosphor's regular icons, as Upkeep uses
 const icons = {
-  play: phPlayCircle,
-  pause: phPauseCircle,
+  play: phPlay,
+  pause: phPause,
   stop: phStop,
   frame: phCaretLineRight,
   previous: phSkipBack,
@@ -182,6 +182,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   const nextButton = find("gw-button", "control-next");
   const speedToggle = find("gw-segmented", "control-speed");
   const speedOther = find("gw-input", "control-speed-other");
+  const speedClear = find("gw-button", "control-speed-clear");
   const cutButton = find("gw-button", "control-cut");
   const captureButton = find("gw-button", "control-capture");
   const downloadButton = find("gw-button", "control-download");
@@ -441,12 +442,15 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     icon: string,
     label?: string,
   ) => {
+    // Play and Pause lead, larger and on a round filled button, as System
+    // Bridge's media controls do
+    const main = button === playButton;
+
     button?.setAttribute("icon", icon);
     button?.setAttribute("labels", "hide");
-    button?.setAttribute("appearance", "plain");
-    button?.setAttribute("variant", "neutral");
-    // Play and Pause lead, larger, as System Bridge's media controls do
-    button?.setAttribute("size", button === playButton ? "large" : "medium");
+    button?.setAttribute("appearance", main ? "accent" : "plain");
+    button?.setAttribute("variant", main ? "brand" : "neutral");
+    button?.setAttribute("size", main ? "large" : "medium");
 
     if (label !== undefined) button?.setAttribute("label", label);
 
@@ -466,6 +470,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   setIcon(zoomOutButton, icons.zoomOut);
   setIcon(zoomInButton, icons.zoomIn);
   setIcon(fullscreenButton, icons.fullscreen);
+  setIcon(speedClear, phX);
+  speedClear?.setAttribute("size", "small");
   setIcon(previousDay, phCaretLeft, "Previous day");
   setIcon(nextDay, phCaretRight, "Next day");
   previousDay?.setAttribute("appearance", "outlined");
@@ -577,12 +583,17 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       video.defaultPlaybackRate = Number(speed);
     }
 
-    // One of the toggle's, or the one typed in, with the toggle left unset
-    const listed = speeds.includes(speed);
+    // The toggle marks a preset, and the field shows whichever speed it is,
+    // unless it's being typed in or stepped, which it's left to
+    if (speedToggle !== null) {
+      speedToggle.value = speeds.includes(speed) ? speed : "";
+    }
 
-    if (speedToggle !== null) speedToggle.value = listed ? speed : "";
+    if (speedOther !== null && !speedOther.matches(":focus-within")) {
+      speedOther.value = speed;
+    }
 
-    if (speedOther !== null && listed) speedOther.value = "";
+    if (speedClear !== null) speedClear.hidden = speedOther?.value === "";
   };
 
   const setSpeed = (next: string) => {
@@ -599,17 +610,38 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     on(speedToggle, "change", () => setSpeed(speedToggle.value));
   }
 
+  // A speed in range takes effect as it's typed. One out of range is pulled
+  // into it on leaving the field, rather than shown as an error line that
+  // would push the timeline down
   speedOther?.addEventListener("input", () => {
     const typed = Number(speedOther.value);
 
-    if (speedOther.value === "") return;
-
-    speedOther.error = isSpeed(typed) ? "" : `${slowest} to ${fastest}`;
-
-    if (isSpeed(typed)) setSpeed(String(typed));
+    // Emptied, it's back to normal speed
+    if (speedOther.value === "") setSpeed("1");
+    else if (isSpeed(typed)) setSpeed(String(typed));
+    else showSpeed();
   });
 
-  if (speedOther !== null && !speeds.includes(speed)) speedOther.value = speed;
+  speedClear?.addEventListener("click", () => {
+    setSpeed("1");
+
+    if (speedOther !== null) speedOther.value = "";
+
+    if (speedClear !== null) speedClear.hidden = true;
+  });
+
+  speedOther?.addEventListener("focusout", () => {
+    const typed = Number(speedOther.value);
+
+    if (speedOther.value === "" || isSpeed(typed)) return;
+
+    const held = String(
+      Number.isFinite(typed) ? Math.min(Math.max(typed, slowest), fastest) : 1,
+    );
+
+    speedOther.value = held;
+    setSpeed(held);
+  });
 
   showSpeed();
 
