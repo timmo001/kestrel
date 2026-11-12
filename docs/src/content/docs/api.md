@@ -38,6 +38,11 @@ video plays from the same address as the page, through a proxy or over HTTPS.
 stream and `chNN_sub` for the sub stream. Play one with
 `/go2rtc/stream.html?src=ch01_sub`.
 
+The DVR8-4575 offers an audio track on every stream but sends nothing on it,
+and an MSE player that asks for audio waits for it forever. The page plays
+video only, with go2rtc's own `video-rtc.js` player and `media` set to
+`video`, so do the same in other players.
+
 ## Push
 
 The server pushes each alert from `/api/attention` once, when it starts, to

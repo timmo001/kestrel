@@ -25,13 +25,37 @@ gw-page {
   padding-block: var(--gw-space-5);
 }
 
-.live-frame {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  border: 0;
+/* Two cameras across on a wide screen, one on a phone */
+.live-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 32rem), 1fr));
+  gap: var(--gw-space-3);
+}
+
+.live-tile {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
   border-radius: var(--gw-radius-md, 8px);
-  background: var(--gw-color-surface-sunken, #000);
+  background: #000;
+}
+
+.live-tile dvr-live {
+  display: block;
+  aspect-ratio: 16 / 9;
+}
+
+.live-tile figcaption {
+  position: absolute;
+  inset-block-start: var(--gw-space-2);
+  /* Top right, clear of the camera's own channel and clock overlays */
+  inset-inline-end: var(--gw-space-2);
+  padding: var(--gw-space-1) var(--gw-space-2);
+  border-radius: var(--gw-radius-sm, 4px);
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 0.875rem;
+  pointer-events: none;
 }
 
 .recording-filters {

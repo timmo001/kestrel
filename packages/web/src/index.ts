@@ -250,38 +250,80 @@ const showRecorder = async () => {
   return status.channels;
 };
 
-// Live: one go2rtc player per channel that has a signal
-const liveGrid = find("gw-grid", "live");
+// Live: a grid of each channel that has a signal, on its main stream
+const liveGrid = find("div", "live-grid");
+
+/** go2rtc's player element, as far as the page sets it up. */
+interface LivePlayer extends HTMLElement {
+  /** How it plays: MSE over the WebSocket, falling back to HLS. */
+  mode: string;
+  /** The tracks it asks for. */
+  media: string;
+  /** The stream's WebSocket URL; setting it connects. */
+  src: string;
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "dvr-live": LivePlayer;
+  }
+}
+
+/** What the page uses from go2rtc's `video-rtc.js`. */
+interface VideoRtcModule {
+  readonly VideoRTC: CustomElementConstructor;
+}
+
+/**
+ * Defines `dvr-live` from go2rtc's own `video-rtc.js`, served beside it, so
+ * the player always matches the go2rtc that sends the stream.
+ */
+const definePlayer = async (path: string) => {
+  if (customElements.get("dvr-live") !== undefined) return;
+
+  const url = new URL(`${path}video-rtc.js`, location.origin).href;
+
+  const { VideoRTC }: VideoRtcModule = await import(url);
+
+  if (customElements.get("dvr-live") === undefined) {
+    customElements.define("dvr-live", VideoRTC);
+  }
+};
 
 const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
   const sources = await call((api) => api.video.sources());
+
+  await definePlayer(sources.path);
 
   const withSignal = new Set(
     channels.flatMap((status) => (status.videoLoss ? [] : [status.channel])),
   );
 
-  const player = (stream: LiveStream) => {
-    const card = element("gw-card");
-    const frame = element("iframe");
+  const tiles = sources.streams.flatMap((stream: LiveStream) => {
+    if (!withSignal.has(stream.channel)) return [];
 
-    card.setAttribute("heading", stream.name);
-    frame.className = "live-frame";
-    frame.title = `${stream.name} live`;
-    frame.loading = "lazy";
-    frame.src = new URL(
-      `${sources.path}stream.html?src=${encodeURIComponent(stream.sub)}&mode=mse`,
+    const figure = element("figure");
+    const player = document.createElement("dvr-live");
+
+    figure.className = "live-tile";
+    player.mode = "mse,hls";
+    // Video only: the recorder offers an audio track but sends nothing on it,
+    // and a player waiting for that audio never starts
+    player.media = "video";
+    figure.append(player, element("figcaption", stream.name));
+
+    return [{ figure, player, stream }];
+  });
+
+  liveGrid?.replaceChildren(...tiles.map(({ figure }) => figure));
+
+  // Connect once they're on the page, where each player creates its video
+  for (const { player, stream } of tiles) {
+    player.src = new URL(
+      `${sources.path}api/ws?src=${encodeURIComponent(stream.main)}`,
       location.origin,
     ).href;
-    card.append(frame);
-
-    return card;
-  };
-
-  liveGrid?.replaceChildren(
-    ...sources.streams
-      .filter((stream) => withSignal.has(stream.channel))
-      .map(player),
-  );
+  }
 };
 
 // Recordings: a day and channel, the month's recorded days, and the clips
