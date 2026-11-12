@@ -51,6 +51,11 @@ mise run serve:server
 Open <https://server.kestrel.localhost>. The docs in [`docs/`](docs) cover
 the settings, the API and the protocol.
 
+The server has no login and listens on `127.0.0.1` by default, so only open it
+up to a network where everyone who can reach it should see your cameras. A
+login is planned for when remote access arrives, in
+[timmo001/kestrel#19](https://github.com/timmo001/kestrel/issues/19).
+
 ## Parts
 
 - [`packages/core`](packages/core): what every source shares: how sources
