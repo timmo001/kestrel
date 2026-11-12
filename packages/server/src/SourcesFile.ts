@@ -18,6 +18,7 @@ import {
   type SettingValues,
   type SourceSettings,
 } from "@timmo001/kestrel-core";
+import { createHash } from "node:crypto";
 import { Effect, FileSystem, Path, Predicate, Schema } from "effect";
 
 export const fileName = "sources.json";
@@ -94,6 +95,25 @@ const restoredValues = (
     }),
   ]);
 
+/** Settings as the file keeps them, without which secrets are set, which is only read back. */
+const forFile = (settings: Settings) => ({
+  sources: settings.sources.map((source) => ({
+    id: source.id,
+    kind: source.kind,
+    name: source.name,
+    settings: source.settings,
+    cameras: source.cameras,
+  })),
+  cameras: settings.cameras,
+});
+
+/** Which version of the settings these are: a hash of them as the file keeps them. */
+export const revisionOf = (settings: Settings) =>
+  createHash("sha256")
+    .update(JSON.stringify(forFile(settings)))
+    .digest("hex")
+    .slice(0, 16);
+
 /** The settings as the API reads them back: secrets left out, and which are set. */
 export const shown = (
   kinds: ReadonlyArray<KindInfo>,
@@ -122,6 +142,7 @@ export const shown = (
     };
   }),
   cameras: settings.cameras,
+  revision: revisionOf(settings),
 });
 
 /**
@@ -234,18 +255,6 @@ export const problems = (
       }),
     ];
   });
-
-/** Settings as the file keeps them, without which secrets are set, which is only read back. */
-const forFile = (settings: Settings) => ({
-  sources: settings.sources.map((source) => ({
-    id: source.id,
-    kind: source.kind,
-    name: source.name,
-    settings: source.settings,
-    cameras: source.cameras,
-  })),
-  cameras: settings.cameras,
-});
 
 /** The sources file in `folder`, if there is one. */
 export const read = Effect.fnUntraced(function* (folder: string) {

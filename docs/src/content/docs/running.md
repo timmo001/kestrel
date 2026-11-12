@@ -24,7 +24,9 @@ The Settings page, in the app bar, lists each source with the settings its
 kind takes. Add source picks a kind, Remove takes one out, and a `stream`
 source lists its cameras with their addresses. Under each source, name its
 cameras: the name shows across the app in place of "Ch 3" or the source's own
-name for it. Save restarts only the sources whose settings changed.
+name for it. Save restarts only the sources whose settings changed. If the
+settings changed since the page loaded them, such as from another tab, the
+save is refused: reload the page and make the change again.
 
 ```json
 {

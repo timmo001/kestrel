@@ -145,6 +145,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   /** Each camera's name, by its id. */
   let labels = new Map<string, string>();
 
+  /** The version of the settings the page read, sent back with a save. */
+  let revision = "";
+
   const say = (message: string, tone: "danger" | "success") => {
     if (notice === null) return;
 
@@ -164,6 +167,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       saved: true,
     }));
     labels = new Map(settings.cameras.map((each) => [each.camera, each.label]));
+    revision = settings.revision ?? "";
   };
 
   /** A field for each of a source's cameras' names, once the server has them. */
@@ -387,6 +391,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     cameras: [...labels].flatMap(([camera, label]) =>
       label.trim() === "" ? [] : [{ camera, label: label.trim() }],
     ),
+    revision,
   });
 
   const loadCameras = () =>

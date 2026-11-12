@@ -87,6 +87,12 @@ export interface CameraLabel extends Schema.Schema.Type<typeof CameraLabel> {}
 export const Settings = Schema.Struct({
   sources: Schema.Array(SourceSettings),
   cameras: Schema.Array(CameraLabel),
+  /**
+   * Which version of the settings these are, as they're read back. A save
+   * sends the one it read and is refused when they've changed since, so a
+   * page left open can't undo a newer save.
+   */
+  revision: Schema.optionalKey(Schema.String),
 });
 
 export interface Settings extends Schema.Schema.Type<typeof Settings> {}

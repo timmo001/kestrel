@@ -36,6 +36,10 @@ no live view; `recordings` and `events` say whether it has them; `signal` is whe
 when its source can't tell. A source that isn't connected yet leaves its
 cameras out until it knows them.
 
+The settings read back carry a `revision`. A save sends back the one it read,
+and is refused with `InvalidSettings` when the settings have changed since,
+such as from another tab, so a page left open can't undo a newer save.
+
 A camera's `name` is its source's name for it, such as `Channel 3`, and its
 `label` the name you gave it on the Settings page, or `null`.
 

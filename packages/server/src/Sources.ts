@@ -221,6 +221,13 @@ export class Sources extends Context.Service<
         function* (incoming: Settings) {
           const before = yield* current;
 
+          if (incoming.revision !== SourcesFile.revisionOf(before.settings)) {
+            return yield* new InvalidSettings({
+              message:
+                "The settings have changed since this page read them, such as from another tab; reload them and save again",
+            });
+          }
+
           const next = SourcesFile.restored(
             kindInfos,
             incoming,
