@@ -17,6 +17,7 @@ import {
   type Details,
   type RecordedDay,
   type Recording,
+  type Settings,
   type SourceId,
   type SourceInfo,
 } from "@timmo001/kestrel-core";
@@ -59,6 +60,7 @@ type Output =
       }>;
     }
   | Details
+  | Settings
   | { readonly cameras: ReadonlyArray<Camera> }
   | { readonly recordings: ReadonlyArray<Recording> }
   | { readonly days: ReadonlyArray<RecordedDay> }
@@ -188,6 +190,41 @@ const date = Flag.String("date").pipe(
   Flag.withAlias("d"),
   Flag.withDescription("The day, such as 2026-11-11; today by default"),
   Flag.optional,
+);
+
+const sources = Command.make(
+  "sources",
+  { json },
+  Effect.fn("sources")(function* ({ json }) {
+    const settings = yield* (yield* ServerClient).call((api) =>
+      api.sources.settings(),
+    );
+
+    if (json) return yield* printJson(settings);
+
+    if (settings.sources.length === 0) {
+      return yield* Console.log("No sources yet: add one on the Settings page");
+    }
+
+    for (const source of settings.sources) {
+      const cameras =
+        source.cameras.length === 0
+          ? ""
+          : `  ${source.cameras.length} camera${source.cameras.length === 1 ? "" : "s"}`;
+
+      yield* Console.log(
+        `${source.id}  ${source.name}  ${source.kind}${cameras}`,
+      );
+    }
+
+    for (const each of settings.cameras) {
+      yield* Console.log(`${each.camera}  named ${each.label}`);
+    }
+  }),
+).pipe(
+  Command.withDescription(
+    "Every source's settings and the names given to cameras, with no secrets; --json for the settings themselves",
+  ),
 );
 
 const cameras = Command.make(
@@ -459,6 +496,7 @@ const cli = Command.make("kestrel").pipe(
   Command.withSubcommands([
     status,
     details,
+    sources,
     cameras,
     recordings,
     download,

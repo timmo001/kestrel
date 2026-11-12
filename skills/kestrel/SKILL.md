@@ -22,7 +22,10 @@ for the recorder's channel 3.
    what it can do: `live`, `still`, `recordings` and `events`, and `signal`
    for whether it has a picture now (`null` when its source can't tell).
    A camera with `still` has a picture at
-   `<server>/api/cameras/<source>/<camera>/still`.
+   `<server>/api/cameras/<source>/<camera>/still`. `sources` gives each
+   source's kind and settings and the names given to cameras, as the
+   Settings page shows them; secrets are left out, and `secrets` says which
+   are set. Changing them is done on the Settings page, not here.
 3. For what was recorded, use `days` for a month, then `recordings` for a
    camera and a day. Each recording's `reasons` say why it was made: `PIR`
    and `motion` are events, `normal` is continuous recording.

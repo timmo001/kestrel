@@ -42,6 +42,12 @@ export const operations: ReadonlyArray<Operation> = [
     access: "read",
   },
   {
+    name: "sources",
+    description:
+      "Every source's settings and the names given to cameras, as the Settings page shows them, with no secrets",
+    access: "read",
+  },
+  {
     name: "cameras",
     description:
       "Every camera's id, name and what it can do, with its live stream names",

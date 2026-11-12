@@ -11,6 +11,7 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | ------------------------------------------------------ | ----------------------------------------------------------- |
 | `kestrel status`                                       | What needs you, each source's connection and its state      |
 | `kestrel details -s <source>`                          | A source's facts, clock, storage and each camera's state    |
+| `kestrel sources`                                      | Each source's settings and camera names, with no secrets    |
 | `kestrel cameras`                                      | Each camera's id, name and what it can do                   |
 | `kestrel recordings -c swann/1 -d <day>`               | A camera's recordings on one day, today by default          |
 | `kestrel download -c swann/1 -d <day> --from … --to …` | Saves that stretch as an MP4, across recordings             |

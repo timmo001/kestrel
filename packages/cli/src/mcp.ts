@@ -15,6 +15,7 @@ import {
   LocalMonth,
   RecordedDay,
   Recording,
+  Settings,
   SourceId,
   SourceInfo,
 } from "@timmo001/kestrel-core";
@@ -54,6 +55,14 @@ const DetailsTool = Tool.make("details", {
     ),
   }),
   success: Details,
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
+const Sources = Tool.make("sources", {
+  description:
+    "Every source's settings and the names given to cameras, as the Settings page shows them, with no secrets",
+  success: Settings,
   failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
@@ -100,6 +109,7 @@ const Events = Tool.make("events", {
 const Tools = Toolkit.make(
   Status,
   DetailsTool,
+  Sources,
   Cameras,
   Recordings,
   Days,
@@ -144,6 +154,7 @@ const handlers = Effect.gen(function* () {
         api.sources.details({ params: { source: found.id } }),
       );
     }),
+    sources: () => client.call((api) => api.sources.settings()),
     cameras: () =>
       client
         .call((api) => api.cameras.list())
