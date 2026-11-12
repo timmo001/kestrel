@@ -10,37 +10,18 @@ import {
   type Camera,
   type CameraLabel,
   type LiveFeed,
-  type RecordedDay,
-  type RecordingReason,
   type Source,
   type SourceInfo,
 } from "@timmo001/kestrel-core";
+import { toMp4 } from "@timmo001/kestrel-format-mp4";
 import { Effect, Layer, Stream } from "effect";
 import { HttpMiddleware, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
 import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import { streamNames } from "./go2rtc/Go2rtc.ts";
-import { toMp4 } from "./Mp4.ts";
+import { Library } from "./Library.ts";
 import { capability, Sources } from "./Sources.ts";
-
-/** Days from several sources as one list, by date, each with every reason. */
-export const mergeDays = (
-  days: ReadonlyArray<RecordedDay>,
-): Array<RecordedDay> => {
-  const byDate = new Map<string, Set<RecordingReason>>();
-
-  for (const day of days) {
-    const reasons = byDate.get(day.date) ?? new Set();
-
-    for (const reason of day.reasons) reasons.add(reason);
-    byDate.set(day.date, reasons);
-  }
-
-  return [...byDate]
-    .toSorted(([a], [b]) => a.localeCompare(b))
-    .map(([date, reasons]) => ({ date, reasons: [...reasons] }));
-};
 
 const SourcesHandlers = HttpApiBuilder.group(
   Api,
@@ -90,8 +71,15 @@ const AttentionHandlers = HttpApiBuilder.group(
   }),
 );
 
-/** A source's cameras, with their stream names and labels; a source that isn't ready yet has none. */
-const camerasOf = (source: Source, labels: ReadonlyArray<CameraLabel>) =>
+/**
+ * A source's cameras, with their stream names and labels, and whether the
+ * library has recordings of each; a source that isn't ready yet has none.
+ */
+const camerasOf = (
+  source: Source,
+  labels: ReadonlyArray<CameraLabel>,
+  recorded: ReadonlyArray<string>,
+) =>
   Effect.gen(function* () {
     const cameras = yield* source.cameras;
 
@@ -111,7 +99,7 @@ const camerasOf = (source: Source, labels: ReadonlyArray<CameraLabel>) =>
         signal: camera.signal,
         live: camera.live && feed !== undefined ? streamNames(feed) : null,
         still: camera.still && source.stills !== undefined,
-        recordings: camera.recordings && source.recordings !== undefined,
+        recordings: recorded.includes(camera.id),
         events: camera.events && source.events !== undefined,
       };
     });
@@ -122,26 +110,18 @@ const CamerasHandlers = HttpApiBuilder.group(
   "cameras",
   Effect.fn(function* (handlers) {
     const sources = yield* Sources;
-
-    /** The recordings of the source a camera's route names. */
-    const recordingsOf = (source: string) =>
-      sources
-        .find(source)
-        .pipe(
-          Effect.flatMap((found) =>
-            capability(found, found.recordings, "recordings"),
-          ),
-        );
+    const library = yield* Library;
 
     return handlers
       .handle("list", () =>
         Effect.gen(function* () {
           const labels = yield* sources.labels;
           const order = yield* sources.order;
+          const recorded = yield* library.cameras;
 
           const lists = yield* Effect.forEach(
             yield* sources.all,
-            (source) => camerasOf(source, labels),
+            (source) => camerasOf(source, labels, recorded),
             { concurrency: "unbounded" },
           );
 
@@ -156,22 +136,16 @@ const CamerasHandlers = HttpApiBuilder.group(
         }),
       )
       .handle("recordings", ({ params, query }) =>
-        recordingsOf(params.source).pipe(
-          Effect.flatMap((recordings) =>
-            recordings.list(cameraId(params.source, params.camera), query.date),
-          ),
-        ),
+        library.list(cameraId(params.source, params.camera), query.date),
       )
       .handle(
         "video",
         Effect.fnUntraced(function* ({ params, query }) {
-          const recordings = yield* recordingsOf(params.source);
-
-          const frames = yield* recordings.video({
+          // Read from the library's one copy, whichever stream is asked for
+          const frames = yield* library.video({
             camera: cameraId(params.source, params.camera),
             begin: query.begin,
             end: query.end,
-            stream: query.stream ?? "main",
             every: query.every,
           });
 
@@ -220,22 +194,9 @@ const RecordingsHandlers = HttpApiBuilder.group(
   Api,
   "recordings",
   Effect.fn(function* (handlers) {
-    const sources = yield* Sources;
+    const library = yield* Library;
 
-    return handlers.handle("days", ({ query }) =>
-      sources.all.pipe(
-        Effect.flatMap((all) =>
-          Effect.forEach(
-            all.flatMap((source) =>
-              source.recordings === undefined ? [] : [source.recordings],
-            ),
-            (recordings) => recordings.days(query.month),
-            { concurrency: "unbounded" },
-          ),
-        ),
-        Effect.map((lists) => mergeDays(lists.flat())),
-      ),
-    );
+    return handlers.handle("days", ({ query }) => library.days(query.month));
   }),
 );
 

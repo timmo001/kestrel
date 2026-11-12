@@ -71,8 +71,11 @@ login is planned for when remote access arrives, in
   and recorders, over their HTTP API and RTSP streams
 - [`packages/source-bambu`](packages/source-bambu): the camera in a Bambu Lab
   P1 or A1 printer, over its own picture feed
+- [`packages/format-mp4`](packages/format-mp4): recorded video as MP4,
+  written for the browser and read back as frames
 - [`packages/nvr`](packages/nvr): records cameras' streams to disk with
-  ffmpeg, in short files by day, and clears out old days
+  ffmpeg, in short files by day, clears out old days and reads the folder
+  back
 - [`packages/server`](packages/server): the server, with the API, go2rtc and
   recording
 - [`packages/web`](packages/web): the web client, installable on a phone

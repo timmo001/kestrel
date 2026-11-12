@@ -11,7 +11,6 @@
  */
 import {
   Clock,
-  Data,
   Duration,
   Effect,
   FileSystem,
@@ -20,13 +19,7 @@ import {
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-
-/** The file each recorded camera's folder holds, so clearing out only ever touches those. */
-const marker = ".kestrel-recordings";
-
-const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
-
-const keyPattern = /^[a-z0-9][a-z0-9-]*(?:\/[a-z0-9][a-z0-9-]*)*$/;
+import { InvalidKey, dayPattern, isKey, localDate, marker } from "./Layout.ts";
 
 const day = Duration.toMillis(Duration.days(1));
 
@@ -34,22 +27,6 @@ const restart = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
   Schedule.spaced(Duration.seconds(30)),
 ]);
-
-/** A key that isn't lower-case words joined by slashes, which could reach outside the folder. */
-export class InvalidKey extends Data.TaggedError("InvalidKey")<{
-  readonly key: string;
-}> {}
-
-/** The local day of a time, such as `2026-11-12`. */
-export const localDate = (millis: number) => {
-  const date = new Date(millis);
-
-  return [
-    String(date.getFullYear()),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0"),
-  ].join("-");
-};
 
 export interface RecordOptions {
   /** The ffmpeg binary. */
@@ -69,7 +46,7 @@ export interface RecordOptions {
  * stream drops, it starts again, waiting longer each time up to 30 seconds.
  */
 export const record = Effect.fnUntraced(function* (options: RecordOptions) {
-  if (!keyPattern.test(options.key)) {
+  if (!isKey(options.key)) {
     return yield* new InvalidKey({ key: options.key });
   }
 

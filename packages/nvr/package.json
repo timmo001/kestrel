@@ -13,6 +13,7 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@timmo001/kestrel-format-mp4": "workspace:*",
     "effect": "4.1.4"
   },
   "devDependencies": {

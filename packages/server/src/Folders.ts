@@ -31,6 +31,13 @@ export const configFolder = Effect.gen(function* () {
   );
 });
 
+/** The folder recordings go in when you haven't chosen one: `recordings` in the state folder. */
+export const ownRecordingsFolder = Effect.gen(function* () {
+  const path = yield* Path.Path;
+
+  return path.join(yield* stateFolder, "recordings");
+});
+
 /** The folder for what the server keeps for itself, such as `~/.local/state/kestrel`. */
 export const stateFolder = Effect.gen(function* () {
   const path = yield* Path.Path;

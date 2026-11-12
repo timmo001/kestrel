@@ -11,16 +11,8 @@
  * @module
  */
 import * as Nvr from "@timmo001/kestrel-nvr";
-import {
-  Config,
-  Duration,
-  Effect,
-  Layer,
-  Path,
-  Schedule,
-  Stream,
-} from "effect";
-import { stateFolder } from "./Folders.ts";
+import { Config, Duration, Effect, Layer, Schedule, Stream } from "effect";
+import { ownRecordingsFolder } from "./Folders.ts";
 import { Go2rtc, mainStream } from "./go2rtc/Go2rtc.ts";
 import { basePath } from "./go2rtc/Proxy.ts";
 import { Sources } from "./Sources.ts";
@@ -35,13 +27,12 @@ export const layer = Layer.effectDiscard(
   Effect.gen(function* () {
     const sources = yield* Sources;
     const go2rtc = yield* Go2rtc;
-    const path = yield* Path.Path;
 
     const ffmpeg = yield* Config.String("KESTREL_FFMPEG").pipe(
       Config.withDefault("ffmpeg"),
     );
 
-    const ownFolder = path.join(yield* stateFolder, "recordings");
+    const ownFolder = yield* ownRecordingsFolder;
 
     yield* sources.recording.pipe(
       Stream.switchMap((settings) => {

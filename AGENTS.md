@@ -25,9 +25,11 @@ and work that depends on one waits for it.
   library, `source-raysharp` implements `Source` for Raysharp recorders,
   `source-stream` for cameras listed by their stream addresses,
   `source-reolink` for Reolink cameras and hubs, `source-bambu` for the
-  camera in a Bambu Lab printer, `nvr` records streams to disk with ffmpeg
-  and knows nothing of sources,
-  `server` serves the API and runs go2rtc and recording, `web` is the app and `cli` is the
+  camera in a Bambu Lab printer, `format-mp4` reads and writes recorded
+  video as MP4, `nvr` records streams to disk with ffmpeg and reads the
+  recordings folder back, knowing nothing of sources,
+  `server` serves the API, runs go2rtc and recording, and serves
+  recordings only from the recordings folder, `web` is the app and `cli` is the
   `kestrel` CLI with its Code Mode and MCP surface. Its skill is
   `skills/kestrel/SKILL.md`; keep it in step with the CLI's operations.
 - Name packages type first, then thing: `source-<kind>` for a source,

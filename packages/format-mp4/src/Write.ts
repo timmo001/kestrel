@@ -1,11 +1,12 @@
 /**
- * Recorded video as MP4: the frames a source sends written as fragmented
- * MP4, which a browser plays as it arrives and any player opens as a file.
+ * Writing recorded video as MP4: the frames a source sends written as
+ * fragmented MP4, which a browser plays as it arrives and any player opens
+ * as a file.
  *
  * @module
  */
 import type { RecordedFrame } from "@timmo001/kestrel-core";
-import { Effect, Schema, Stream } from "effect";
+import { Effect, Stream } from "effect";
 import {
   EncodedPacket,
   EncodedVideoPacketSource,
@@ -14,11 +15,7 @@ import {
   StreamTarget,
   type StreamTargetChunk,
 } from "mediabunny";
-
-/** The frames couldn't be written as MP4. */
-export class Mp4Error extends Schema.TaggedError<Mp4Error>()("Mp4Error", {
-  message: Schema.String,
-}) {}
+import { Mp4Error } from "./Errors.ts";
 
 const hex = (value: number) => value.toString(16).padStart(2, "0");
 

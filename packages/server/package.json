@@ -19,13 +19,13 @@
     "@effect/platform-bun": "4.1.4",
     "@timmo001/groundwork-pwa": "0.26.1",
     "@timmo001/kestrel-core": "workspace:*",
+    "@timmo001/kestrel-format-mp4": "workspace:*",
     "@timmo001/kestrel-nvr": "workspace:*",
     "@timmo001/kestrel-source-bambu": "workspace:*",
     "@timmo001/kestrel-source-raysharp": "workspace:*",
     "@timmo001/kestrel-source-reolink": "workspace:*",
     "@timmo001/kestrel-source-stream": "workspace:*",
     "effect": "4.1.4",
-    "mediabunny": "1.65.2",
     "web-push": "4.0.0"
   },
   "devDependencies": {

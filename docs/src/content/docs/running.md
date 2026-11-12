@@ -151,7 +151,15 @@ to use it from a phone, and `KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and
 login, so only listen where everyone
 who can reach it should see the cameras and change its sources.
 
-## Recording cameras
+## Recordings
+
+Every recording the web client and CLI show comes from the recordings
+folder on the server, so playing one never reaches a recorder or camera.
+The server writes its own recordings there, and copies each source's in
+beside them, with why each was made, such as motion, in the file's name:
+`<day>/<time>.motion.mp4`.
+
+### Recording cameras
 
 The server can record cameras itself, for those whose source keeps no
 recordings of its own, such as a Reolink camera or a stream. It needs
