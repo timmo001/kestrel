@@ -197,6 +197,15 @@ interface Tile {
   readonly ratio: number | null;
 }
 
+/**
+ * A picture's zoom: `"fill"` to cover its tile, else a scale of it fitted
+ * whole, and how far it's been dragged off centre.
+ */
+interface View {
+  level: number | "fill";
+  pan: { x: number; y: number };
+}
+
 /** The local time as a file name's part, such as `2026-11-12T10-30-05`. */
 const fileTime = () => {
   const now = new Date();
@@ -246,9 +255,8 @@ export const livePage = (): LivePage => {
   let tiles: ReadonlyArray<Tile> = [];
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
-  /** The picked camera's zoom, and how far its picture's moved from the middle. */
-  let zoom = 1;
-  let pan = { x: 0, y: 0 };
+  /** Each camera's zoom on this page. */
+  const views = new Map<Camera["id"], View>();
 
   const shown = () => section?.hidden === false;
 
@@ -265,7 +273,6 @@ export const livePage = (): LivePage => {
     const arrangement = gridFor(size());
 
     target.dataset.layout = arrangement.layout;
-    target.toggleAttribute("data-fill", fill);
 
     const ratio =
       arrangement.columns === null || arrangement.rows === null
@@ -435,13 +442,8 @@ export const livePage = (): LivePage => {
     showZoom();
   };
 
-  /** Picks a camera on the page; another camera's picture starts whole. */
+  /** Picks a camera on the page, which the zoom keys and buttons act on. */
   const pick = (id: Camera["id"]) => {
-    if (id !== picked) {
-      zoom = 1;
-      pan = { x: 0, y: 0 };
-    }
-
     picked = id;
     keepPlace();
     showPicked();
@@ -526,14 +528,24 @@ export const livePage = (): LivePage => {
 
         if (picture !== null) {
           picture.className = "live-still";
+          // A drag moves the picture around, not a copy of it
+          picture.draggable = false;
           picture.alt = "";
           picture.addEventListener("load", () => {
             delete figure.dataset.loading;
+            showZoom();
           });
           figure.append(picture);
         }
 
         figure.append(hold, element("figcaption", cameraLabel(stream.id)));
+
+        // Fill and the zoom's reach follow the picture's size, known once
+        // its first frame does. Media events don't bubble, so the tile
+        // listens as they pass down
+        for (const type of ["loadedmetadata", "resize"]) {
+          figure.addEventListener(type, () => showZoom(), { capture: true });
+        }
 
         figure.addEventListener("click", () => pick(stream.id));
 
@@ -545,9 +557,8 @@ export const livePage = (): LivePage => {
         return { stream, figure, player, picture, hold, ratio };
       });
 
-    // A new page starts with every picture whole, and the pick on it
-    zoom = 1;
-    pan = { x: 0, y: 0 };
+    // A new page starts each picture fitted or filled, and the pick on it
+    views.clear();
 
     if (!tiles.some((tile) => tile.stream.id === picked)) {
       picked = tiles[0]?.stream.id ?? picked;
@@ -820,12 +831,23 @@ export const livePage = (): LivePage => {
 
   helpToggle(shortcutsPopover, helpButton);
 
-  /** Fit whole pictures, or fill the tiles with them. */
+  /**
+   * Fills every tile with its picture, or fits each whole: the zoom every
+   * picture starts at, which the zoom keys go on from.
+   */
   const setFill = (next: boolean) => {
     fill = next;
-    grid?.toggleAttribute("data-fill", fill);
+
+    for (const tile of tiles) {
+      views.set(tile.stream.id, {
+        level: fill ? "fill" : 1,
+        pan: { x: 0, y: 0 },
+      });
+    }
+
     keepPlace();
     showControls();
+    showZoom();
   };
 
   if (fitToggle !== null) {
@@ -839,82 +861,149 @@ export const livePage = (): LivePage => {
     });
   }
 
-  // Zoom, on the picked camera's picture: in steps from the buttons and
-  // keys, or at the pointer with Ctrl and the wheel or a pinch, and moved
-  // around by dragging it, as on the Recordings page
+  // Zoom: each picture fitted whole or filling its tile, as Z sets them all,
+  // then zoomed on from there: the picked camera in steps from the buttons
+  // and keys, or the one under the pointer with Ctrl and the wheel or a
+  // pinch. A picture bigger than its tile, filled or zoomed, moves around
+  // by dragging, as on the Recordings page
   const zoomed = () => tiles.find((tile) => tile.stream.id === picked);
 
-  const showZoom = () => {
-    const tile = zoomed();
-    const box = tile?.figure.getBoundingClientRect();
-    const reachX = ((zoom - 1) * (box?.width ?? 0)) / 2;
-    const reachY = ((zoom - 1) * (box?.height ?? 0)) / 2;
+  const viewOf = (tile: Tile) => {
+    const found = views.get(tile.stream.id);
 
-    pan = {
-      x: Math.min(Math.max(pan.x, -reachX), reachX),
-      y: Math.min(Math.max(pan.y, -reachY), reachY),
+    if (found !== undefined) return found;
+
+    const view: View = { level: fill ? "fill" : 1, pan: { x: 0, y: 0 } };
+
+    views.set(tile.stream.id, view);
+
+    return view;
+  };
+
+  /**
+   * Where a tile's picture sits: its tile, its scale from fitted whole, and
+   * how far it reaches past the tile each way, so how far it can move.
+   */
+  const placeOf = (tile: Tile) => {
+    const box = tile.figure.getBoundingClientRect();
+    const source = tile.picture ?? tile.player?.querySelector("video") ?? null;
+    const size = source === null ? { width: 0, height: 0 } : sizeOf(source);
+
+    // A squeezed stream's frame is drawn at the picture's own shape
+    const picture =
+      source instanceof HTMLVideoElement
+        ? drawnSize(size.width, size.height, tile.ratio)
+        : size;
+
+    const known = picture.width > 0 && picture.height > 0 && box.width > 0;
+    const across = known ? box.width / picture.width : 1;
+    const down = known ? box.height / picture.height : 1;
+    const fitted = Math.min(across, down);
+    const { level } = viewOf(tile);
+    const scale = level === "fill" ? Math.max(across, down) / fitted : level;
+
+    return {
+      box,
+      scale,
+      reachX: Math.max(0, (picture.width * fitted * scale - box.width) / 2),
+      reachY: Math.max(0, (picture.height * fitted * scale - box.height) / 2),
     };
+  };
 
-    for (const each of tiles) {
+  const showZoom = () => {
+    for (const tile of tiles) {
+      const view = viewOf(tile);
+      const { scale, reachX, reachY } = placeOf(tile);
+
+      view.pan = {
+        x: Math.min(Math.max(view.pan.x, -reachX), reachX),
+        y: Math.min(Math.max(view.pan.y, -reachY), reachY),
+      };
+
       const transform =
-        each === tile && zoom > 1
-          ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
-          : "";
+        scale === 1
+          ? ""
+          : `translate(${view.pan.x}px, ${view.pan.y}px) scale(${scale})`;
 
-      for (const part of [each.player, each.picture, each.hold]) {
+      for (const part of [tile.player, tile.picture, tile.hold]) {
         if (part !== null) part.style.transform = transform;
       }
 
-      each.figure.toggleAttribute("data-zoomed", each === tile && zoom > 1);
+      // Less than a pixel to move isn't worth a drag
+      tile.figure.toggleAttribute("data-movable", reachX >= 1 || reachY >= 1);
     }
+
+    const tile = zoomed();
+    const scale = tile === undefined ? 1 : placeOf(tile).scale;
 
     if (zoomFitButton !== null) {
-      zoomFitButton.textContent = `${Math.round(zoom * 100)}%`;
-      zoomFitButton.disabled = zoom === 1;
+      zoomFitButton.textContent = `${Math.round(scale * 100)}%`;
+      zoomFitButton.disabled = scale <= 1;
     }
 
-    if (zoomOutButton !== null) zoomOutButton.disabled = zoom === 1;
+    if (zoomOutButton !== null) zoomOutButton.disabled = scale <= 1;
 
     if (zoomInButton !== null) {
       zoomInButton.disabled =
-        zoom === pictureZooms.at(-1) || tile === undefined;
+        tile === undefined || scale >= (pictureZooms.at(-1) ?? 1);
     }
   };
 
-  /** Zooms to `next`, keeping the point at `at` (from the picture's middle) where it is. */
-  const zoomTo = (next: number, at = { x: 0, y: 0 }) => {
-    pan = {
-      x: at.x - ((at.x - pan.x) / zoom) * next,
-      y: at.y - ((at.y - pan.y) / zoom) * next,
+  /**
+   * Zooms a picture to `next`, keeping the point at `at` (from its tile's
+   * middle) where it is.
+   */
+  const zoomTo = (
+    tile: Tile | undefined,
+    next: number,
+    at = { x: 0, y: 0 },
+  ) => {
+    if (tile === undefined) return;
+
+    const view = viewOf(tile);
+    const { scale } = placeOf(tile);
+
+    view.pan = {
+      x: at.x - ((at.x - view.pan.x) / scale) * next,
+      y: at.y - ((at.y - view.pan.y) / scale) * next,
     };
-    zoom = next;
+    view.level = next;
     showZoom();
   };
 
-  const zoomStep = (by: -1 | 1, at?: { x: number; y: number }) => {
-    const index = pictureZooms.indexOf(zoom) + by;
+  /** Zooms a picture a step in or out from where it is, filled or not. */
+  const zoomStep = (
+    tile: Tile | undefined,
+    by: -1 | 1,
+    at?: { x: number; y: number },
+  ) => {
+    if (tile === undefined) return;
+
+    const { scale } = placeOf(tile);
 
     const next =
-      pictureZooms[Math.min(Math.max(index, 0), pictureZooms.length - 1)];
+      by > 0
+        ? pictureZooms.find((each) => each > scale + 0.01)
+        : pictureZooms.filter((each) => each < scale - 0.01).at(-1);
 
-    if (next !== undefined && next !== zoom) zoomTo(next, at);
+    if (next !== undefined) zoomTo(tile, next, at);
   };
 
-  zoomInButton?.addEventListener("click", () => zoomStep(1));
-  zoomOutButton?.addEventListener("click", () => zoomStep(-1));
-  zoomFitButton?.addEventListener("click", () => zoomTo(1));
+  zoomInButton?.addEventListener("click", () => zoomStep(zoomed(), 1));
+  zoomOutButton?.addEventListener("click", () => zoomStep(zoomed(), -1));
+  zoomFitButton?.addEventListener("click", () => zoomTo(zoomed(), 1));
 
   /** The tile a pointer event is on. */
   const tileAt = (event: Event) =>
     tiles.find((tile) => event.composedPath().includes(tile.figure));
 
-  /** A pointer's place from the middle of the picked camera's tile. */
-  const fromMiddle = (event: MouseEvent) => {
-    const box = zoomed()?.figure.getBoundingClientRect();
+  /** A pointer's place from the middle of a tile. */
+  const fromMiddle = (event: MouseEvent, tile: Tile) => {
+    const box = tile.figure.getBoundingClientRect();
 
     return {
-      x: event.clientX - ((box?.left ?? 0) + (box?.width ?? 0) / 2),
-      y: event.clientY - ((box?.top ?? 0) + (box?.height ?? 0) / 2),
+      x: event.clientX - (box.left + box.width / 2),
+      y: event.clientY - (box.top + box.height / 2),
     };
   };
 
@@ -937,28 +1026,34 @@ export const livePage = (): LivePage => {
 
       if (Math.abs(wheeled) < wheelStep) return;
 
-      zoomStep(wheeled < 0 ? 1 : -1, fromMiddle(event));
+      zoomStep(tile, wheeled < 0 ? 1 : -1, fromMiddle(event, tile));
       wheeled = 0;
     },
     { passive: false },
   );
 
-  // A drag on the zoomed picture moves it around
-  let drag: { x: number; y: number; pan: typeof pan } | undefined;
+  // A drag on a picture bigger than its tile moves it around, and picks it
+  let drag:
+    | { tile: Tile; x: number; y: number; pan: { x: number; y: number } }
+    | undefined;
 
   grid?.addEventListener("pointerdown", (event) => {
     const tile = tileAt(event);
 
-    if (zoom === 1 || tile === undefined || tile !== zoomed()) return;
+    if (tile === undefined || !tile.figure.hasAttribute("data-movable")) {
+      return;
+    }
 
-    drag = { x: event.clientX, y: event.clientY, pan };
-    grid.setPointerCapture(event.pointerId);
+    drag = { tile, x: event.clientX, y: event.clientY, pan: viewOf(tile).pan };
+    pick(tile.stream.id);
   });
 
-  grid?.addEventListener("pointermove", (event) => {
+  // The window follows the drag, so it goes on past the tile, while clicks
+  // still land on the tile for a double click
+  window.addEventListener("pointermove", (event) => {
     if (drag === undefined) return;
 
-    pan = {
+    viewOf(drag.tile).pan = {
       x: drag.pan.x + event.clientX - drag.x,
       y: drag.pan.y + event.clientY - drag.y,
     };
@@ -966,12 +1061,13 @@ export const livePage = (): LivePage => {
   });
 
   for (const type of ["pointerup", "pointercancel"]) {
-    grid?.addEventListener(type, () => {
+    window.addEventListener(type, () => {
       drag = undefined;
     });
   }
 
-  // The tiles' size changed, so the picture's reach did too
+  // The tiles' size changed, so how much Fill zooms and how far a picture
+  // reaches did too
   window.addEventListener("resize", () => showZoom());
 
   const keys = new Map<string, () => void>([
@@ -986,10 +1082,10 @@ export const livePage = (): LivePage => {
     ["Enter", toggleSolo],
     ["Escape", leaveSolo],
     ["Backspace", leaveSolo],
-    ["+", () => zoomStep(1)],
-    ["=", () => zoomStep(1)],
-    ["-", () => zoomStep(-1)],
-    ["0", () => zoomTo(1)],
+    ["+", () => zoomStep(zoomed(), 1)],
+    ["=", () => zoomStep(zoomed(), 1)],
+    ["-", () => zoomStep(zoomed(), -1)],
+    ["0", () => zoomTo(zoomed(), 1)],
     ["s", capture],
     ["z", () => setFill(!fill)],
     ["f", () => fullscreenButton?.click()],

@@ -238,12 +238,13 @@ gw-page {
   content: "";
 }
 
-/* Zoomed in, a drag moves around the picture */
-.live-tile[data-zoomed] {
+/* Filled or zoomed past its tile, a drag moves around the picture */
+.live-tile[data-movable] {
   cursor: grab;
+  user-select: none;
 }
 
-.live-tile[data-zoomed]:active {
+.live-tile[data-movable]:active {
   cursor: grabbing;
 }
 
@@ -253,19 +254,15 @@ gw-page {
   transition: opacity 200ms ease-out;
 }
 
+/* Each picture fitted whole; Fill and the zoom scale it from there */
 .live-tile video,
 .live-still {
   object-fit: contain;
 }
 
-/* Fill: each picture zoomed to cover its tile, its edges cropped */
-.live-grid[data-fill] :is(video, .live-still, .live-hold) {
-  object-fit: cover;
-}
-
 /* A squeezed stream, such as a recorder's 16:9 picture in 352×288: its
-   player takes the picture's own shape, as big as fits (or covers, to
-   fill), and the video stretches back out to it */
+   player takes the picture's own shape, as big as fits, and the video
+   stretches back out to it */
 .live-tile[data-squeezed] {
   container-type: size;
 }
@@ -278,18 +275,7 @@ gw-page {
   margin: auto;
 }
 
-.live-grid[data-fill] .live-tile[data-squeezed] dvr-live {
-  width: max(100cqw, 100cqh * var(--tile-ratio));
-  height: max(100cqh, 100cqw / var(--tile-ratio));
-  /* Wider or taller than the tile, it's centred by its middle */
-  inset: 50% auto auto 50%;
-  margin: 0;
-  translate: -50% -50%;
-}
-
-/* Fit or fill, the squeezed picture fills its own player */
-.live-tile[data-squeezed] video,
-.live-grid[data-fill] .live-tile[data-squeezed] video {
+.live-tile[data-squeezed] video {
   object-fit: fill;
 }
 
