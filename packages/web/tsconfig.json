@@ -22,5 +22,5 @@
       }
     ]
   },
-  "include": ["src", "pwa.config.ts", "oxlint.config.ts"]
+  "include": ["src", "scripts", "pwa.config.ts", "oxlint.config.ts"]
 }
