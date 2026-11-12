@@ -101,6 +101,23 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/protocol-baichuan": {
+      "name": "@timmo001/kestrel-protocol-baichuan",
+      "version": "0.0.0",
+      "dependencies": {
+        "@effect/platform-node-shared": "4.1.4",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
     "packages/protocol-raysharp": {
       "name": "@timmo001/kestrel-protocol-raysharp",
       "version": "0.0.0",
@@ -188,7 +205,10 @@
       "name": "@timmo001/kestrel-source-reolink",
       "version": "0.0.0",
       "dependencies": {
+        "@effect/platform-node-shared": "4.1.4",
         "@timmo001/kestrel-core": "workspace:*",
+        "@timmo001/kestrel-format-mp4": "workspace:*",
+        "@timmo001/kestrel-protocol-baichuan": "workspace:*",
         "effect": "4.1.4",
       },
       "devDependencies": {
@@ -893,6 +913,8 @@
     "@timmo001/kestrel-format-mp4": ["@timmo001/kestrel-format-mp4@workspace:packages/format-mp4"],
 
     "@timmo001/kestrel-nvr": ["@timmo001/kestrel-nvr@workspace:packages/nvr"],
+
+    "@timmo001/kestrel-protocol-baichuan": ["@timmo001/kestrel-protocol-baichuan@workspace:packages/protocol-baichuan"],
 
     "@timmo001/kestrel-protocol-raysharp": ["@timmo001/kestrel-protocol-raysharp@workspace:packages/protocol-raysharp"],
 

@@ -13,7 +13,10 @@
     "typecheck": "tsc"
   },
   "dependencies": {
+    "@effect/platform-node-shared": "4.1.4",
     "@timmo001/kestrel-core": "workspace:*",
+    "@timmo001/kestrel-format-mp4": "workspace:*",
+    "@timmo001/kestrel-protocol-baichuan": "workspace:*",
     "effect": "4.1.4"
   },
   "devDependencies": {

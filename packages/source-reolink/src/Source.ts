@@ -7,8 +7,9 @@
  * change on as an event. Stills come from its `Snap` command, and its
  * details from its device and disk info. Its recordings, on an SD card or
  * a hub's disk, are listed from its `Search` command, one search per
- * request, as some firmware fails a batch. They aren't handed over: older
- * cameras cut a download short and hubs refuse to prepare one.
+ * request, as some firmware fails a batch. A hub or recorder hands its files
+ * over by replaying them on its own protocol; a camera's are listed only, as
+ * it cuts a download short and older firmware refuses a replay.
  *
  * @module
  */
@@ -16,6 +17,7 @@ import {
   cameraId,
   cameraParts,
   InvalidSettings,
+  NoRecordings,
   SourceUnavailable,
   UnknownCamera,
   type CameraEvent,
@@ -26,6 +28,7 @@ import {
   type Kind,
   type LiveFeed,
   type Source,
+  type SourceRecordings,
   type SourceSettings,
   type StillPicture,
 } from "@timmo001/kestrel-core";
@@ -43,6 +46,7 @@ import {
   Semaphore,
   Stream,
 } from "effect";
+import { deviceReplays, type DeviceFile } from "./Replays.ts";
 
 /** How often each camera's motion and detection state is read. */
 const pollEvery = Duration.seconds(2);
@@ -193,6 +197,8 @@ const SearchFiles = Schema.Struct({
           StartTime: ReolinkTime,
           EndTime: ReolinkTime,
           size: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+          /** Its path on the device, which a replay asks for. */
+          name: Schema.optional(Schema.String),
         }),
       ),
     ),
@@ -327,6 +333,16 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
   const api = new URL("/cgi-bin/api.cgi", base).href;
   const username = Redacted.make(settings.username);
   const password = Redacted.make(settings.password);
+
+  const replays = yield* deviceReplays({
+    name,
+    host: base.hostname,
+    username,
+    password,
+  });
+
+  // Only a hub or recorder replays its files, which isn't known until it answers
+  let replaying = false;
 
   const unavailable = (message: string) =>
     new SourceUnavailable({ message: `${name} ${message}` });
@@ -688,6 +704,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
   yield* Effect.gen(function* () {
     const device = yield* discover;
 
+    replaying = device.recorder;
     yield* Ref.set(current, Option.some(device));
 
     yield* Ref.set(connection, {
@@ -800,6 +817,116 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       }),
     ]);
 
+  /** A channel's files on a day, as its search lists them. */
+  const filesOn = (channel: Channel, date: string) =>
+    search(
+      channel,
+      0,
+      reolinkTime(date, 0, 0, 0),
+      reolinkTime(date, 23, 59, 59),
+    ).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, SearchFiles)),
+      Effect.map((value) => value.SearchResult.File ?? []),
+    );
+
+  const listing = {
+    days: Effect.fnUntraced(function* (month) {
+      const device = yield* opened;
+      const [year = 0, mon = 0] = month.split("-").map(Number);
+      const last = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+
+      const found = yield* Effect.forEach(device.channels, (channel) =>
+        search(
+          channel,
+          1,
+          reolinkTime(`${month}-01`, 0, 0, 0),
+          reolinkTime(`${month}-${two(last)}`, 23, 59, 59),
+        ).pipe(Effect.flatMap((list) => valueOf(list, 0, SearchStatus))),
+      );
+
+      const dates = new Set(
+        found.flatMap((value) =>
+          (value.SearchResult.Status ?? []).flatMap((status) =>
+            status.table
+              .split("")
+              .flatMap((flag, at) =>
+                flag === "1"
+                  ? [`${status.year}-${two(status.mon)}-${two(at + 1)}`]
+                  : [],
+              ),
+          ),
+        ),
+      );
+
+      // Its search doesn't say why, and these record on events
+      return [...dates].toSorted().map((date) => ({
+        date,
+        reasons: ["motion" as const],
+      }));
+    }),
+    list: Effect.fnUntraced(function* (camera, date) {
+      const device = yield* opened;
+      const channel = yield* channelOf(device, camera);
+      const files = yield* filesOn(channel, date);
+
+      return files.map((file) => ({
+        camera,
+        begin: localTimeOf(file.StartTime),
+        end: localTimeOf(file.EndTime),
+        reasons: ["motion" as const],
+        bytes: file.size === undefined ? null : Number(file.size),
+      }));
+    }),
+  } satisfies SourceRecordings;
+
+  /** Its main stream's files, replayed; those are the files its search lists. */
+  const video: NonNullable<SourceRecordings["video"]> = Effect.fnUntraced(
+    function* (options) {
+      const device = yield* opened;
+      const channel = yield* channelOf(device, options.camera);
+
+      const dates = new Set(
+        [options.begin, options.end].map((time) => time.slice(0, 10)),
+      );
+
+      const found = yield* Effect.forEach(dates, (date) =>
+        filesOn(channel, date),
+      );
+
+      // A file that runs past midnight is listed on both days
+      const files = new Map<string, DeviceFile>();
+
+      for (const file of found.flat()) {
+        const begin = localTimeOf(file.StartTime);
+        const end = localTimeOf(file.EndTime);
+
+        if (
+          file.name !== undefined &&
+          begin < options.end &&
+          end > options.begin
+        ) {
+          files.set(file.name, { name: file.name, begin, end });
+        }
+      }
+
+      if (files.size === 0) {
+        return yield* new NoRecordings({
+          message: `Nothing was recorded on ${options.camera} from ${options.begin} to ${options.end}`,
+        });
+      }
+
+      return replays.video({
+        channel: channel.channel,
+        files: [...files.values()].toSorted((a, b) =>
+          a.begin.localeCompare(b.begin),
+        ),
+        begin: options.begin,
+        end: options.end,
+        every: options.every,
+      });
+    },
+  );
+
   const source: Source = {
     id,
     kind: "reolink",
@@ -833,60 +960,8 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         })),
       ),
     ),
-    recordings: {
-      days: Effect.fnUntraced(function* (month) {
-        const device = yield* opened;
-        const [year = 0, mon = 0] = month.split("-").map(Number);
-        const last = new Date(Date.UTC(year, mon, 0)).getUTCDate();
-
-        const found = yield* Effect.forEach(device.channels, (channel) =>
-          search(
-            channel,
-            1,
-            reolinkTime(`${month}-01`, 0, 0, 0),
-            reolinkTime(`${month}-${two(last)}`, 23, 59, 59),
-          ).pipe(Effect.flatMap((list) => valueOf(list, 0, SearchStatus))),
-        );
-
-        const dates = new Set(
-          found.flatMap((value) =>
-            (value.SearchResult.Status ?? []).flatMap((status) =>
-              status.table
-                .split("")
-                .flatMap((flag, at) =>
-                  flag === "1"
-                    ? [`${status.year}-${two(status.mon)}-${two(at + 1)}`]
-                    : [],
-                ),
-            ),
-          ),
-        );
-
-        // Its search doesn't say why, and these record on events
-        return [...dates].toSorted().map((date) => ({
-          date,
-          reasons: ["motion" as const],
-        }));
-      }),
-      list: Effect.fnUntraced(function* (camera, date) {
-        const device = yield* opened;
-        const channel = yield* channelOf(device, camera);
-
-        const value = yield* search(
-          channel,
-          0,
-          reolinkTime(date, 0, 0, 0),
-          reolinkTime(date, 23, 59, 59),
-        ).pipe(Effect.flatMap((list) => valueOf(list, 0, SearchFiles)));
-
-        return (value.SearchResult.File ?? []).map((file) => ({
-          camera,
-          begin: localTimeOf(file.StartTime),
-          end: localTimeOf(file.EndTime),
-          reasons: ["motion" as const],
-          bytes: file.size === undefined ? null : Number(file.size),
-        }));
-      }),
+    get recordings(): SourceRecordings {
+      return replaying ? { ...listing, video } : listing;
     },
     live: opened.pipe(
       Effect.map((device) =>

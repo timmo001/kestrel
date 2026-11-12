@@ -69,6 +69,8 @@ login is planned for when remote access arrives, in
   their stream addresses, such as RTSP, or a still picture, for live view
 - [`packages/source-reolink`](packages/source-reolink): Reolink cameras, hubs
   and recorders, over their HTTP API and RTSP streams
+- [`packages/protocol-baichuan`](packages/protocol-baichuan): Reolink's own
+  protocol on port 9000, for replaying recorded files
 - [`packages/source-bambu`](packages/source-bambu): the camera in a Bambu Lab
   P1 or A1 printer, over its own picture feed
 - [`packages/format-mp4`](packages/format-mp4): recorded video as MP4,
