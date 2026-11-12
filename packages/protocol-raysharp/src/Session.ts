@@ -7,14 +7,7 @@
  * @module
  */
 import * as NodeSocket from "@effect/platform-node-shared/NodeSocket";
-import type {
-  AlarmEvent,
-  ChannelRecording,
-  DeviceInfo,
-  LocalTime,
-  RecordedDay,
-  RecorderStatus,
-} from "@timmo001/kestrel-core/domain";
+import type { LocalTime, RecordedDay } from "@timmo001/kestrel-core";
 import {
   Array as Arr,
   Cause,
@@ -50,6 +43,12 @@ import {
   statusMinimumSize,
   type RecordedStream,
 } from "./Messages.ts";
+import type {
+  AlarmEvent,
+  ChannelRecording,
+  DeviceInfo,
+  RecorderStatus,
+} from "./Reports.ts";
 
 /** The recorder turned the login down. */
 export class LoginRefused extends Schema.TaggedError<LoginRefused>()(

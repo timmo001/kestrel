@@ -9,7 +9,7 @@
  * recording on any. It answers what the page asks of one player, so the page
  * drives one camera or several the same way.
  */
-import type { CameraId } from "@timmo001/kestrel-core/domain";
+import type { CameraId } from "@timmo001/kestrel-core";
 import { cameraLabel } from "./cameras.ts";
 import { momentAt, nextMoment, type Track } from "./moments.ts";
 import {
@@ -19,7 +19,7 @@ import {
   type Clip,
   type Player,
   type View,
-} from "./player.ts";
+} from "./recording-player.ts";
 import { element } from "./shared.ts";
 
 /** One camera's tile: its figure, video and player. */

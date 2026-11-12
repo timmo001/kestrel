@@ -5,8 +5,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./domain": "./src/Domain.ts"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "test": "bun test --pass-with-no-tests",

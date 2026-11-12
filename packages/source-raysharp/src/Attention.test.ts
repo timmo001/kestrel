@@ -1,5 +1,5 @@
 /** Checks which recorder states need you, which are pushed as alerts. */
-import type { ChannelStatus } from "@timmo001/kestrel-core";
+import type { ChannelStatus } from "@timmo001/kestrel-protocol-raysharp";
 import { expect, test } from "bun:test";
 import { attentionFor } from "./Attention.ts";
 
@@ -28,7 +28,7 @@ test("only a camera that had a signal alerts when it loses it", () => {
     {
       source: "swann",
       level: "passive",
-      kind: "disk",
+      kind: "storage",
       message: "Disk 1 is full, so the oldest recordings are recorded over",
     },
     {
@@ -44,7 +44,11 @@ test("a lost connection is the only item", () => {
   expect(
     attentionFor(
       source,
-      { connected: false, since: null, error: "Connection refused" },
+      {
+        connected: false,
+        since: "2026-11-12T13:00:00.000Z",
+        error: "Connection refused",
+      },
       null,
       new Set([1]),
     ),
@@ -56,4 +60,15 @@ test("a lost connection is the only item", () => {
       message: "Can't reach Swann recorder: Connection refused",
     },
   ]);
+});
+
+test("nothing needs you while the first login is still under way", () => {
+  expect(
+    attentionFor(
+      source,
+      { connected: false, since: null, error: null },
+      null,
+      new Set(),
+    ),
+  ).toEqual([]);
 });

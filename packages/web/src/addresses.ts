@@ -1,10 +1,10 @@
 /**
  * Old addresses and saved settings, carried over: the pages used to be hash
- * addresses, such as `/#recordings`, and before camera ids Recordings and
- * Live named the recorder's channels by number. Plain functions with no page
- * in them, so they can be tested.
+ * addresses, such as `/#recordings`, the Sources page was Recorder, and
+ * before camera ids Recordings and Live named the recorder's channels by
+ * number. Plain functions with no page in them, so they can be tested.
  */
-import { CameraId, cameraId, cameraParts } from "@timmo001/kestrel-core/domain";
+import { CameraId, cameraId, cameraParts } from "@timmo001/kestrel-core";
 import { Option, Schema, SchemaGetter } from "effect";
 
 /** The recorder's source, which channel numbers from before camera ids meant. */
@@ -40,11 +40,14 @@ export const newAddress = (
   url: URL,
   pageNames: ReadonlySet<string>,
 ): string | undefined => {
-  const name = url.hash.slice(1);
+  // The Sources page was the Recorder page
+  const name = url.hash.slice(1) === "recorder" ? "sources" : url.hash.slice(1);
 
   if (url.pathname === "/" && pageNames.has(name) && name !== "live") {
     return `/${name}`;
   }
+
+  if (url.pathname === "/recorder") return `/sources${url.search}`;
 
   const search = url.searchParams;
 

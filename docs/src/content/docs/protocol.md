@@ -1,11 +1,12 @@
 ---
 title: Protocol
-description: What the recorder's control protocol looks like, as packages/rsnet speaks it.
+description: What the recorder's control protocol looks like, as packages/protocol-raysharp speaks it.
 ---
 
-Raysharp recorders take control messages on TCP port 9000. `packages/rsnet`
-follows the message numbers and layouts in the vendor SDK's protocol header,
-and the notes here say where firmware SRV7.1.0 differs.
+Raysharp recorders take control messages on TCP port 9000.
+`packages/protocol-raysharp` follows the message numbers and layouts in the
+vendor SDK's protocol header, and the notes here say where firmware SRV7.1.0
+differs.
 
 ## Framing
 

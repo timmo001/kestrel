@@ -12,20 +12,26 @@
  */
 import {
   cameraId,
+  cameraParts,
   NoRecordings,
   SourceUnavailable,
   UnknownCamera,
-  type AlarmEvent,
+  type CameraEvent,
+  type CameraId,
   type CameraInfo,
   type Connection,
+  type Details,
   type LiveFeed,
   type RecordedFrame,
-  type ReceivedEvent,
   type Recording,
   type Source,
   type SourceId,
 } from "@timmo001/kestrel-core";
-import { Session } from "@timmo001/kestrel-rsnet";
+import {
+  Session,
+  type AlarmEvent,
+  type RecorderStatus,
+} from "@timmo001/kestrel-protocol-raysharp";
 import {
   Config,
   DateTime,
@@ -38,7 +44,11 @@ import {
   Schedule,
   Stream,
 } from "effect";
+import { attentionFor } from "./Attention.ts";
 import { fromSeconds, stretches, toSeconds } from "./Stretches.ts";
+
+/** How often the recorder's status is read, for what needs you. */
+const pollEvery = Duration.minutes(1);
 
 /** How many alarm reports the source keeps for a page that opens later. */
 const keptEvents = 200;
@@ -89,6 +99,31 @@ const lastDay = (month: string) => {
 const channelsOf = (opened: Session.Session) =>
   Array.from({ length: opened.device.channels }, (_, index) => index + 1);
 
+/** The recorder's device and status as general details. */
+const detailsOf = (
+  id: SourceId,
+  opened: Session.Session,
+  status: RecorderStatus,
+): Details => ({
+  clock: status.time,
+  facts: [
+    { label: "Name", value: opened.device.name },
+    { label: "Firmware", value: opened.device.firmware },
+    { label: "Channels", value: String(opened.device.channels) },
+  ],
+  storage: status.disks.map((disk) => ({
+    name: `Disk ${disk.disk}`,
+    state: disk.state,
+    ok: disk.state === "ok",
+  })),
+  cameras: status.channels.map((channel) => ({
+    camera: cameraId(id, String(channel.channel)),
+    signal: !channel.videoLoss,
+    recording: channel.recordingMode,
+    motion: channel.motion,
+  })),
+});
+
 export interface Options {
   /** The source's id, which its cameras' ids start with, such as `swann`. */
   readonly id: SourceId;
@@ -129,21 +164,19 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     error: null,
   });
 
-  const recent = yield* Ref.make<ReadonlyArray<ReceivedEvent>>([]);
-  const events = yield* PubSub.sliding<ReceivedEvent>(256);
+  const recent = yield* Ref.make<ReadonlyArray<CameraEvent>>([]);
+  const events = yield* PubSub.sliding<CameraEvent>(256);
 
   const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
 
   const receive = Effect.fnUntraced(function* (event: AlarmEvent) {
-    const received: ReceivedEvent = {
+    const received: CameraEvent = {
       source: id,
       camera:
         event.channel === null ? null : cameraId(id, String(event.channel)),
       kind: event.kind,
-      subtype: event.subtype,
       active: event.active,
       time: event.time,
-      size: event.size,
       receivedAt: yield* now,
     };
 
@@ -217,24 +250,65 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     ),
   );
 
-  /** The channel a camera's own id names, such as `3`, if the recorder has it. */
-  const channelOf = (open: Session.Session, camera: string) => {
-    const channel = Number(camera);
+  /** The channel a camera's id names, such as 3 for `swann/3`, if it's this recorder's. */
+  const channelOf = (open: Session.Session, camera: CameraId) => {
+    const parts = cameraParts(camera);
+    const channel = Number(parts.camera);
 
-    return /^[1-9]\d*$/.test(camera) && channel <= open.device.channels
+    return parts.source === id &&
+      /^[1-9]\d*$/.test(parts.camera) &&
+      channel <= open.device.channels
       ? Effect.succeed(channel)
       : Effect.fail(
           new UnknownCamera({
-            message: `The recorder has no camera ${cameraId(id, camera)}`,
+            message: `${options.name} has no camera ${camera}`,
           }),
         );
   };
+
+  // The latest status, read every minute for what needs you, and the
+  // channels that have had a signal since the server started
+  const latest = yield* Ref.make<RecorderStatus | null>(null);
+  const hadSignal = new Set<number>();
+
+  // Retried within the minute, so the first read doesn't miss the login
+  // that's still under way as the server starts
+  const readStatus = opened.pipe(
+    Effect.flatMap((open) => open.status),
+    Effect.retry(
+      Schedule.spaced(Duration.seconds(5)).pipe(
+        Schedule.upTo({ duration: Duration.seconds(55) }),
+      ),
+    ),
+    Effect.tap((status) =>
+      Effect.sync(() => {
+        for (const channel of status.channels) {
+          if (!channel.videoLoss) hadSignal.add(channel.channel);
+        }
+      }),
+    ),
+    Effect.flatMap((status) => Ref.set(latest, status)),
+    Effect.catch(() => Ref.set(latest, null)),
+  );
+
+  yield* readStatus.pipe(
+    Effect.repeat(Schedule.spaced(pollEvery)),
+    Effect.forkScoped,
+  );
 
   const source: Source = {
     id,
     kind: "raysharp",
     name: options.name,
     connection: Ref.get(connection),
+    attention: Effect.gen(function* () {
+      return attentionFor(
+        { id, name: options.name },
+        yield* Ref.get(connection),
+        yield* Ref.get(latest),
+        hadSignal,
+      );
+    }),
     cameras: Effect.gen(function* () {
       const open = yield* opened;
       const status = yield* open.status.pipe(Effect.option);
@@ -291,16 +365,16 @@ export const make = Effect.fnUntraced(function* (options: Options) {
           .pipe(Effect.mapError(unavailable));
 
         return found.map((recording): Recording => ({
-          camera: cameraId(id, camera),
+          camera,
           begin: recording.begin,
           end: recording.end,
           reasons: recording.reasons,
           bytes: recording.bytes,
         }));
       }),
-      video: Effect.fnUntraced(function* (options) {
+      video: Effect.fnUntraced(function* (request) {
         const open = yield* opened;
-        const channel = yield* channelOf(open, options.camera);
+        const channel = yield* channelOf(open, request.camera);
 
         const found = yield* open
           .recordings({
@@ -308,20 +382,20 @@ export const make = Effect.fnUntraced(function* (options: Options) {
             // From an hour before, for a file that starts earlier and runs
             // into the range, to a minute after, for whether the next file
             // follows straight on
-            begin: fromSeconds(toSeconds(options.begin) - 3600),
-            end: fromSeconds(toSeconds(options.end) + 60),
+            begin: fromSeconds(toSeconds(request.begin) - 3600),
+            end: fromSeconds(toSeconds(request.end) + 60),
           })
           .pipe(Effect.mapError(unavailable));
 
-        const parts = stretches(found, options.begin, options.end);
+        const parts = stretches(found, request.begin, request.end);
 
         if (parts.length === 0) {
           return yield* new NoRecordings({
-            message: `Nothing was recorded on ${cameraId(id, options.camera)} from ${options.begin} to ${options.end}`,
+            message: `Nothing was recorded on ${request.camera} from ${request.begin} to ${request.end}`,
           });
         }
 
-        const every = options.every;
+        const every = request.every;
 
         // A file at a time, whole or key frames only
         return Stream.fromIterable(parts).pipe(
@@ -330,13 +404,13 @@ export const make = Effect.fnUntraced(function* (options: Options) {
               every === undefined
                 ? open.download({
                     channel,
-                    stream: options.stream,
+                    stream: request.stream,
                     begin: part.begin,
                     end: part.end,
                   })
                 : open.keyFrames({
                     channel,
-                    stream: options.stream,
+                    stream: request.stream,
                     begin: part.begin,
                     end: part.end,
                     every,
@@ -351,14 +425,12 @@ export const make = Effect.fnUntraced(function* (options: Options) {
       recent: Ref.get(recent),
       live: Stream.fromPubSub(events),
     },
-    details: {
-      device: Effect.map(opened, (open) => open.device),
-      status: opened.pipe(
-        Effect.flatMap((open) =>
-          open.status.pipe(Effect.mapError(unavailable)),
-        ),
-      ),
-    },
+    details: Effect.gen(function* () {
+      const open = yield* opened;
+      const status = yield* open.status.pipe(Effect.mapError(unavailable));
+
+      return detailsOf(id, open, status);
+    }),
   };
 
   return source;

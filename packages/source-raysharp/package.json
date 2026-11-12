@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@timmo001/kestrel-core": "workspace:*",
-    "@timmo001/kestrel-rsnet": "workspace:*",
+    "@timmo001/kestrel-protocol-raysharp": "workspace:*",
     "effect": "4.1.4"
   },
   "devDependencies": {

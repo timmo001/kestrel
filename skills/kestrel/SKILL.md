@@ -15,7 +15,9 @@ Cameras are named by id: their source's id and their own, such as `swann/3`
 for the recorder's channel 3.
 
 1. Start with `status`. If a source isn't connected, say why from its
-   `connection.error` and stop: its cameras don't answer until it is.
+   `connection.error` and stop: its cameras don't answer until it is. Its
+   `details` give each connected source's clock, storage and each camera's
+   state; `details` alone gives one source's, with its facts.
 2. `cameras` lists each camera's id, name and what it can do: `live`,
    `recordings` and `events`, and `signal` for whether it has a picture now.
 3. For what was recorded, use `days` for a month, then `recordings` for a

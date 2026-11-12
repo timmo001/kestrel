@@ -1,8 +1,8 @@
 /**
  * The server's API from the page: a typed client over the same origin, and
- * the live alarm reports as server-sent events.
+ * the live events as server-sent events.
  */
-import { ReceivedEvent } from "@timmo001/kestrel-core/domain";
+import { CameraEvent } from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
 import { Effect, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
@@ -19,21 +19,21 @@ export const call = <A, E>(use: (api: Client) => Effect.Effect<A, E>) =>
   Effect.runPromise(Effect.flatMap(client, use));
 
 const decodeEvent = Schema.decodeUnknownSync(
-  Schema.fromJsonString(ReceivedEvent),
+  Schema.fromJsonString(CameraEvent),
 );
 
 /**
- * Listens for alarm reports. The browser reconnects by itself when the
- * server drops the stream. Returns a function that stops listening.
+ * Listens for events. The browser reconnects by itself when the server
+ * drops the stream. Returns a function that stops listening.
  */
-export const listenForEvents = (onEvent: (event: ReceivedEvent) => void) => {
+export const listenForEvents = (onEvent: (event: CameraEvent) => void) => {
   const source = new EventSource(new URL("api/events/live", location.origin));
 
   source.addEventListener("message", (message) => {
     try {
       onEvent(decodeEvent(message.data));
     } catch (error) {
-      console.warn("Skipped an alarm report the page couldn't read", error);
+      console.warn("Skipped an event the page couldn't read", error);
     }
   });
 

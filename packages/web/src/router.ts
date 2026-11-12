@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { CameraId, LocalDate, LocalTime } from "@timmo001/kestrel-core/domain";
+import { CameraId, LocalDate, LocalTime } from "@timmo001/kestrel-core";
 import { Option, Schema, SchemaGetter } from "effect";
 import { Atom } from "effect/reactivity";
 import { newAddress } from "./addresses.ts";
@@ -67,7 +67,7 @@ export const routes = {
   live: route("/", NoParams, NoSearch),
   recordings: route("/recordings", NoParams, RecordingsSearch),
   events: route("/events", NoParams, NoSearch),
-  recorder: route("/recorder", NoParams, NoSearch),
+  sources: route("/sources", NoParams, NoSearch),
 } as const;
 
 // oxlint-disable-next-line typescript/no-explicit-any -- each route keeps its own param and search types
@@ -438,6 +438,6 @@ const makeRouter = <const R extends AnyRoutes>(
 const pageNames = new Set(Object.keys(routes));
 
 export const { href, navigate, currentLocation } = makeRouter(routes, {
-  // Old addresses, such as `/#recordings` or `channel=3`, still land
+  // Old addresses, such as `/#recordings`, `/recorder` or `channel=3`, still land
   redirect: (url) => newAddress(url, pageNames),
 });

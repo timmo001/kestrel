@@ -10,16 +10,16 @@ import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   cameraParts,
   LocalTime,
+  type Attention,
   type Camera,
+  type CameraEvent,
   type CameraId,
-  type DeviceInfo,
-  type ReceivedEvent,
+  type Details,
   type RecordedDay,
-  type RecorderStatus,
   type Recording,
+  type SourceId,
   type SourceInfo,
-} from "@timmo001/kestrel-core/domain";
-import type { Attention } from "@timmo001/kestrel-server/api";
+} from "@timmo001/kestrel-core";
 import {
   Console,
   Effect,
@@ -32,11 +32,11 @@ import {
 import { Command, Flag } from "effect/cli";
 import { serveMcp } from "./mcp.ts";
 import {
+  ClientError,
   operations,
-  Recorder,
-  RecorderError,
-  recorderSource,
   resolveCamera,
+  resolveSource,
+  ServerClient,
   type Operation,
 } from "./operations.ts";
 
@@ -52,14 +52,17 @@ type Output =
       /** How many alerts there are, for scripts that only need the count. */
       readonly alerts: number;
       readonly attention: ReadonlyArray<Attention>;
-      /** The recorder's status, while it's connected. */
-      readonly status: RecorderStatus | null;
+      /** Each connected source's details, where it has them. */
+      readonly details: ReadonlyArray<{
+        readonly source: SourceId;
+        readonly details: Details;
+      }>;
     }
-  | DeviceInfo
+  | Details
   | { readonly cameras: ReadonlyArray<Camera> }
   | { readonly recordings: ReadonlyArray<Recording> }
   | { readonly days: ReadonlyArray<RecordedDay> }
-  | { readonly events: ReadonlyArray<ReceivedEvent> }
+  | { readonly events: ReadonlyArray<CameraEvent> }
   | {
       readonly file: string;
       readonly bytes: number;
@@ -80,7 +83,7 @@ type Output =
 const printJson = (value: Output) =>
   Console.log(JSON.stringify(value, null, 2));
 
-/** Today in this machine's time zone, which the recorder's clock is kept in. */
+/** Today in this machine's time zone, which a source's clock is kept in. */
 const today = () => {
   const now = new Date();
 
@@ -91,36 +94,41 @@ const today = () => {
   ].join("-");
 };
 
+/** A source's details as lines: its clock, storage and each camera's state. */
+const printDetails = Effect.fn("printDetails")(function* (details: Details) {
+  yield* Console.log(`Clock  ${details.clock?.replace("T", " ") ?? "unknown"}`);
+
+  for (const each of details.storage) {
+    yield* Console.log(`${each.name} ${each.state}`);
+  }
+
+  for (const each of details.cameras) {
+    yield* Console.log(
+      `${each.camera}  ${each.signal === false ? "no signal" : each.recording}${each.motion === true ? "  motion" : ""}`,
+    );
+  }
+});
+
 const status = Command.make(
   "status",
   { json },
   Effect.fn("status")(function* ({ json }) {
-    const recorder = yield* Recorder;
-    const sources = yield* recorder.call((api) => api.sources.list());
-    const attention = yield* recorder.call((api) => api.sources.attention());
+    const client = yield* ServerClient;
+    const sources = yield* client.call((api) => api.sources.list());
+    const attention = yield* client.call((api) => api.attention.list());
 
     const alerts = attention.filter((item) => item.level === "alert").length;
 
-    // The recorder's clock, disks and channels, while it's connected
-    const withDetails = sources.find(
-      (source) => source.details && source.connection.connected,
+    // Each connected source's details, such as a recorder's disks and channels
+    const details = yield* Effect.forEach(
+      sources.filter((source) => source.details && source.connection.connected),
+      (source) =>
+        client
+          .call((api) => api.sources.details({ params: { source: source.id } }))
+          .pipe(Effect.map((found) => ({ source: source.id, details: found }))),
     );
 
-    const current =
-      withDetails === undefined
-        ? null
-        : yield* recorder.call((api) =>
-            api.sources.status({ params: { source: withDetails.id } }),
-          );
-
-    if (json) {
-      return yield* printJson({
-        sources,
-        alerts,
-        attention,
-        status: current,
-      });
-    }
+    if (json) return yield* printJson({ sources, alerts, attention, details });
 
     for (const item of attention) {
       yield* Console.log(
@@ -128,46 +136,45 @@ const status = Command.make(
       );
     }
 
-    if (current === null) return;
-
-    yield* Console.log(
-      `Clock  ${current.time?.replace("T", " ") ?? "unknown"}`,
-    );
-
-    for (const disk of current.disks) {
-      yield* Console.log(`Disk ${disk.disk} ${disk.state}`);
-    }
-
-    for (const channel of current.channels) {
-      yield* Console.log(
-        `Channel ${channel.channel}  ${channel.videoLoss ? "no signal" : channel.recordingMode}${channel.motion ? "  motion" : ""}`,
-      );
-    }
+    for (const each of details) yield* printDetails(each.details);
   }),
 ).pipe(
   Command.withDescription(
-    "What needs you, each source's connection, and the recorder's clock, disks and each channel's state",
+    "What needs you, and each source's connection, clock, storage and cameras",
   ),
 );
 
-const device = Command.make(
-  "device",
-  { json },
-  Effect.fn("device")(function* ({ json }) {
-    const source = yield* recorderSource();
+const details = Command.make(
+  "details",
+  {
+    json,
+    source: Flag.String("source").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription(
+        "The source, such as swann; the only one with details by default",
+      ),
+      Flag.optional,
+    ),
+  },
+  Effect.fn("details")(function* ({ json, source }) {
+    const found = yield* resolveSource(source);
 
-    const info = yield* (yield* Recorder).call((api) =>
-      api.sources.device({ params: { source: source.id } }),
+    const info = yield* (yield* ServerClient).call((api) =>
+      api.sources.details({ params: { source: found.id } }),
     );
 
     if (json) return yield* printJson(info);
 
-    yield* Console.log(
-      `${info.name}  firmware ${info.firmware}  ${info.channels} channels  ${info.mac}`,
-    );
+    for (const fact of info.facts) {
+      yield* Console.log(`${fact.label}  ${fact.value}`);
+    }
+
+    yield* printDetails(info);
   }),
 ).pipe(
-  Command.withDescription("The recorder's name, firmware and channel count"),
+  Command.withDescription(
+    "A source's details: its facts, clock, storage and each camera's state",
+  ),
 );
 
 const camera = Flag.String("camera").pipe(
@@ -187,7 +194,7 @@ const cameras = Command.make(
   "cameras",
   { json },
   Effect.fn("cameras")(function* ({ json }) {
-    const list = yield* (yield* Recorder).call((api) => api.cameras.list());
+    const list = yield* (yield* ServerClient).call((api) => api.cameras.list());
 
     if (json) return yield* printJson({ cameras: list });
 
@@ -220,7 +227,7 @@ const recordings = Command.make(
     const day = Option.getOrElse(date, today);
     const id = yield* resolveCamera(camera);
 
-    const list = yield* (yield* Recorder).call((api) =>
+    const list = yield* (yield* ServerClient).call((api) =>
       api.cameras.recordings({ params: cameraParts(id), query: { date: day } }),
     );
 
@@ -255,8 +262,8 @@ const days = Command.make(
   Effect.fn("days")(function* ({ json, month }) {
     const picked = Option.getOrElse(month, () => today().slice(0, 7));
 
-    const list = yield* (yield* Recorder).call((api) =>
-      api.cameras.days({ query: { month: picked } }),
+    const list = yield* (yield* ServerClient).call((api) =>
+      api.recordings.days({ query: { month: picked } }),
     );
 
     if (json) return yield* printJson({ days: list });
@@ -277,12 +284,14 @@ const events = Command.make(
   "events",
   { json },
   Effect.fn("events")(function* ({ json }) {
-    const list = yield* (yield* Recorder).call((api) => api.events.recent());
+    const list = yield* (yield* ServerClient).call((api) =>
+      api.events.recent(),
+    );
 
     if (json) return yield* printJson({ events: list });
 
     if (list.length === 0) {
-      return yield* Console.log("No alarm reports since the server started");
+      return yield* Console.log("No events since the server started");
     }
 
     for (const event of list) {
@@ -293,17 +302,17 @@ const events = Command.make(
   }),
 ).pipe(
   Command.withDescription(
-    "The newest motion, PIR, video loss and disk reports",
+    "The newest events, such as motion and PIR, from every source",
   ),
 );
 
 const decodeTime = Schema.decodeUnknownEffect(LocalTime);
 
 /**
- * A recorder time from a flag: a full one such as `2026-11-11T21:46:00`, or
+ * A source's time from a flag: a full one such as `2026-11-11T21:46:00`, or
  * a time of day such as `21:46` or `21:46:30` on `day`.
  */
-const recorderTime = (day: string, value: string) => {
+const timeOn = (day: string, value: string) => {
   const clock = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(value);
 
   const full =
@@ -314,7 +323,7 @@ const recorderTime = (day: string, value: string) => {
   return decodeTime(full).pipe(
     Effect.mapError(
       () =>
-        new RecorderError({
+        new ClientError({
           message: `"${value}" isn't a time: use 21:46, 21:46:30 or 2026-11-11T21:46:30`,
         }),
     ),
@@ -349,18 +358,18 @@ const download = Command.make(
   },
   Effect.fn("download")(function* (options) {
     const day = Option.getOrElse(options.date, today);
-    const begin = yield* recorderTime(day, options.from);
-    const end = yield* recorderTime(day, options.to);
+    const begin = yield* timeOn(day, options.from);
+    const end = yield* timeOn(day, options.to);
 
     if (end <= begin) {
-      return yield* new RecorderError({
+      return yield* new ClientError({
         message: "--to must come after --from",
       });
     }
 
     const id = yield* resolveCamera(options.camera);
 
-    const response = yield* (yield* Recorder).call((api) =>
+    const response = yield* (yield* ServerClient).call((api) =>
       api.cameras.video({
         params: cameraParts(id),
         query: {
@@ -387,7 +396,7 @@ const download = Command.make(
       Stream.run(fs.sink(file)),
       Effect.mapError(
         (error) =>
-          new RecorderError({
+          new ClientError({
             message: `The download stopped: ${error instanceof Error ? error.message : String(error)}`,
           }),
       ),
@@ -448,7 +457,7 @@ const cli = Command.make("kestrel").pipe(
   ),
   Command.withSubcommands([
     status,
-    device,
+    details,
     cameras,
     recordings,
     download,
@@ -461,6 +470,6 @@ const cli = Command.make("kestrel").pipe(
 
 cli.pipe(
   Command.run({ version: "0.0.0" }),
-  Effect.provide(Layer.mergeAll(Recorder.layer, BunServices.layer)),
+  Effect.provide(Layer.mergeAll(ServerClient.layer, BunServices.layer)),
   BunRuntime.runMain,
 );

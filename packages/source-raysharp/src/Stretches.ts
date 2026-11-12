@@ -5,7 +5,8 @@
  *
  * @module
  */
-import type { ChannelRecording, LocalTime } from "@timmo001/kestrel-core";
+import type { LocalTime } from "@timmo001/kestrel-core";
+import type { ChannelRecording } from "@timmo001/kestrel-protocol-raysharp";
 
 /** A recorder time as seconds since 1970, read as UTC: the recorder keeps no zone. */
 export const toSeconds = (time: LocalTime) => Date.parse(`${time}Z`) / 1000;

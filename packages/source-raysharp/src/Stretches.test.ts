@@ -3,7 +3,7 @@
  * gets wrong silently: a range ending where the next file starts sends that
  * file instead.
  */
-import type { ChannelRecording } from "@timmo001/kestrel-core";
+import type { ChannelRecording } from "@timmo001/kestrel-protocol-raysharp";
 import { expect, test } from "bun:test";
 import { stretches } from "./Stretches.ts";
 

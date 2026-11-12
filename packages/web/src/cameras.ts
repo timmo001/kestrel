@@ -3,7 +3,7 @@
  * sources are reachable, and labelled "Ch 3" for a recorder's channel or by
  * name otherwise.
  */
-import type { Camera, CameraId } from "@timmo001/kestrel-core/domain";
+import type { Camera, CameraId } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 
 let known: ReadonlyArray<Camera> = [];

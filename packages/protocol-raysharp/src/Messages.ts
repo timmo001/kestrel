@@ -5,18 +5,20 @@
  * @module
  */
 import type {
+  LocalTime,
+  RecordedDay,
+  RecordingReason,
+} from "@timmo001/kestrel-core";
+import { reader, writer, type Reader, type Writer } from "./Codec.ts";
+import type {
   AlarmEvent,
   AlarmKind,
   ChannelRecording,
   DeviceInfo,
   DiskState,
-  LocalTime,
-  RecordedDay,
   RecorderStatus,
   RecordingMode,
-  RecordingReason,
-} from "@timmo001/kestrel-core/domain";
-import { reader, writer, type Reader, type Writer } from "./Codec.ts";
+} from "./Reports.ts";
 
 /** Message types. */
 export const MessageType = {

@@ -1,8 +1,9 @@
 /**
- * The page script: Base's fonts, the theme CSS and the components, then the
- * app bar's pages (live view, recordings, events and the recorder's health),
- * one shown at a time from the address. Live and Recordings have modules of
- * their own. The service worker keeps the shell so the app starts offline.
+ * The page script, the app's shell: the fonts, the theme and the
+ * components, the connection banner and what needs you, then the app bar's
+ * pages (Live, Recordings, Events and Sources), one shown at a time from the
+ * address, each from a module of its own. The service worker keeps the
+ * shell so the app starts offline.
  */
 // Settings saved under the app's old name, carried over before any are read
 import "./renamed.ts";
@@ -15,14 +16,7 @@ import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
-import {
-  cameraParts,
-  type Camera,
-  type ChannelStatus,
-  type ReceivedEvent,
-  type SourceInfo,
-} from "@timmo001/kestrel-core/domain";
-import type { Attention } from "@timmo001/kestrel-server/api";
+import type { Attention, Camera, SourceInfo } from "@timmo001/kestrel-core";
 import {
   connectPwa,
   pushState,
@@ -30,17 +24,13 @@ import {
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
 import { pageTheme } from "@timmo001/groundwork-tokens/page";
-import {
-  createIcon,
-  on,
-  type MenuItem,
-  type TableRow,
-} from "@timmo001/groundwork-ui";
+import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
-import { call, listenForEvents } from "./api.ts";
-import { cameraLabel, loadCameras } from "./cameras.ts";
+import { call } from "./api.ts";
+import { loadCameras } from "./cameras.ts";
+import { eventsPage } from "./events.ts";
 import {
   phBell,
   phBellRinging,
@@ -50,18 +40,10 @@ import {
   phVideoCamera,
 } from "./icons.ts";
 import { livePage } from "./live.ts";
-import { playbackPage } from "./playback.ts";
+import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import {
-  actionsColumn,
-  dateTimeFormat,
-  element,
-  find,
-  localDate,
-  reasonChips,
-  recordingRow,
-  timeFormat,
-} from "./shared.ts";
+import { find } from "./shared.ts";
+import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
 import {
   pickerOptions,
   themeDocuments,
@@ -135,26 +117,15 @@ const showConnection = async () => {
 };
 
 // What needs you, from the server's attention list: alerts first, then
-// passive notes, above every page. A passive disk note, such as a full
-// disk, shows in the Disks card instead.
+// passive notes, above every page. A passive storage note, such as a full
+// disk, shows in its source's Storage card instead.
 const attentionStack = find("gw-stack", "attention");
 
-const isDiskNote = (item: Attention) =>
-  item.level === "passive" && item.kind === "disk";
+const fetchAttention = (): Promise<ReadonlyArray<Attention>> =>
+  call((api) => api.attention.list()).catch(() => []);
 
-const attentionAlert = (item: Attention) => {
-  const alert = element("gw-alert", item.message);
-
-  alert.setAttribute("tone", item.level === "alert" ? "warning" : "info");
-
-  return alert;
-};
-
-const fetchAttention = () =>
-  call((api) => api.sources.attention()).catch(() => []);
-
-const showAttention = async () => {
-  const items = (await fetchAttention()).filter((item) => !isDiskNote(item));
+const showAttention = (all: ReadonlyArray<Attention>) => {
+  const items = all.filter((item) => !isStorageNote(item));
 
   if (attentionStack === null) return;
 
@@ -162,189 +133,50 @@ const showAttention = async () => {
   attentionStack.hidden = items.length === 0;
   attentionStack.replaceChildren(
     ...items
-      .sort((a, b) => (a.level === b.level ? 0 : a.level === "alert" ? -1 : 1))
+      .toSorted((a, b) =>
+        a.level === b.level ? 0 : a.level === "alert" ? -1 : 1,
+      )
       .map(attentionAlert),
   );
 };
 
-// Recorder: device facts, disks and each channel's state, from the source
-// with details, which is the recorder
-const deviceCard = find("gw-card", "device");
-const disksCard = find("gw-card", "disks");
-const channelsTable = find("gw-table", "channels");
-let today = "";
-
-if (channelsTable !== null) {
-  channelsTable.columns = [
-    { id: "channel", header: "Channel", numeric: true },
-    { id: "signal", header: "Signal" },
-    { id: "recording", header: "Recording" },
-    { id: "motion", header: "Motion now" },
-  ];
-}
-
-const channelRow = (status: ChannelStatus): TableRow => ({
-  channel: status.channel,
-  signal: status.videoLoss ? "No signal" : "OK",
-  recording: status.recordingMode,
-  motion: status.motion ? "Yes" : "No",
-});
-
-/** Today on the recorder's clock where there's one, or the browser's. */
-const browserToday = () => new Date().toISOString().slice(0, 10);
-
-const showRecorder = async (sources: ReadonlyArray<SourceInfo>) => {
-  const recorder = sources.find((source) => source.details);
-
-  if (recorder === undefined) {
-    today = browserToday();
-
-    return;
-  }
-
-  const params = { source: recorder.id };
-
-  const [device, status, attention] = await Promise.all([
-    call((api) => api.sources.device({ params })),
-    call((api) => api.sources.status({ params })),
-    fetchAttention(),
-  ]);
-
-  today = status.time?.slice(0, 10) ?? browserToday();
-
-  if (deviceCard !== null) {
-    const facts = element("gw-facts");
-
-    facts.items = [
-      { label: "Name", value: device.name },
-      { label: "Firmware", value: device.firmware },
-      { label: "Channels", value: String(device.channels) },
-      {
-        label: "Recorder clock",
-        value:
-          status.time === null
-            ? "Unknown"
-            : dateTimeFormat.format(localDate(status.time)),
-      },
-    ];
-
-    deviceCard.loading = false;
-    deviceCard.replaceChildren(facts);
-  }
-
-  if (disksCard !== null) {
-    const row = element("gw-row");
-
-    for (const disk of status.disks) {
-      const badge = element("gw-badge", disk.state);
-
-      badge.setAttribute("label", `Disk ${disk.disk}`);
-      badge.setAttribute("tone", disk.state === "ok" ? "success" : "warning");
-      row.append(badge);
-    }
-
-    if (status.disks.length === 0) row.append(element("span", "No disks"));
-
-    disksCard.loading = false;
-    disksCard.replaceChildren(
-      row,
-      ...attention.filter(isDiskNote).map(attentionAlert),
-    );
-  }
-
-  if (channelsTable !== null) {
-    channelsTable.rows = status.channels.map(channelRow);
-  }
-};
-
-// Live: its own module, with its layouts and controls
+// Each page is a module of its own
 const live = livePage();
 let cameras: ReadonlyArray<Camera> | undefined;
 
-// Recordings: its own module, as the recorder's client lays out playback.
-// Its cameras, day and the time to play from live in the address
-const playback = playbackPage({
+// Recordings: its cameras, day and the time to play from live in the address
+const recordings = recordingsPage({
   onPick: (search) => navigate(href("recordings", { search })),
 });
 
-// Events: alarm reports as they arrive, and today's motion and PIR clips
-// from the recordings, which show events even if reports don't come through
-const eventsTable = find("gw-table", "events");
-const clipsTable = find("gw-table", "clips");
-
-if (eventsTable !== null) {
-  eventsTable.columns = [
-    {
-      id: "receivedAt",
-      header: "Received",
-      cell: (row) => timeFormat.format(new Date(String(row.receivedAt))),
-    },
-    { id: "kind", header: "What" },
-    { id: "camera", header: "Camera" },
-    { id: "state", header: "State" },
-  ];
-}
-
-const eventRow = (event: ReceivedEvent): TableRow => ({
-  receivedAt: event.receivedAt,
-  kind: event.kind,
-  camera: event.camera === null ? "" : cameraLabel(event.camera),
-  state: event.active === null ? "" : event.active ? "Started" : "Ended",
+// Events: a clip plays on the Recordings page, on its own day and camera
+const events = eventsPage({
+  onPlay: (clip) =>
+    navigate(
+      href("recordings", {
+        search: {
+          camera: clip.camera,
+          date: clip.begin.slice(0, 10),
+          at: clip.begin,
+        },
+      }),
+    ),
 });
 
-if (clipsTable !== null) {
-  clipsTable.columns = [
-    // Plays it on the Recordings page, on its own day and camera
-    actionsColumn((clip) =>
-      navigate(
-        href("recordings", {
-          search: {
-            camera: clip.camera,
-            date: clip.begin.slice(0, 10),
-            at: clip.begin,
-          },
-        }),
-      ),
-    ),
-    { id: "begin", header: "Start" },
-    { id: "cameraLabel", header: "Camera" },
-    { id: "length", header: "Length", sortable: false },
-    { id: "reasons", header: "Why", cell: reasonChips, wide: true },
-  ];
-}
+const sources = sourcesPage();
 
-const showEvents = async () => {
-  const recent = await call((api) => api.events.recent());
+/** Today on the first source's clock where there's one, or the browser's. */
+let today = "";
 
-  if (eventsTable !== null) eventsTable.rows = recent.map(eventRow);
+/** Shows what needs you and each source, and keeps today from its clock. */
+const showSources = async (list: ReadonlyArray<SourceInfo>) => {
+  const attention = await fetchAttention();
 
-  listenForEvents((event) => {
-    if (eventsTable !== null) {
-      eventsTable.rows = [eventRow(event), ...eventsTable.rows];
-    }
-  });
-};
+  showAttention(attention);
 
-const showClips = async (list: ReadonlyArray<Camera>) => {
-  const perCamera = await Promise.all(
-    list.map((camera) =>
-      call((api) =>
-        api.cameras.recordings({
-          params: cameraParts(camera.id),
-          query: { date: today },
-        }),
-      ).catch(() => []),
-    ),
-  );
+  const clock = await sources.show(list, attention);
 
-  if (clipsTable === null) return;
-
-  clipsTable.rows = perCamera
-    .flat()
-    .filter((clip) =>
-      clip.reasons.some((reason) => reason === "motion" || reason === "PIR"),
-    )
-    .map(recordingRow);
+  today = clock?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
 };
 
 // Pages: one shown at a time, from the router's current location, so each
@@ -352,14 +184,14 @@ const showClips = async (list: ReadonlyArray<Camera>) => {
 type Page = Location["name"];
 
 const isPage = Schema.is(
-  Schema.Literals(["live", "recordings", "events", "recorder", "notFound"]),
+  Schema.Literals(["live", "recordings", "events", "sources", "notFound"]),
 );
 
 const pageTitles: Record<Page, string> = {
   live: "Live",
   recordings: "Recordings",
   events: "Events",
-  recorder: "Recorder",
+  sources: "Sources",
   notFound: "Page not found",
 };
 
@@ -372,7 +204,7 @@ const pageIcons: Record<Page, string> = {
   live: phVideoCamera,
   recordings: phFilmStrip,
   events: phBellRinging,
-  recorder: phHardDrives,
+  sources: phHardDrives,
   notFound: phVideoCamera,
 };
 
@@ -388,7 +220,7 @@ const showPage = (location: Location) => {
   const left = currentPage;
 
   // The Recordings page follows its search, such as a new day, in place
-  if (location.name === "recordings") playback.open(location.search);
+  if (location.name === "recordings") recordings.open(location.search);
 
   if (page === left) return;
 
@@ -412,10 +244,10 @@ const showPage = (location: Location) => {
 
   if (left === "live") live.stop();
 
-  if (left === "recordings") playback.pause();
+  if (left === "recordings") recordings.pause();
 
   // Arriving at a player, the keyboard controls work straight away
-  if (page === "recordings") requestAnimationFrame(playback.focus);
+  if (page === "recordings") requestAnimationFrame(recordings.focus);
 
   if (page === "live") requestAnimationFrame(live.focus);
 
@@ -476,13 +308,13 @@ const notifyItems: Record<Exclude<PushState, "unsupported">, MenuItem> = {
   default: {
     value: "notify",
     label: "Notify me",
-    description: "Alerts about the recorder, pushed to this browser",
+    description: "Alerts about your cameras, pushed to this browser",
     icon: bell,
   },
   subscribed: {
     value: "notify",
     label: "Notifying this browser",
-    description: "Alerts about the recorder are pushed here",
+    description: "Alerts about your cameras are pushed here",
     icon: bell,
     disabled: true,
   },
@@ -530,38 +362,36 @@ void pwa.worker.then(async (registration) => {
 });
 
 /** Every source connected, so their cameras are all known. */
-const allConnected = (sources: ReadonlyArray<SourceInfo> | null) =>
-  sources !== null && sources.every((source) => source.connection.connected);
+const allConnected = (list: ReadonlyArray<SourceInfo>) =>
+  list.every((source) => source.connection.connected);
 
 // Start once the sources are reachable, then keep the health fresh
 const start = async () => {
-  const sources = await showConnection();
+  const list = await showConnection();
 
-  if (sources === null || !allConnected(sources)) {
+  if (list === null || !allConnected(list)) {
     setTimeout(() => void start(), 5000);
 
     return;
   }
 
-  await showRecorder(sources);
-
+  // The cameras first, so every page labels them, such as "Ch 3"
   const known = await loadCameras();
   const recorded = known.filter((camera) => camera.recordings);
 
+  await showSources(list);
+
   cameras = known;
-  playback.start(today, recorded);
+  recordings.start(today, recorded);
 
   await Promise.all([
-    showAttention(),
     currentPage === "live" ? live.show(known) : undefined,
-    showEvents(),
-    showClips(recorded),
+    events.start(recorded, today),
   ]);
 
   setInterval(() => {
-    void showAttention();
     void showConnection().then((next) =>
-      next === null ? undefined : showRecorder(next),
+      next === null ? undefined : showSources(next),
     );
   }, 30_000);
 };

@@ -2,12 +2,12 @@
  * What the pages share: finding and making elements, dates and times in the
  * browser's language, and recordings as table rows with Play and Download.
  */
-import { RecordingReason, type Recording } from "@timmo001/kestrel-core/domain";
+import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
 import { phDownloadSimple, phPlay } from "./icons.ts";
-import { clipUrl, type Clip } from "./player.ts";
+import { clipUrl, type Clip } from "./recording-player.ts";
 
 /** Fields that take text: a toggle's radios don't, so keys pass them by. */
 export const typingTargets =

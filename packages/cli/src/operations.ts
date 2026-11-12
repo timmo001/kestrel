@@ -1,22 +1,21 @@
 /**
- * The operations the CLI and MCP server share, and the `Recorder` service
- * they run against: the server's API, at `KESTREL_SERVER`. Every
- * operation only reads from the sources; `download` also writes a file on
- * this machine, so it's marked as a write. It's CLI-only, as a video file
- * means nothing in an MCP reply. Cameras are named by id, such as
- * `swann/3`.
+ * The operations the CLI and MCP server share, and the `ServerClient` they
+ * run through: the server's API, at `KESTREL_SERVER`. Every operation only
+ * reads from the sources; `download` also writes a file on this machine,
+ * so it's marked as a write. It's CLI-only, as a video file means nothing
+ * in an MCP reply. Cameras are named by id, such as `swann/3`.
  *
  * @module
  */
-import { CameraId, cameraId } from "@timmo001/kestrel-core/domain";
+import { CameraId, cameraId, type SourceInfo } from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
 import { Config, Context, Effect, Layer, Option, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
-/** The server couldn't be reached, or couldn't reach a source, or the input doesn't read. */
-export class RecorderError extends Schema.TaggedError<RecorderError>()(
-  "RecorderError",
+/** The server couldn't be reached or couldn't reach a source, or the input doesn't read. */
+export class ClientError extends Schema.TaggedError<ClientError>()(
+  "ClientError",
   { message: Schema.String },
 ) {}
 
@@ -33,12 +32,13 @@ export const operations: ReadonlyArray<Operation> = [
   {
     name: "status",
     description:
-      "What needs you, each source's connection, and the recorder's clock, disks and each channel's state",
+      "What needs you, and each source's connection, clock, storage and cameras",
     access: "read",
   },
   {
-    name: "device",
-    description: "The recorder's name, firmware and channel count",
+    name: "details",
+    description:
+      "A source's details: its facts, clock, storage and each camera's state",
     access: "read",
   },
   {
@@ -65,7 +65,7 @@ export const operations: ReadonlyArray<Operation> = [
   },
   {
     name: "events",
-    description: "The newest motion, PIR, video loss and disk reports",
+    description: "The newest events, such as motion and PIR, from every source",
     access: "read",
   },
 ];
@@ -80,26 +80,27 @@ const makeClient = Effect.gen(function* () {
 
 type Client = Effect.Success<typeof makeClient>;
 
-export class Recorder extends Context.Service<
-  Recorder,
+/** The Kestrel server's API, as the CLI and MCP server call it. */
+export class ServerClient extends Context.Service<
+  ServerClient,
   {
-    /** Runs one call against the server, with its failures as a `RecorderError`. */
+    /** Runs one call against the server, with its failures as a `ClientError`. */
     readonly call: <A, E>(
       use: (client: Client) => Effect.Effect<A, E>,
-    ) => Effect.Effect<A, RecorderError>;
+    ) => Effect.Effect<A, ClientError>;
   }
->()("@timmo001/kestrel-cli/Recorder") {
+>()("@timmo001/kestrel-cli/ServerClient") {
   static readonly layer = Layer.effect(
-    Recorder,
+    ServerClient,
     Effect.gen(function* () {
       const client = yield* makeClient;
 
-      return Recorder.of({
+      return ServerClient.of({
         call: (use) =>
           use(client).pipe(
             Effect.mapError(
               (error) =>
-                new RecorderError({
+                new ClientError({
                   message:
                     error instanceof Error ? error.message : String(error),
                 }),
@@ -114,7 +115,7 @@ const decodeCameraId = Schema.decodeUnknownOption(CameraId);
 
 /**
  * A camera from a flag or a tool's parameter: its id, such as `swann/3`, or
- * while there's only one source, a bare number such as `3` for that
+ * while there's only one source, its own id, such as `3`, for that
  * source's camera.
  */
 export const resolveCamera = Effect.fn("resolveCamera")(function* (
@@ -124,26 +125,44 @@ export const resolveCamera = Effect.fn("resolveCamera")(function* (
 
   if (Option.isSome(id)) return id.value;
 
-  const sources = yield* (yield* Recorder).call((api) => api.sources.list());
+  const sources = yield* (yield* ServerClient).call((api) =>
+    api.sources.list(),
+  );
+
   const only = sources.length === 1 ? sources[0] : undefined;
 
   if (only !== undefined && /^[a-z0-9][a-z0-9-]*$/.test(value)) {
     return cameraId(only.id, value);
   }
 
-  return yield* new RecorderError({
+  return yield* new ClientError({
     message: `"${value}" isn't a camera: name it by id, such as swann/3; \`kestrel cameras\` lists them`,
   });
 });
 
-/** The first source with a device and status, such as the recorder. */
-export const recorderSource = Effect.fn("recorderSource")(function* () {
-  const sources = yield* (yield* Recorder).call((api) => api.sources.list());
-  const found = sources.find((source) => source.details);
+/**
+ * The source a flag or parameter names, or without one, the only source
+ * with details.
+ */
+export const resolveSource = Effect.fn("resolveSource")(function* (
+  named: Option.Option<string>,
+) {
+  const sources = yield* (yield* ServerClient).call((api) =>
+    api.sources.list(),
+  );
+
+  const withDetails = sources.filter((source) => source.details);
+
+  const found: SourceInfo | undefined = Option.match(named, {
+    onSome: (id) => sources.find((source) => source.id === id),
+    onNone: () => (withDetails.length === 1 ? withDetails[0] : undefined),
+  });
 
   if (found === undefined) {
-    return yield* new RecorderError({
-      message: "No source has a device and status to show",
+    return yield* new ClientError({
+      message: Option.isSome(named)
+        ? `There's no source ${named.value}; \`kestrel status\` lists them`
+        : "Name the source with --source; `kestrel status` lists them",
     });
   }
 

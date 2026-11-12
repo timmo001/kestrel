@@ -10,7 +10,7 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | Command                                                | Returns                                                     |
 | ------------------------------------------------------ | ----------------------------------------------------------- |
 | `kestrel status`                                       | What needs you, each source's connection and its state      |
-| `kestrel device`                                       | The recorder's name, firmware and channel count             |
+| `kestrel details -s <source>`                          | A source's facts, clock, storage and each camera's state    |
 | `kestrel cameras`                                      | Each camera's id, name and what it can do                   |
 | `kestrel recordings -c swann/1 -d <day>`               | A camera's recordings on one day, today by default          |
 | `kestrel download -c swann/1 -d <day> --from … --to …` | Saves that stretch as an MP4, across recordings             |
@@ -18,7 +18,8 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel events`                                       | The newest events                                           |
 
 `-c` takes a camera's id, such as `swann/1`; while there's one source, its
-camera's own id, such as `1`, is enough. `download` takes times of day on
+camera's own id, such as `1`, is enough. `details` shows the only source
+with details unless `-s` names one. `download` takes times of day on
 `--date`, such as `21:46` or `21:46:30`, or full ones such as
 `2026-11-11T21:46:30`. `--sub` saves the small sub stream, and `-o` names the
 file; by default it's named after the camera and start.
@@ -38,4 +39,4 @@ reply, so `download` stays in the CLI.
 
 `skills/kestrel/SKILL.md` tells an agent to use Code Mode first, then MCP,
 then the CLI, and how to read what comes back: start from `status`, and look
-for PIR and motion recordings when no alarm reports have come in.
+for PIR and motion recordings when no events have come in.

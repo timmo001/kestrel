@@ -6,43 +6,55 @@
  */
 import { BunStdio } from "@effect/platform-bun";
 import {
+  Attention,
   Camera,
+  CameraEvent,
   cameraParts,
-  DeviceInfo,
+  Details,
   LocalDate,
-  ReceivedEvent,
+  LocalMonth,
   RecordedDay,
-  RecorderStatus,
   Recording,
+  SourceId,
   SourceInfo,
-} from "@timmo001/kestrel-core/domain";
-import { Attention, LocalMonth } from "@timmo001/kestrel-server/api";
-import { Effect, Layer, Schema } from "effect";
+} from "@timmo001/kestrel-core";
+import { Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import {
-  Recorder,
-  RecorderError,
-  recorderSource,
+  ClientError,
   resolveCamera,
+  resolveSource,
+  ServerClient,
 } from "./operations.ts";
 
 const Status = Tool.make("status", {
   description:
-    "What needs you, each source's connection, and the recorder's clock, disks and each channel's state",
+    "What needs you, and each source's connection, clock, storage and cameras",
   success: Schema.Struct({
     sources: Schema.Array(SourceInfo),
     alerts: Schema.Number,
     attention: Schema.Array(Attention),
-    status: Schema.NullOr(RecorderStatus),
+    details: Schema.Array(
+      Schema.Struct({ source: SourceId, details: Details }),
+    ),
   }),
-  failure: RecorderError,
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
-const Device = Tool.make("device", {
-  description: "The recorder's name, firmware and channel count",
-  success: DeviceInfo,
-  failure: RecorderError,
+const DetailsTool = Tool.make("details", {
+  description:
+    "A source's details: its facts, clock, storage and each camera's state",
+  parameters: Schema.Struct({
+    source: Schema.optional(
+      Schema.String.annotate({
+        description:
+          "The source, such as swann; the only one with details by default",
+      }),
+    ),
+  }),
+  success: Details,
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
@@ -50,7 +62,7 @@ const Cameras = Tool.make("cameras", {
   description:
     "Every camera's id, name and what it can do, with its live stream names",
   success: Schema.Struct({ cameras: Schema.Array(Camera) }),
-  failure: RecorderError,
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
@@ -64,7 +76,7 @@ const Recordings = Tool.make("recordings", {
     date: LocalDate.annotate({ description: "The day, such as 2026-11-11" }),
   }),
   success: Schema.Struct({ recordings: Schema.Array(Recording) }),
-  failure: RecorderError,
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
@@ -74,73 +86,85 @@ const Days = Tool.make("days", {
     month: LocalMonth.annotate({ description: "The month, such as 2026-11" }),
   }),
   success: Schema.Struct({ days: Schema.Array(RecordedDay) }),
-  failure: RecorderError,
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
 const Events = Tool.make("events", {
-  description: "The newest motion, PIR, video loss and disk reports",
-  success: Schema.Struct({ events: Schema.Array(ReceivedEvent) }),
-  failure: RecorderError,
+  description: "The newest events, such as motion and PIR, from every source",
+  success: Schema.Struct({ events: Schema.Array(CameraEvent) }),
+  failure: ClientError,
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
-const Tools = Toolkit.make(Status, Device, Cameras, Recordings, Days, Events);
+const Tools = Toolkit.make(
+  Status,
+  DetailsTool,
+  Cameras,
+  Recordings,
+  Days,
+  Events,
+);
 
 const handlers = Effect.gen(function* () {
-  const recorder = yield* Recorder;
+  const client = yield* ServerClient;
 
   return Tools.of({
     status: Effect.fn("mcp.status")(function* () {
-      const sources = yield* recorder.call((api) => api.sources.list());
-      const attention = yield* recorder.call((api) => api.sources.attention());
+      const sources = yield* client.call((api) => api.sources.list());
+      const attention = yield* client.call((api) => api.attention.list());
 
-      const withDetails = sources.find(
-        (source) => source.details && source.connection.connected,
+      const details = yield* Effect.forEach(
+        sources.filter(
+          (source) => source.details && source.connection.connected,
+        ),
+        (source) =>
+          client
+            .call((api) =>
+              api.sources.details({ params: { source: source.id } }),
+            )
+            .pipe(
+              Effect.map((found) => ({ source: source.id, details: found })),
+            ),
       );
 
       return {
         sources,
         alerts: attention.filter((item) => item.level === "alert").length,
         attention,
-        status:
-          withDetails === undefined
-            ? null
-            : yield* recorder.call((api) =>
-                api.sources.status({ params: { source: withDetails.id } }),
-              ),
+        details,
       };
     }),
-    device: Effect.fn("mcp.device")(function* () {
-      const source = yield* recorderSource().pipe(
-        Effect.provideService(Recorder, recorder),
+    details: Effect.fn("mcp.details")(function* ({ source }) {
+      const found = yield* resolveSource(Option.fromUndefinedOr(source)).pipe(
+        Effect.provideService(ServerClient, client),
       );
 
-      return yield* recorder.call((api) =>
-        api.sources.device({ params: { source: source.id } }),
+      return yield* client.call((api) =>
+        api.sources.details({ params: { source: found.id } }),
       );
     }),
     cameras: () =>
-      recorder
+      client
         .call((api) => api.cameras.list())
         .pipe(Effect.map((list) => ({ cameras: list }))),
     recordings: Effect.fn("mcp.recordings")(function* ({ camera, date }) {
       const id = yield* resolveCamera(camera).pipe(
-        Effect.provideService(Recorder, recorder),
+        Effect.provideService(ServerClient, client),
       );
 
-      const list = yield* recorder.call((api) =>
+      const list = yield* client.call((api) =>
         api.cameras.recordings({ params: cameraParts(id), query: { date } }),
       );
 
       return { recordings: list };
     }),
     days: ({ month }) =>
-      recorder
-        .call((api) => api.cameras.days({ query: { month } }))
+      client
+        .call((api) => api.recordings.days({ query: { month } }))
         .pipe(Effect.map((list) => ({ days: list }))),
     events: () =>
-      recorder
+      client
         .call((api) => api.events.recent())
         .pipe(Effect.map((list) => ({ events: list }))),
   });

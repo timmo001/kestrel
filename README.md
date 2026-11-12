@@ -53,14 +53,14 @@ the settings, the API and the protocol.
 
 ## Parts
 
-- [`packages/core`](packages/core): what every source shares: the shapes it
-  reports and the service it provides, in TypeScript with
-  [Effect](https://effect.website)
-- [`packages/rsnet`](packages/rsnet): the Raysharp recorders' control
-  protocol
+- [`packages/core`](packages/core): what every source shares: how sources
+  and cameras are named, what they report and the interface each kind
+  implements, in TypeScript with [Effect](https://effect.website)
+- [`packages/protocol-raysharp`](packages/protocol-raysharp): the Raysharp
+  recorders' control protocol
 - [`packages/source-raysharp`](packages/source-raysharp): Raysharp recorders
   as a source, over that protocol and their RTSP streams
-- [`packages/server`](packages/server): the server, with go2rtc and the API
+- [`packages/server`](packages/server): the server, with the API and go2rtc
 - [`packages/web`](packages/web): the web client, installable on a phone
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and
   MCP for agents, and its [skill](skills/kestrel/SKILL.md)

@@ -20,14 +20,17 @@ and work that depends on one waits for it.
   paths, host names or addresses from anyone's network.
 - Recorder credentials are never printed, logged or passed on a command line.
 - Each part is a private Bun workspace package under `packages/<name>/`:
-  `core` holds what every source shares (the shapes, errors and the
-  `Recorder` service), `rsnet` is the protocol library, `source-raysharp`
-  provides the `Recorder` for Raysharp recorders, `server` runs go2rtc and
-  the API, `web` is the app and `cli` is the `kestrel` CLI with its Code
-  Mode and MCP surface. Its skill is `skills/kestrel/SKILL.md`; keep it in
-  step with the CLI's operations.
-- Recorder-specific code belongs in its source package, never in `server`,
-  `web` or `cli`.
+  `core` holds what every source shares (ids, shapes, errors and the
+  `Source` interface), `protocol-raysharp` is the Raysharp protocol
+  library, `source-raysharp` implements `Source` for Raysharp recorders,
+  `server` serves the API and runs go2rtc, `web` is the app and `cli` is the
+  `kestrel` CLI with its Code Mode and MCP surface. Its skill is
+  `skills/kestrel/SKILL.md`; keep it in step with the CLI's operations.
+- Name packages type first, then thing: `source-<kind>` for a source,
+  `protocol-<kind>` for a protocol library.
+- Anything only one kind of source has belongs in its own packages, never in
+  `core`, `server`, `web` or `cli`; those speak only in sources, cameras and
+  the general shapes in `core`.
 - Use mise-pinned tools and Bun. Pin dependencies to exact versions
   (`bun add -E`) and keep `bun.lock` in sync.
 - Open each hand-written source file with a short `/** */` header saying what
@@ -35,9 +38,9 @@ and work that depends on one waits for it.
 
 ## The protocol
 
-- `packages/rsnet` follows the vendor SDK's protocol header for message
-  numbers and layouts. Firmware SRV7.1.0 differs in places, and the comments
-  beside the parsers say where.
+- `packages/protocol-raysharp` follows the vendor SDK's protocol header for
+  message numbers and layouts. Firmware SRV7.1.0 differs in places, and the
+  comments beside the parsers say where.
 - Prefer layouts from the SDK header or existing open-source clients over
   guessing. Changes that touch the wire format need a check against a real
   recorder, since there's no simulator.

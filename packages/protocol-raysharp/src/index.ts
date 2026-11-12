@@ -11,4 +11,6 @@ export * as Messages from "./Messages.ts";
 
 export * as Recorded from "./Recorded.ts";
 
+export * from "./Reports.ts";
+
 export * as Session from "./Session.ts";

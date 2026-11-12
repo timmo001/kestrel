@@ -1,8 +1,8 @@
 /** Checks which recording each camera plays at a moment, and where playback runs on to. */
-import type { Recording } from "@timmo001/kestrel-core/domain";
+import type { Recording } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
 import { momentAt, nextMoment, recordingAt, type Track } from "./moments.ts";
-import { toSeconds } from "./player.ts";
+import { toSeconds } from "./recording-player.ts";
 
 const recording = (camera: string, begin: string, end: string): Recording => ({
   camera,

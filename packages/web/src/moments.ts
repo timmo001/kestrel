@@ -4,8 +4,8 @@
  * keeps the time, and the next moment any of them recorded. Plain functions
  * with no page in them, so they can be tested.
  */
-import type { CameraId, Recording } from "@timmo001/kestrel-core/domain";
-import { toSeconds } from "./player.ts";
+import type { CameraId, Recording } from "@timmo001/kestrel-core";
+import { toSeconds } from "./recording-player.ts";
 
 /** A camera and its day's recordings, earliest first. */
 export interface Track {

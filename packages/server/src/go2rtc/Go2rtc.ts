@@ -1,8 +1,8 @@
 /**
- * Live video through go2rtc. Browsers can't play RTSP, so the server runs
- * go2rtc beside it with every source's live streams, each camera's main and
- * sub stream, named from the camera's id, and the web client plays them
- * through the server, under `/go2rtc/`. The config holds the sources'
+ * The go2rtc process, which plays every camera live. Browsers can't play
+ * RTSP, so the server runs go2rtc beside it with every source's live
+ * streams, each camera's main and sub stream named from its id, and the
+ * proxy passes it through under `/go2rtc/`. The config holds the sources'
  * addresses, which can carry their logins, so it's written to a private
  * temporary file rather than passed on the command line, and go2rtc's own
  * logging is kept off.
@@ -22,8 +22,8 @@ import {
   Schedule,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { basePath } from "./Go2rtc.ts";
-import { Sources } from "./Sources.ts";
+import { Sources } from "../Sources.ts";
+import { basePath } from "./Proxy.ts";
 
 const restart = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
@@ -37,15 +37,15 @@ export const streamNames = (camera: CameraId, hasSub: boolean): LiveStreams => {
   return { main, sub: hasSub ? `${main}_sub` : null };
 };
 
-export class Video extends Context.Service<
-  Video,
+export class Go2rtc extends Context.Service<
+  Go2rtc,
   {
     /** The port go2rtc listens on, on 127.0.0.1. */
     readonly port: number;
   }
->()("@timmo001/kestrel-server/Video") {
+>()("@timmo001/kestrel-server/Go2rtc") {
   static readonly layer = Layer.effect(
-    Video,
+    Go2rtc,
     Effect.gen(function* () {
       const sources = yield* Sources;
       const fs = yield* FileSystem.FileSystem;
@@ -146,7 +146,7 @@ export class Video extends Context.Service<
 
       yield* Effect.forkScoped(run);
 
-      return Video.of({ port });
+      return Go2rtc.of({ port });
     }),
   );
 }

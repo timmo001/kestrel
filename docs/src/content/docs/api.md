@@ -15,13 +15,12 @@ recorder's channel 3, and its routes take the two as path segments.
 | Endpoint                                             | Returns                                                       |
 | ---------------------------------------------------- | ------------------------------------------------------------- |
 | `GET /api/sources`                                   | Each source: its kind, name and whether it's connected        |
-| `GET /api/sources/:source/device`                    | A recorder's name, firmware, MAC and channel count            |
-| `GET /api/sources/:source/status`                    | Its clock, disks and each channel's state                     |
+| `GET /api/sources/:source/details`                   | Its facts, clock, storage and each camera's state             |
 | `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source |
 | `GET /api/cameras`                                   | Each camera: its id, name and what it can do                  |
 | `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`        |
 | `GET /api/cameras/:source/:camera/video?…`           | Recorded video as MP4; see below                              |
-| `GET /api/days?month=…`                              | The days with recordings on any camera in a month             |
+| `GET /api/recordings/days?month=…`                   | The days with recordings on any camera in a month             |
 | `GET /api/events/`                                   | The last 200 events from each source, newest first            |
 | `GET /api/events/live`                               | Events as server-sent events                                  |
 | `GET /api/health`                                    | 204 while the server is up                                    |
@@ -32,11 +31,23 @@ say whether it has them; `signal` is whether it has a picture now, or `null`
 when its source can't tell. A source that isn't connected yet leaves its
 cameras out until it knows them.
 
+A source's details are general, so any source can fill them in: `facts` are
+labelled values, such as the recorder's name, firmware and channel count;
+`clock` is its own time, where it keeps one; `storage` lists each disk or
+card with its state; and `cameras` gives each camera's signal, what it's
+recording and whether there's motion now. A source with nothing to show
+returns 404 with `NotSupported`.
+
 `/api/attention` is the status source the CLI's `status`, the page and push
-read. Alerts are what needs you: a source can't be reached, a disk is bad or
-unformatted, or a camera that had a signal while the server ran has lost it.
-A full disk is passive, since the recorder records over its oldest
-recordings; the page shows it in the Disks card.
+read. Each source works out its own. Alerts are what needs you: a source
+can't be reached, a disk is bad or unformatted, or a camera that had a signal
+while the server ran has lost it. A full disk is passive, since the recorder
+records over its oldest recordings; the page shows it in the source's
+Storage card.
+
+An event in `/api/events` has its source, its camera where it's about one,
+its kind (such as `motion` or `PIR`), whether it started or ended, the
+source's own time for it, and when the server received it.
 
 Every endpoint that needs a source returns 503 with a `SourceUnavailable`
 error while it isn't connected. An id that names no source or camera returns

@@ -22,8 +22,8 @@ sessions, passes on what they report, and runs go2rtc for the video. See
 
 ## What it does
 
-- **Recorder health:** the recorder's clock, its disks, and each channel's
-  signal, recording mode and motion.
+- **Sources:** each source's connection and, for the recorder, its clock,
+  its disks, and each camera's signal, recording mode and motion.
 - **Recordings:** which days have recordings, and each day's clips on a
   channel, with why they were recorded (motion, PIR, alarm or normal) and
   their size. The player is laid out as the recorder's own client lays out
@@ -39,13 +39,13 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   recording, and the timeline has a track for each. They play the full
   stream while the recorder keeps up, about 14 times real time across them,
   and the sub stream past that.
-- **Pages:** Live, Recordings, Events and Recorder each have an address of
+- **Pages:** Live, Recordings, Events and Sources each have an address of
   their own, such as `/recordings?camera=swann/1&date=2026-11-11`, or
   `/recordings?camera=swann/1&cameras=swann/1,swann/3,swann/4&date=2026-11-11`
   for several cameras together. A camera's id is its source's and its own,
   such as `swann/3` for the recorder's channel 3. Older addresses by channel
   number still work.
-- **Events:** motion, PIR, video loss and disk reports as the recorder sends
+- **Events:** motion, PIR, video loss and disk events as each source reports
   them, and today's motion and PIR clips found by search.
 - **Live view:** the cameras with a signal through go2rtc, 1, 2, 3 or 4 at a
   time (and 6, 9 or 16 on bigger recorders, from the sub stream), paged with
@@ -55,15 +55,15 @@ sessions, passes on what they report, and runs go2rtc for the video. See
 
 ## Parts
 
-| Part                       | What it is                                                        |
-| -------------------------- | ----------------------------------------------------------------- |
-| `packages/core`            | What every source shares, in TypeScript with Effect               |
-| `packages/rsnet`           | The Raysharp recorders' control protocol                          |
-| `packages/source-raysharp` | Raysharp recorders as a source, over that protocol and their RTSP |
-| `packages/server`          | The server: go2rtc and the [API](/api)                            |
-| `packages/web`             | The web client, installable on a phone                            |
-| `packages/cli`             | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents)   |
-| `docs`                     | This site                                                         |
+| Part                         | What it is                                                        |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `packages/core`              | What every source shares, in TypeScript with Effect               |
+| `packages/protocol-raysharp` | The Raysharp recorders' control protocol                          |
+| `packages/source-raysharp`   | Raysharp recorders as a source, over that protocol and their RTSP |
+| `packages/server`            | The server: the [API](/api) and go2rtc                            |
+| `packages/web`               | The web client, installable on a phone                            |
+| `packages/cli`               | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents)   |
+| `docs`                       | This site                                                         |
 
 ## Machine-readable docs
 

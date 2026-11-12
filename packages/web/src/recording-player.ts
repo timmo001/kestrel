@@ -1,5 +1,5 @@
 /**
- * The recordings player. It plays the server's MP4 of a recording through
+ * One camera's recording player. It plays the server's MP4 of a recording through
  * Media Source Extensions rather than a plain video source: the length is
  * known from the start, a seek past what's loaded asks the server for video
  * from there, and only a few minutes around the playhead stay in memory, as

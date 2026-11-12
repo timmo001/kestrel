@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { Option, Schema } from "effect";
 import { newAddress, SavedCamera } from "./addresses.ts";
 
-const pages = new Set(["live", "recordings", "events", "recorder"]);
+const pages = new Set(["live", "recordings", "events", "sources"]);
 
 const moved = (address: string) =>
   newAddress(new URL(address, "https://kestrel.localhost"), pages);
@@ -25,6 +25,11 @@ test("current addresses stay as they are", () => {
 
 test("old hash addresses go to their page", () => {
   expect(moved("/#events")).toBe("/events");
+});
+
+test("the Recorder page's addresses go to Sources", () => {
+  expect(moved("/recorder")).toBe("/sources");
+  expect(moved("/#recorder")).toBe("/sources");
 });
 
 test("a saved channel number reads as the recorder's camera, and an id as itself", () => {

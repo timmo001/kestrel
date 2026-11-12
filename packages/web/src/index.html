@@ -31,8 +31,8 @@
       <a class="nav-link" href="/events" data-page="events"
         ><span>Events</span></a
       >
-      <a class="nav-link" href="/recorder" data-page="recorder"
-        ><span>Recorder</span></a
+      <a class="nav-link" href="/sources" data-page="sources"
+        ><span>Sources</span></a
       >
       <!-- Reset is left out: Base and Auto are picked like any other -->
       <gw-theme-picker slot="actions" no-import no-reset></gw-theme-picker>
@@ -352,17 +352,17 @@
           ></gw-table>
         </section>
 
-        <!-- Events: alarm reports as they arrive, and today's clips -->
+        <!-- Events: events as they arrive, and today's clips -->
         <section class="page" data-page="events" hidden>
           <gw-page-header heading="Events" level="2"></gw-page-header>
           <gw-stack>
             <gw-table
               class="events"
-              label="Alarm reports"
+              label="Events"
               row-key="receivedAt"
               sort="receivedAt"
               descending
-              empty-label="No alarm reports since the server started"
+              empty-label="No events since the server started"
             ></gw-table>
             <gw-table
               class="clips"
@@ -375,30 +375,12 @@
           </gw-stack>
         </section>
 
-        <!-- Recorder: device facts, disks and each channel's state -->
-        <section class="page" data-page="recorder" hidden>
-          <gw-page-header heading="Recorder" level="2"></gw-page-header>
-          <gw-stack>
-            <gw-grid style="--gw-grid-min: 20rem">
-              <gw-card
-                heading="Device"
-                class="device"
-                loading
-                lines="4"
-              ></gw-card>
-              <gw-card
-                heading="Disks"
-                class="disks"
-                loading
-                lines="1"
-              ></gw-card>
-            </gw-grid>
-            <gw-table
-              class="channels"
-              label="Channels"
-              row-key="channel"
-              search="never"
-            ></gw-table>
+        <!-- Sources: each source's connection, and its details where it has
+             them, such as a recorder's device, disks and cameras -->
+        <section class="page" data-page="sources" hidden>
+          <gw-page-header heading="Sources" level="2"></gw-page-header>
+          <gw-stack class="source-list">
+            <gw-card heading="Sources" loading lines="4"></gw-card>
           </gw-stack>
         </section>
 

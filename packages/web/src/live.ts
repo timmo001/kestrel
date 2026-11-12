@@ -6,7 +6,7 @@
  * browser. The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { Camera } from "@timmo001/kestrel-core/domain";
+import type { Camera } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";

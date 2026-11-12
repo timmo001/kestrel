@@ -1,27 +1,24 @@
 /**
  * What a source kind implements, such as the Raysharp recorder: its
- * connection, its cameras and where go2rtc reads their live streams, and
- * the capabilities only some sources have, each optional: recordings,
- * events, and details such as a recorder's device and status. A camera is
- * named by its id within the source here, such as `3` for `swann/3`.
+ * connection and what needs you about it, its cameras and where go2rtc
+ * reads their live streams, and the capabilities only some sources have,
+ * each optional: recordings, events and details. Cameras are named by their
+ * full id, such as `swann/3`.
  *
  * @module
  */
 import type { Effect, Redacted, Stream } from "effect";
+import type { Attention, Details } from "./Details.ts";
 import type {
-  CameraId,
-  Connection,
-  DeviceInfo,
-  LocalTime,
   NoRecordings,
-  ReceivedEvent,
-  RecordedDay,
-  RecorderStatus,
-  Recording,
-  SourceId,
   SourceUnavailable,
   UnknownCamera,
-} from "./Domain.ts";
+} from "./Errors.ts";
+import type { CameraEvent } from "./Events.ts";
+import type { CameraId, SourceId } from "./Ids.ts";
+import type { RecordedDay, Recording } from "./Recordings.ts";
+import type { Connection } from "./Sources.ts";
+import type { LocalTime } from "./Times.ts";
 
 /** One frame of recorded H.264 video. */
 export interface RecordedFrame {
@@ -72,7 +69,7 @@ export interface SourceRecordings {
   ) => Effect.Effect<Array<RecordedDay>, SourceUnavailable>;
   /** A camera's recordings on one day, such as `2026-11-11`. */
   readonly list: (
-    camera: string,
+    camera: CameraId,
     date: string,
   ) => Effect.Effect<Array<Recording>, SourceUnavailable | UnknownCamera>;
   /**
@@ -81,7 +78,7 @@ export interface SourceRecordings {
    * when nothing was recorded then.
    */
   readonly video: (options: {
-    readonly camera: string;
+    readonly camera: CameraId;
     readonly begin: LocalTime;
     readonly end: LocalTime;
     readonly stream: "main" | "sub";
@@ -95,15 +92,9 @@ export interface SourceRecordings {
 /** Events, for a source that reports them. */
 export interface SourceEvents {
   /** The newest, newest first. */
-  readonly recent: Effect.Effect<ReadonlyArray<ReceivedEvent>>;
+  readonly recent: Effect.Effect<ReadonlyArray<CameraEvent>>;
   /** Each as it arrives. */
-  readonly live: Stream.Stream<ReceivedEvent>;
-}
-
-/** A device and its status, for a source that has them, such as a recorder. */
-export interface SourceDetails {
-  readonly device: Effect.Effect<DeviceInfo, SourceUnavailable>;
-  readonly status: Effect.Effect<RecorderStatus, SourceUnavailable>;
+  readonly live: Stream.Stream<CameraEvent>;
 }
 
 export interface Source {
@@ -112,11 +103,14 @@ export interface Source {
   readonly kind: string;
   readonly name: string;
   readonly connection: Effect.Effect<Connection>;
+  /** What needs you about it now, such as a lost connection or a bad disk. */
+  readonly attention: Effect.Effect<ReadonlyArray<Attention>>;
   /** Its cameras. Fails until it knows them, such as before a recorder's first login. */
   readonly cameras: Effect.Effect<ReadonlyArray<CameraInfo>, SourceUnavailable>;
   /** Where go2rtc reads each camera's live streams; fails as `cameras` does. */
   readonly live: Effect.Effect<ReadonlyArray<LiveFeed>, SourceUnavailable>;
   readonly recordings?: SourceRecordings;
   readonly events?: SourceEvents;
-  readonly details?: SourceDetails;
+  /** What it shows about itself, such as a recorder's device, disks and channels. */
+  readonly details?: Effect.Effect<Details, SourceUnavailable>;
 }

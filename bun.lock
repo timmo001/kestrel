@@ -66,8 +66,8 @@
         "typescript": "7.0.2",
       },
     },
-    "packages/rsnet": {
-      "name": "@timmo001/kestrel-rsnet",
+    "packages/protocol-raysharp": {
+      "name": "@timmo001/kestrel-protocol-raysharp",
       "version": "0.0.0",
       "dependencies": {
         "@effect/platform-node-shared": "4.1.4",
@@ -112,7 +112,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@timmo001/kestrel-core": "workspace:*",
-        "@timmo001/kestrel-rsnet": "workspace:*",
+        "@timmo001/kestrel-protocol-raysharp": "workspace:*",
         "effect": "4.1.4",
       },
       "devDependencies": {
@@ -797,7 +797,7 @@
 
     "@timmo001/kestrel-core": ["@timmo001/kestrel-core@workspace:packages/core"],
 
-    "@timmo001/kestrel-rsnet": ["@timmo001/kestrel-rsnet@workspace:packages/rsnet"],
+    "@timmo001/kestrel-protocol-raysharp": ["@timmo001/kestrel-protocol-raysharp@workspace:packages/protocol-raysharp"],
 
     "@timmo001/kestrel-server": ["@timmo001/kestrel-server@workspace:packages/server"],
 

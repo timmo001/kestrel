@@ -14,7 +14,7 @@ import {
   type Camera,
   type CameraId,
   type Recording,
-} from "@timmo001/kestrel-core/domain";
+} from "@timmo001/kestrel-core";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { isText, keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
@@ -39,7 +39,7 @@ import {
   phSkipForward,
   phStop,
 } from "./icons.ts";
-import { mostCameras, playerGroup } from "./group.ts";
+import { mostCameras, playerGroup } from "./player-group.ts";
 import { nextMoment, previousMoment, type Track } from "./moments.ts";
 import {
   clipUrl,
@@ -48,7 +48,7 @@ import {
   toSeconds,
   type Clip,
   type View,
-} from "./player.ts";
+} from "./recording-player.ts";
 import type { RecordingsSearch } from "./router.ts";
 import {
   actionsColumn,
@@ -212,12 +212,12 @@ const save = (href: string, name?: string) => {
   link.click();
 };
 
-export interface PlaybackOptions {
+export interface RecordingsOptions {
   /** Asks to show cameras and a day: the page follows once the address does. */
   readonly onPick: (search: RecordingsSearch) => void;
 }
 
-export interface PlaybackPage {
+export interface RecordingsPage {
   /** The cameras with recordings, and the last day, which is the default one. */
   readonly start: (today: string, cameras: ReadonlyArray<Camera>) => void;
   /** Shows what the address asks for: cameras, a day and a time to play. */
@@ -229,7 +229,7 @@ export interface PlaybackPage {
 }
 
 /** The Recordings page, wired to its elements. */
-export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
+export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const dayPicker = find("gw-date-picker", "day");
   const previousDay = find("gw-button", "day-previous");
   const nextDay = find("gw-button", "day-next");
@@ -1055,7 +1055,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   /** The days with recordings on any camera in a month, such as `2026-11`. */
   const recordedDaysIn = async (month: string) =>
     (
-      await call((api) => api.cameras.days({ query: { month } })).catch(
+      await call((api) => api.recordings.days({ query: { month } })).catch(
         () => [],
       )
     ).map((recorded) => recorded.date);
