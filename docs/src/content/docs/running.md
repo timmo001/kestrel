@@ -151,6 +151,22 @@ to use it from a phone, and `KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and
 login, so only listen where everyone
 who can reach it should see the cameras and change its sources.
 
+## Recording cameras
+
+The server can record cameras itself, for those whose source keeps no
+recordings of its own, such as a Reolink camera or a stream. It needs
+`ffmpeg` installed. Each picked camera's main stream is read from go2rtc,
+so the camera serves one connection however many watch or record it, and
+saved unchanged, video only, as 5-minute MP4 files in
+`recordings/<source>/<camera>/<day>/` in the state folder, or a folder you
+choose, such as a share on a NAS. Each hour, days older than the ones kept
+are deleted: 14 by default. Only folders the server records into are
+touched, so a shared folder is safe.
+
+The cameras, folder and days are saved in `sources.json` under
+`recording`, beside the rest of the settings, so every client sees the
+same ones.
+
 After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
 1Password to be unlocked.
@@ -164,6 +180,7 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 | `KESTREL_GO2RTC_PORT`      | `1984`                   | go2rtc's port                                 |
 | `KESTREL_GO2RTC_RTSP_PORT` | `1985`                   | go2rtc's RTSP port, on 127.0.0.1 only         |
 | `KESTREL_GO2RTC`           | `go2rtc`                 | The go2rtc binary                             |
+| `KESTREL_FFMPEG`           | `ffmpeg`                 | The ffmpeg binary, for recording cameras      |
 | `KESTREL_WEB`              | `packages/web/dist`      | The built web client                          |
 | `KESTREL_CONFIG`           | `~/.config/kestrel`      | Where `sources.json` is kept                  |
-| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions are kept             |
+| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions and recordings go    |

@@ -8,6 +8,7 @@
  * new one.
  */
 import {
+  defaultRecordingDays,
   SourceId,
   type Camera,
   type KindInfo,
@@ -452,6 +453,11 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       label.trim() === "" ? [] : [{ camera, label: label.trim() }],
     ),
     order,
+    recording: saved?.recording ?? {
+      cameras: [],
+      folder: null,
+      days: defaultRecordingDays,
+    },
     revision,
   });
 

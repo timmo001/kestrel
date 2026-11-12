@@ -13,6 +13,7 @@ import { Go2rtc } from "./go2rtc/Go2rtc.ts";
 import * as Proxy from "./go2rtc/Proxy.ts";
 import { routes } from "./Handlers.ts";
 import { Push } from "./Push.ts";
+import * as Recording from "./Recording.ts";
 import { Sources } from "./Sources.ts";
 
 /**
@@ -89,6 +90,7 @@ export const layer = (options: ServeOptions) =>
     Layer.provide(
       BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
     ),
+    Layer.merge(Recording.layer),
     Layer.provide([Go2rtc.layer, Attention.layer]),
     Layer.provide(Push.layer),
     // Last, so the routes and go2rtc share one connection to each source.

@@ -224,6 +224,14 @@ const sources = Command.make(
     if (settings.order.length > 0) {
       yield* Console.log(`Camera order  ${settings.order.join(", ")}`);
     }
+
+    const recording = settings.recording;
+
+    yield* Console.log(
+      recording.cameras.length === 0
+        ? `Recording  none, keeping ${recording.days} days`
+        : `Recording  ${recording.cameras.join(", ")} to ${recording.folder ?? "the state folder"}, keeping ${recording.days} days`,
+    );
   }),
 ).pipe(
   Command.withDescription(

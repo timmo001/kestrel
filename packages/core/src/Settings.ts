@@ -83,6 +83,29 @@ export const CameraLabel = Schema.Struct({
 
 export interface CameraLabel extends Schema.Schema.Type<typeof CameraLabel> {}
 
+/** How many days of recordings are kept when you haven't said. */
+export const defaultRecordingDays = 14;
+
+/** What the server records itself: which cameras, where, and for how long. */
+export const RecordingSettings = Schema.Struct({
+  /** The cameras it records, by id. */
+  cameras: Schema.Array(CameraId).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  /** The folder recordings go in; `null` for `recordings` in the state folder. */
+  folder: Schema.NullOr(Schema.String).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(null)),
+  ),
+  /** How many days back are kept, besides today. */
+  days: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultRecordingDays)),
+  ),
+});
+
+export interface RecordingSettings extends Schema.Schema.Type<
+  typeof RecordingSettings
+> {}
+
 /** Every source and camera label, as the sources file keeps them. */
 export const Settings = Schema.Struct({
   sources: Schema.Array(SourceSettings),
@@ -93,6 +116,10 @@ export const Settings = Schema.Struct({
    */
   order: Schema.Array(CameraId).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  /** What the server records itself. */
+  recording: RecordingSettings.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed({})),
   ),
   /**
    * Which version of the settings these are, as they're read back. A save

@@ -106,6 +106,7 @@ const forFile = (settings: Settings) => ({
   })),
   cameras: settings.cameras,
   order: settings.order,
+  recording: settings.recording,
 });
 
 /** Which version of the settings these are: a hash of them as the file keeps them. */
@@ -144,6 +145,7 @@ export const shown = (
   }),
   cameras: settings.cameras,
   order: settings.order,
+  recording: settings.recording,
   revision: revisionOf(settings),
 });
 
@@ -191,6 +193,13 @@ export const restored = (
   order: incoming.order.filter(
     (camera, index) => incoming.order.indexOf(camera) === index,
   ),
+  recording: {
+    cameras: incoming.recording.cameras.filter(
+      (camera, index) => incoming.recording.cameras.indexOf(camera) === index,
+    ),
+    folder: incoming.recording.folder?.trim() || null,
+    days: incoming.recording.days,
+  },
 });
 
 /** The required fields a set of values leaves out or empty. */

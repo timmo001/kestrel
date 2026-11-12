@@ -11,7 +11,12 @@
  *
  * @module
  */
-import type { LiveFeed, LiveStreams, Source } from "@timmo001/kestrel-core";
+import type {
+  CameraId,
+  LiveFeed,
+  LiveStreams,
+  Source,
+} from "@timmo001/kestrel-core";
 import {
   Config,
   Context,
@@ -36,9 +41,12 @@ const restart = Schedule.min([
 /** How often the sources' streams are read again, since a source doesn't say when it's ready. */
 const checkEvery = Duration.seconds(5);
 
+/** A camera's main go2rtc stream name, such as `swann_3`. */
+export const mainStream = (camera: CameraId) => camera.replace("/", "_");
+
 /** A camera's go2rtc stream names, such as `swann_3` and `swann_3_sub`, and how to draw its sub stream. */
 export const streamNames = (feed: LiveFeed): LiveStreams => {
-  const main = feed.camera.replace("/", "_");
+  const main = mainStream(feed.camera);
 
   return {
     main,

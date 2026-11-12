@@ -71,7 +71,10 @@ login is planned for when remote access arrives, in
   and recorders, over their HTTP API and RTSP streams
 - [`packages/source-bambu`](packages/source-bambu): the camera in a Bambu Lab
   P1 or A1 printer, over its own picture feed
-- [`packages/server`](packages/server): the server, with the API and go2rtc
+- [`packages/nvr`](packages/nvr): records cameras' streams to disk with
+  ffmpeg, in short files by day, and clears out old days
+- [`packages/server`](packages/server): the server, with the API, go2rtc and
+  recording
 - [`packages/web`](packages/web): the web client, installable on a phone
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and
   MCP for agents, and its [skill](skills/kestrel/SKILL.md)

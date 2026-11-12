@@ -10,6 +10,7 @@
  * @module
  */
 import {
+  defaultRecordingDays,
   InvalidSettings,
   NotSupported,
   SourceUnavailable,
@@ -18,6 +19,7 @@ import {
   type CameraLabel,
   type Kind,
   type KindInfo,
+  type RecordingSettings,
   type Settings,
   type Source,
   type SourceSettings,
@@ -66,6 +68,7 @@ const firstSettings: Settings = {
   ],
   cameras: [],
   order: [],
+  recording: { cameras: [], folder: null, days: defaultRecordingDays },
 };
 
 /** A source that couldn't start, listed with the reason and nothing else. */
@@ -120,6 +123,8 @@ export class Sources extends Context.Service<
     readonly labels: Effect.Effect<ReadonlyArray<CameraLabel>>;
     /** The order you gave cameras, by id; those it leaves out follow. */
     readonly order: Effect.Effect<ReadonlyArray<CameraId>>;
+    /** What the server records itself, then again each time a save changes it. */
+    readonly recording: Stream.Stream<RecordingSettings>;
     /** The settings as they're read back, with secrets left out. */
     readonly settings: Effect.Effect<Settings>;
     /**
@@ -283,6 +288,10 @@ export class Sources extends Context.Service<
         kinds: kindInfos,
         labels: current.pipe(Effect.map(({ settings }) => settings.cameras)),
         order: current.pipe(Effect.map(({ settings }) => settings.order)),
+        recording: SubscriptionRef.changes(state).pipe(
+          Stream.map(({ settings }) => settings.recording),
+          Stream.changesWith((a, b) => Equal.equals(a, b)),
+        ),
         settings: current.pipe(
           Effect.map(({ settings }) => SourcesFile.shown(kindInfos, settings)),
         ),
