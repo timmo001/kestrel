@@ -33,7 +33,7 @@ const json = Flag.Boolean("json").pipe(
 type Output =
   | {
       readonly connection: Connection;
-      /** How many items need you: the count a bar shows. */
+      /** How many alerts there are, for scripts that only need the count. */
       readonly alerts: number;
       readonly attention: ReadonlyArray<Attention>;
       readonly status: RecorderStatus | null;

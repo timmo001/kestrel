@@ -52,8 +52,8 @@ export const Connection = Schema.Struct({
 export interface Connection extends Schema.Schema.Type<typeof Connection> {}
 
 /**
- * Something about the recorder that needs you. An alert is counted wherever
- * the status shows, such as a bar; a passive one is only listed.
+ * Something about the recorder that needs you. An alert is pushed and
+ * counted; a passive one is only listed.
  */
 export const Attention = Schema.Struct({
   level: Schema.Literals(["alert", "passive"]),
@@ -84,7 +84,7 @@ export interface VideoSources extends Schema.Schema.Type<typeof VideoSources> {}
 export class RecorderGroup extends HttpApiGroup.make("recorder")
   .add(
     HttpApiEndpoint.get("connection", "/connection", { success: Connection }),
-    /** What needs you: the status source the CLI, the page and any bar read. */
+    /** What needs you: the status source the CLI, the page and push read. */
     HttpApiEndpoint.get("attention", "/attention", {
       success: Schema.Array(Attention),
     }),

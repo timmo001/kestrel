@@ -1,8 +1,9 @@
 /**
  * What needs you about the recorder, worked out from its connection and a
- * status read every minute: the one status source the CLI, the page and any
- * bar read. Each alert is pushed to subscribed phones once, when it starts. Only a camera that had a signal while the server ran counts when
- * its signal goes, so empty channels don't.
+ * status read every minute: the one status source the CLI and the page read.
+ * Each alert is pushed to subscribed phones once, when it starts. Only a
+ * camera that had a signal while the server ran counts when its signal goes,
+ * so empty channels don't.
  *
  * @module
  */

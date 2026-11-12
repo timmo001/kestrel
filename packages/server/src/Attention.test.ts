@@ -1,4 +1,4 @@
-/** Checks which recorder states need you, which a bar counts. */
+/** Checks which recorder states need you, which are pushed as alerts. */
 import type { ChannelStatus } from "@timmo001/dvr-revival-rsnet/domain";
 import { expect, test } from "bun:test";
 import { attentionFor } from "./Attention.ts";

@@ -21,11 +21,11 @@ they're the recorder's own clock, as it keeps them, such as
 | `GET /api/video/sources`               | Where go2rtc is served, and each channel's stream names         |
 | `GET /api/health`                      | 204 while the server is up                                      |
 
-`/api/attention` is the status source the CLI's `status`, the page and any bar
+`/api/attention` is the status source the CLI's `status`, the page and push
 read. Alerts are what needs you: the recorder can't be reached, a disk is bad
 or unformatted, or a camera that had a signal while the server ran has lost
 it. A full disk is passive, since the recorder records over its oldest
-recordings. A bar shows the count of alerts.
+recordings; the page shows it in the Disks card.
 
 Every endpoint that needs the recorder returns 503 with a
 `RecorderUnavailable` error while the server isn't logged in.
