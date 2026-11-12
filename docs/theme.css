@@ -1,11 +1,11 @@
 /*
- * The docs site's styles: docs-kit's Blume theme with Groundwork's Base by
- * default and every other theme to pick, as the app offers
- * (timmo001/kestrel#7), with each theme's fonts. A browser only
- * downloads the fonts in use.
+ * The docs site's styles: docs-kit's Blume theme with Kestrel's own theme by
+ * default and every Groundwork theme to pick, as the app offers, with each
+ * theme's fonts. A browser only downloads the fonts in use. Kestrel's theme
+ * is written in below by scripts/theme.ts, from the app's
+ * kestrel.theme.json.
  */
 @import "@timmo001/docs-kit/blume/theme.css";
-@import "@timmo001/docs-kit/blume/themes/base.css";
 @import "@timmo001/docs-kit/blume/themes/all.css";
 
 @import "@fontsource-variable/mona-sans";
@@ -13,3 +13,172 @@
 @import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
 @import "@fontsource-variable/jetbrains-mono";
+
+/* kestrel.theme.json, rendered by scripts/theme.ts: start */
+:root {
+  --blume-radius: 10px;
+  --blume-font-body: "Mona Sans Variable", "Mona Sans", system-ui, sans-serif;
+  --blume-font-display:
+    "Mona Sans Variable", "Mona Sans", system-ui, sans-serif;
+  --blume-font-mono:
+    "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+  --blume-background: oklch(97.5% 0.0088 261.66);
+  --blume-foreground: oklch(37.2% 0.0058 261.66);
+  --blume-muted: oklch(96.3% 0.0088 261.66);
+  --blume-muted-foreground: oklch(52.9% 0.0058 261.66);
+  --blume-border: oklch(89.5% 0.0088 261.66);
+  --blume-accent: oklch(51.98% 0.1184 49.7);
+  --blume-accent-foreground: oklch(100% 0 0);
+  --blume-action: oklch(24% 0.0058 261.66);
+  --blume-action-foreground: oklch(99.5% 0.0024 261.66);
+  --blume-code-background: oklch(99.5% 0.0024 261.66);
+  --blume-code-highlight: oklch(51.8% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(51.8% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(50.55% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(50.55% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(53.41% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(53.41% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(53.41% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(53.41% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(52.08% 0.1075 81.96 / 0.14);
+  --blume-code-warning-border: oklch(52.08% 0.1075 81.96 / 0.45);
+  --blume-code-word: oklch(51.8% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(51.8% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(51.98% 0.1184 49.7);
+}
+
+:root[data-theme="dark"] {
+  --blume-background: oklch(21.68% 0.0146 261.66);
+  --blume-foreground: oklch(87.09% 0.0058 261.66);
+  --blume-muted: oklch(20.18% 0.0146 261.66);
+  --blume-muted-foreground: oklch(68.07% 0.0058 261.66);
+  --blume-border: oklch(35.68% 0.0146 261.66);
+  --blume-accent: oklch(71.08% 0.1184 49.7);
+  --blume-accent-foreground: oklch(15% 0 0);
+  --blume-action: oklch(93% 0.0058 261.66);
+  --blume-action-foreground: oklch(21.68% 0.0146 261.66);
+  --blume-code-background: oklch(26.68% 0.0146 261.66);
+  --blume-code-highlight: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(67.71% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(67.71% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(80.42% 0.1602 81.96 / 0.14);
+  --blume-code-warning-border: oklch(80.42% 0.1602 81.96 / 0.45);
+  --blume-code-word: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(71.08% 0.1184 49.7);
+}
+
+:root[data-theme="dark"][data-gw-darker] {
+  --blume-background: oklch(20.18% 0.0146 261.66);
+  --blume-foreground: oklch(87.09% 0.0058 261.66);
+  --blume-muted: oklch(18.68% 0.0146 261.66);
+  --blume-muted-foreground: oklch(68.07% 0.0058 261.66);
+  --blume-border: oklch(43.68% 0.0146 261.66);
+  --blume-accent: oklch(71.08% 0.1184 49.7);
+  --blume-accent-foreground: oklch(15% 0 0);
+  --blume-action: oklch(93% 0.0058 261.66);
+  --blume-action-foreground: oklch(20.18% 0.0146 261.66);
+  --blume-code-background: oklch(25.18% 0.0146 261.66);
+  --blume-code-highlight: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(67.71% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(67.71% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(80.42% 0.1602 81.96 / 0.14);
+  --blume-code-warning-border: oklch(80.42% 0.1602 81.96 / 0.45);
+  --blume-code-word: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(71.08% 0.1184 49.7);
+}
+:root[data-gw-docs-theme="kestrel"] {
+  --blume-radius: 10px;
+  --blume-font-body: "Mona Sans Variable", "Mona Sans", system-ui, sans-serif;
+  --blume-font-display:
+    "Mona Sans Variable", "Mona Sans", system-ui, sans-serif;
+  --blume-font-mono:
+    "Geist Mono Variable", "Geist Mono", ui-monospace, monospace;
+  --blume-background: oklch(97.5% 0.0088 261.66);
+  --blume-foreground: oklch(37.2% 0.0058 261.66);
+  --blume-muted: oklch(96.3% 0.0088 261.66);
+  --blume-muted-foreground: oklch(52.9% 0.0058 261.66);
+  --blume-border: oklch(89.5% 0.0088 261.66);
+  --blume-accent: oklch(51.98% 0.1184 49.7);
+  --blume-accent-foreground: oklch(100% 0 0);
+  --blume-action: oklch(24% 0.0058 261.66);
+  --blume-action-foreground: oklch(99.5% 0.0024 261.66);
+  --blume-code-background: oklch(99.5% 0.0024 261.66);
+  --blume-code-highlight: oklch(51.8% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(51.8% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(50.55% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(50.55% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(53.41% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(53.41% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(53.41% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(53.41% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(52.08% 0.1075 81.96 / 0.14);
+  --blume-code-warning-border: oklch(52.08% 0.1075 81.96 / 0.45);
+  --blume-code-word: oklch(51.8% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(51.8% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(51.98% 0.1184 49.7);
+}
+
+:root[data-gw-docs-theme="kestrel"][data-theme="dark"] {
+  --blume-background: oklch(21.68% 0.0146 261.66);
+  --blume-foreground: oklch(87.09% 0.0058 261.66);
+  --blume-muted: oklch(20.18% 0.0146 261.66);
+  --blume-muted-foreground: oklch(68.07% 0.0058 261.66);
+  --blume-border: oklch(35.68% 0.0146 261.66);
+  --blume-accent: oklch(71.08% 0.1184 49.7);
+  --blume-accent-foreground: oklch(15% 0 0);
+  --blume-action: oklch(93% 0.0058 261.66);
+  --blume-action-foreground: oklch(21.68% 0.0146 261.66);
+  --blume-code-background: oklch(26.68% 0.0146 261.66);
+  --blume-code-highlight: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(67.71% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(67.71% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(80.42% 0.1602 81.96 / 0.14);
+  --blume-code-warning-border: oklch(80.42% 0.1602 81.96 / 0.45);
+  --blume-code-word: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(71.08% 0.1184 49.7);
+}
+
+:root[data-gw-docs-theme="kestrel"][data-theme="dark"][data-gw-darker] {
+  --blume-background: oklch(20.18% 0.0146 261.66);
+  --blume-foreground: oklch(87.09% 0.0058 261.66);
+  --blume-muted: oklch(18.68% 0.0146 261.66);
+  --blume-muted-foreground: oklch(68.07% 0.0058 261.66);
+  --blume-border: oklch(43.68% 0.0146 261.66);
+  --blume-accent: oklch(71.08% 0.1184 49.7);
+  --blume-accent-foreground: oklch(15% 0 0);
+  --blume-action: oklch(93% 0.0058 261.66);
+  --blume-action-foreground: oklch(20.18% 0.0146 261.66);
+  --blume-code-background: oklch(25.18% 0.0146 261.66);
+  --blume-code-highlight: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-highlight-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --blume-code-add: oklch(67.71% 0.1299 150.03 / 0.14);
+  --blume-code-add-border: oklch(67.71% 0.1299 150.03 / 0.45);
+  --blume-code-remove: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-remove-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-error: oklch(70.51% 0.13 25.52 / 0.14);
+  --blume-code-error-border: oklch(70.51% 0.13 25.52 / 0.45);
+  --blume-code-warning: oklch(80.42% 0.1602 81.96 / 0.14);
+  --blume-code-warning-border: oklch(80.42% 0.1602 81.96 / 0.45);
+  --blume-code-word: oklch(68.78% 0.1197 249.65 / 0.14);
+  --blume-code-word-border: oklch(68.78% 0.1197 249.65 / 0.45);
+  --gw-docs-link: oklch(71.08% 0.1184 49.7);
+}
+/* kestrel.theme.json, rendered by scripts/theme.ts: end */

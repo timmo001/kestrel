@@ -4,13 +4,14 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "dev": "blume dev",
-    "start": "blume dev",
-    "build": "blume build --strict",
-    "check": "blume check --strict --isolated",
+    "dev": "bun scripts/theme.ts && blume dev",
+    "start": "bun scripts/theme.ts && blume dev",
+    "build": "bun scripts/theme.ts && blume build --strict",
+    "check": "bun scripts/theme.ts && blume check --strict --isolated",
     "validate": "blume validate --strict",
     "preview": "blume preview",
-    "brand": "bun scripts/brand-images.ts"
+    "brand": "bun scripts/brand-images.ts",
+    "theme": "bun scripts/theme.ts"
   },
   "dependencies": {
     "@astrojs/cloudflare": "14.4.7",
@@ -25,6 +26,7 @@
     "sharp": "0.35.5"
   },
   "devDependencies": {
-    "astro": "7.4.10"
+    "astro": "7.4.10",
+    "prettier": "3.10.0"
   }
 }

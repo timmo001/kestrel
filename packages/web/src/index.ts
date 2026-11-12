@@ -23,7 +23,7 @@ import {
   subscribePush,
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
-import { pageTheme, themeOptions } from "@timmo001/groundwork-tokens/page";
+import { pageTheme } from "@timmo001/groundwork-tokens/page";
 import {
   createIcon,
   on,
@@ -55,11 +55,20 @@ import {
   recordingRow,
   timeFormat,
 } from "./shared.ts";
-import { themeSettings, themes } from "./theme.ts";
+import {
+  pickerOptions,
+  themeDocuments,
+  themeSettings,
+  themes,
+} from "./theme.ts";
 
-// The theme picker in the app bar: every Groundwork theme and mode, with
-// nothing to import, so it's always one of the themes listed
-const theme = pageTheme({ ...themeSettings, themes });
+// The theme picker in the app bar: Kestrel's own theme, then every Groundwork
+// theme and mode, with nothing to import, so it's always one of those listed
+const theme = pageTheme({
+  ...themeSettings,
+  themes,
+  documents: themeDocuments,
+});
 
 const isThemeMode = Schema.is(
   Schema.Literals(["auto", "light", "dark", "darker"]),
@@ -75,7 +84,7 @@ const showTheme = () => {
   themePicker.mode = mode;
   themePicker.theme = current;
   themePicker.scheme = only ?? "";
-  themePicker.themes = themeOptions(themes);
+  themePicker.themes = pickerOptions;
 };
 
 theme.subscribe(showTheme);

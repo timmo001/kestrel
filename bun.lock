@@ -25,6 +25,7 @@
       },
       "devDependencies": {
         "astro": "7.4.10",
+        "prettier": "3.10.0",
       },
     },
     "packages/cli": {

@@ -1,8 +1,8 @@
 ---
 /**
  * docs-kit's header search with the theme picker offering what the app does:
- * Base first, then the other core themes, then the optional ones by family
- * (timmo001/kestrel#7).
+ * Kestrel's own theme first and by default, then the core themes, then the
+ * optional ones by family.
  */
 import HeaderSearch from "@timmo001/docs-kit/blume/header-search.astro";
 import {
@@ -11,10 +11,10 @@ import {
 } from "@timmo001/groundwork-tokens/choices";
 
 const themes = [
-  ...coreThemeChoices.filter((theme) => theme.id === "base"),
-  ...coreThemeChoices.filter((theme) => theme.id !== "base"),
+  { id: "kestrel", name: "Kestrel" },
+  ...coreThemeChoices,
   ...optionalThemeChoices,
 ];
 ---
 
-<HeaderSearch {...Astro.props} themes={themes} defaultTheme="base" />
+<HeaderSearch {...Astro.props} themes={themes} defaultTheme="kestrel" />
