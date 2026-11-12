@@ -33,7 +33,6 @@ import {
   phSkipBack,
   phSkipForward,
   phStop,
-  phX,
 } from "./icons.ts";
 import {
   clipUrl,
@@ -205,7 +204,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   const nextButton = find("gw-button", "control-next");
   const speedToggle = find("gw-segmented", "control-speed");
   const speedOther = find("gw-input", "control-speed-other");
-  const speedClear = find("gw-button", "control-speed-clear");
   const cutButton = find("gw-button", "control-cut");
   const captureButton = find("gw-button", "control-capture");
   const downloadButton = find("gw-button", "control-download");
@@ -498,8 +496,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   setIcon(zoomOutButton, icons.zoomOut);
   setIcon(zoomInButton, icons.zoomIn);
   setIcon(fullscreenButton, icons.fullscreen);
-  setIcon(speedClear, phX);
-  speedClear?.setAttribute("size", "small");
   setIcon(previousDay, phCaretLeft, "Previous day");
   setIcon(nextDay, phCaretRight, "Next day");
   previousDay?.setAttribute("appearance", "outlined");
@@ -643,8 +639,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     if (speedOther !== null && !speedOther.matches(":focus-within")) {
       speedOther.value = speed;
     }
-
-    if (speedClear !== null) speedClear.hidden = speedOther?.value === "";
   };
 
   const setSpeed = (next: string) => {
@@ -671,14 +665,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     if (speedOther.value === "") setSpeed("1");
     else if (isSpeed(typed)) setSpeed(String(typed));
     else showSpeed();
-  });
-
-  speedClear?.addEventListener("click", () => {
-    setSpeed("1");
-
-    if (speedOther !== null) speedOther.value = "";
-
-    if (speedClear !== null) speedClear.hidden = true;
   });
 
   speedOther?.addEventListener("focusout", () => {

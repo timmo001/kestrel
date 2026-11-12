@@ -31,7 +31,6 @@ const names = [
   "skip-back",
   "skip-forward",
   "stop",
-  "x",
 ];
 
 const exportName = (name: string) =>
