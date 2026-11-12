@@ -163,6 +163,9 @@ export const actionsColumn = (onPlay: (clip: Clip) => void): TableColumn => ({
     save.setAttribute("icon", phDownloadSimple);
     save.setAttribute("variant", "neutral");
     save.setAttribute("href", clipUrl(rowClip(row), true));
+    // Side by side, however narrow the column
+    actions.setAttribute("nowrap", "");
+    actions.setAttribute("gap", "s");
     actions.append(play, save);
 
     return actions;
