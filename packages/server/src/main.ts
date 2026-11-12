@@ -1,7 +1,8 @@
 /**
  * Starts the server. The recorder's address and login come from the
  * environment: `DVR_HOST`, `DVR_USERNAME` and `DVR_PASSWORD`, with
- * `DVR_PORT` and `DVR_RTSP_PORT` when they aren't the defaults.
+ * `DVR_PORT` and `DVR_RTSP_PORT` when they aren't the defaults, and
+ * `DVR_RTSP_USERNAME` or `DVR_RTSP_PASSWORD` for a separate RTSP login.
  */
 import path from "node:path";
 import { BunRuntime, BunServices } from "@effect/platform-bun";

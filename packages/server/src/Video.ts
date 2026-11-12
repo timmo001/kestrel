@@ -73,8 +73,14 @@ export class Video extends Context.Service<
         Config.withDefault(554),
       );
 
-      const username = yield* Config.Redacted("DVR_USERNAME");
-      const password = yield* Config.Redacted("DVR_PASSWORD");
+      // Some recorders keep a separate RTSP login; otherwise it's the same one
+      const username = yield* Config.Redacted("DVR_RTSP_USERNAME").pipe(
+        Config.orElse(() => Config.Redacted("DVR_USERNAME")),
+      );
+
+      const password = yield* Config.Redacted("DVR_RTSP_PASSWORD").pipe(
+        Config.orElse(() => Config.Redacted("DVR_PASSWORD")),
+      );
 
       const login = `${encodeURIComponent(Redacted.value(username))}:${encodeURIComponent(Redacted.value(password))}`;
 
