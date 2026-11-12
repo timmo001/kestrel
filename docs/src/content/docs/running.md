@@ -82,7 +82,10 @@ Start the host with `https://` where its HTTP port is off. It has live view
 from each camera's RTSP main and sub streams, so turn RTSP on in the
 camera's network settings, and stills, motion and person, vehicle and animal
 detections, read every couple of seconds, and its disks or SD card. Its
-recordings aren't read yet.
+recordings on an SD card or a hub's disk are listed beside the server's
+own, marked as on the source, but not copied: older cameras cut a
+download short and hubs refuse to prepare one. Record the camera on the
+server for footage you can play.
 
 A `bambu` source is a Bambu Lab P1 or A1 printer's camera, from its `host`
 and the LAN `accessCode` on its network settings screen. These printers

@@ -54,7 +54,8 @@ const wanted = Effect.fnUntraced(function* (
 ) {
   const recordings = source.recordings;
 
-  if (recordings === undefined) return [];
+  // A source that only lists its recordings has nothing to copy
+  if (recordings?.video === undefined) return [];
 
   const now = yield* Clock.currentTimeMillis;
   const settled = Nvr.localTime(now - settling);
@@ -107,11 +108,11 @@ const wanted = Effect.fnUntraced(function* (
 /** Copies one recording into the folder. */
 const copy = (folder: string, want: Wanted) =>
   Effect.gen(function* () {
-    const recordings = want.source.recordings;
+    const video = want.source.recordings?.video;
 
-    if (recordings === undefined) return;
+    if (video === undefined) return;
 
-    const frames = yield* recordings.video({
+    const frames = yield* video({
       camera: want.recording.camera,
       begin: want.recording.begin,
       end: want.recording.end,

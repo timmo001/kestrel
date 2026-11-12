@@ -5,7 +5,10 @@
  * in for a token, finds its channels and their RTSP streams, and reads each
  * camera's motion and detection state every couple of seconds, passing each
  * change on as an event. Stills come from its `Snap` command, and its
- * details from its device and disk info. Its recordings aren't read yet.
+ * details from its device and disk info. Its recordings, on an SD card or
+ * a hub's disk, are listed from its `Search` command, one search per
+ * request, as some firmware fails a batch. They aren't handed over: older
+ * cameras cut a download short and hubs refuse to prepare one.
  *
  * @module
  */
@@ -154,6 +157,60 @@ const HddInfo = Schema.Struct({
     }),
   ),
 });
+
+const ReolinkTime = Schema.Struct({
+  year: Schema.Number,
+  mon: Schema.Number,
+  day: Schema.Number,
+  hour: Schema.Number,
+  min: Schema.Number,
+  sec: Schema.Number,
+});
+
+interface ReolinkTime extends Schema.Schema.Type<typeof ReolinkTime> {}
+
+/** The days of a month with recordings, as a `0` or `1` for each day. */
+const SearchStatus = Schema.Struct({
+  SearchResult: Schema.Struct({
+    Status: Schema.optional(
+      Schema.Array(
+        Schema.Struct({
+          year: Schema.Number,
+          mon: Schema.Number,
+          table: Schema.String,
+        }),
+      ),
+    ),
+  }),
+});
+
+/** The files on a day; a hub sends their sizes as strings. */
+const SearchFiles = Schema.Struct({
+  SearchResult: Schema.Struct({
+    File: Schema.optional(
+      Schema.Array(
+        Schema.Struct({
+          StartTime: ReolinkTime,
+          EndTime: ReolinkTime,
+          size: Schema.optional(Schema.Union([Schema.Number, Schema.String])),
+        }),
+      ),
+    ),
+  }),
+});
+
+const two = (value: number) => String(value).padStart(2, "0");
+
+/** A Reolink time as a local time, such as `2026-11-12T14:02:33`. */
+const localTimeOf = (time: ReolinkTime) =>
+  `${time.year}-${two(time.mon)}-${two(time.day)}T${two(time.hour)}:${two(time.min)}:${two(time.sec)}`;
+
+/** A local date, such as `2026-11-12`, at a time of day. */
+const reolinkTime = (date: string, hour: number, min: number, sec: number) => {
+  const [year = 0, mon = 0, day = 0] = date.split("-").map(Number);
+
+  return { year, mon, day, hour, min, sec };
+};
 
 /** The token's gone, so it needs to log in again. */
 class LoginNeeded extends Schema.TaggedError<LoginNeeded>()(
@@ -714,6 +771,35 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       ),
     );
 
+  /** A Reolink time as a command parameter. */
+  const timeParam = (time: ReolinkTime): Param => ({
+    year: time.year,
+    mon: time.mon,
+    day: time.day,
+    hour: time.hour,
+    min: time.min,
+    sec: time.sec,
+  });
+
+  /** One search, sent alone: some firmware fails a batch of them. */
+  const search = (
+    channel: Channel,
+    onlyStatus: number,
+    from: ReolinkTime,
+    to: ReolinkTime,
+  ) =>
+    call([
+      command("Search", {
+        Search: {
+          channel: channel.channel,
+          onlyStatus,
+          streamType: "main",
+          StartTime: timeParam(from),
+          EndTime: timeParam(to),
+        },
+      }),
+    ]);
+
   const source: Source = {
     id,
     kind: "reolink",
@@ -742,11 +828,66 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           signal: channel.online,
           live: true,
           still: true,
-          recordings: false,
+          recordings: true,
           events: true,
         })),
       ),
     ),
+    recordings: {
+      days: Effect.fnUntraced(function* (month) {
+        const device = yield* opened;
+        const [year = 0, mon = 0] = month.split("-").map(Number);
+        const last = new Date(Date.UTC(year, mon, 0)).getUTCDate();
+
+        const found = yield* Effect.forEach(device.channels, (channel) =>
+          search(
+            channel,
+            1,
+            reolinkTime(`${month}-01`, 0, 0, 0),
+            reolinkTime(`${month}-${two(last)}`, 23, 59, 59),
+          ).pipe(Effect.flatMap((list) => valueOf(list, 0, SearchStatus))),
+        );
+
+        const dates = new Set(
+          found.flatMap((value) =>
+            (value.SearchResult.Status ?? []).flatMap((status) =>
+              status.table
+                .split("")
+                .flatMap((flag, at) =>
+                  flag === "1"
+                    ? [`${status.year}-${two(status.mon)}-${two(at + 1)}`]
+                    : [],
+                ),
+            ),
+          ),
+        );
+
+        // Its search doesn't say why, and these record on events
+        return [...dates].toSorted().map((date) => ({
+          date,
+          reasons: ["motion" as const],
+        }));
+      }),
+      list: Effect.fnUntraced(function* (camera, date) {
+        const device = yield* opened;
+        const channel = yield* channelOf(device, camera);
+
+        const value = yield* search(
+          channel,
+          0,
+          reolinkTime(date, 0, 0, 0),
+          reolinkTime(date, 23, 59, 59),
+        ).pipe(Effect.flatMap((list) => valueOf(list, 0, SearchFiles)));
+
+        return (value.SearchResult.File ?? []).map((file) => ({
+          camera,
+          begin: localTimeOf(file.StartTime),
+          end: localTimeOf(file.EndTime),
+          reasons: ["motion" as const],
+          bytes: file.size === undefined ? null : Number(file.size),
+        }));
+      }),
+    },
     live: opened.pipe(
       Effect.map((device) =>
         device.channels.map((channel): LiveFeed => ({

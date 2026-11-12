@@ -294,16 +294,16 @@ export class Library extends Context.Service<
           });
 
           if (parts.length === 0) {
-            const recordings = yield* remoteOf(options.camera);
+            const remote = (yield* remoteOf(options.camera))?.video;
 
-            if (recordings === undefined) {
+            if (remote === undefined) {
               return yield* new NoRecordings({
                 message: `Nothing was recorded on ${options.camera} from ${options.begin} to ${options.end}`,
               });
             }
 
             // Nothing's copied yet, so it plays from the source
-            return yield* recordings.video({
+            return yield* remote({
               camera: options.camera,
               begin: options.begin,
               end: options.end,

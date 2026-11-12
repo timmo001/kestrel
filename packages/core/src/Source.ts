@@ -98,9 +98,10 @@ export interface SourceRecordings {
   /**
    * What a camera recorded between two times, as its frames; or with
    * `every`, key frames only, one per that many seconds. Fails up front
-   * when nothing was recorded then.
+   * when nothing was recorded then. Left out where the source lists its
+   * recordings but can't hand them over, so they're never copied.
    */
-  readonly video: (options: {
+  readonly video?: (options: {
     readonly camera: CameraId;
     readonly begin: LocalTime;
     readonly end: LocalTime;
