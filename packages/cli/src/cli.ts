@@ -210,13 +210,13 @@ const cameras = Command.make(
       ].flat();
 
       yield* Console.log(
-        `${each.id}  ${each.name}  ${can.join(", ")}${each.signal === false ? "  no signal" : ""}`,
+        `${each.id}  ${each.label ?? each.name}  ${can.join(", ")}${each.signal === false ? "  no signal" : ""}`,
       );
     }
   }),
 ).pipe(
   Command.withDescription(
-    "Every camera's id, name and what it can do, with its live stream names",
+    "Every camera's id, its label or name, and what it can do, with its live stream names",
   ),
 );
 

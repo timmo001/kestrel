@@ -18,7 +18,10 @@ export interface LiveStreams extends Schema.Schema.Type<typeof LiveStreams> {}
 export const Camera = Schema.Struct({
   id: CameraId,
   source: SourceId,
+  /** Its source's name for it, such as `Channel 3`. */
   name: Schema.String,
+  /** The name you gave it, such as `Front door`; `null` until you name it. */
+  label: Schema.NullOr(Schema.String),
   /** A recorder's channel number, for "Ch 3"; `null` for a camera that isn't one. */
   channel: Schema.NullOr(Schema.Number),
   /** Whether it has a picture now; `null` when its source can't tell. */

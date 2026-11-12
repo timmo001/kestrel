@@ -5,4 +5,8 @@
  *
  * @module
  */
-export { make, type Options } from "./Source.ts";
+import type { Kind } from "@timmo001/kestrel-core";
+import { info, make } from "./Source.ts";
+
+/** The `raysharp` kind of source. */
+export const kind: Kind = { info, make };

@@ -1,7 +1,7 @@
 /**
- * What every source shares: how sources and cameras are named, what they
- * report (cameras, recordings, events and details), their errors, and the
- * `Source` interface each kind implements and the server serves.
+ * What every source shares: how sources and cameras are named and set up,
+ * what they report (cameras, recordings, events and details), their errors,
+ * and the `Source` interface each kind implements and the server serves.
  *
  * @module
  */
@@ -16,6 +16,8 @@ export * from "./Events.ts";
 export * from "./Ids.ts";
 
 export * from "./Recordings.ts";
+
+export * from "./Settings.ts";
 
 export * from "./Sources.ts";
 

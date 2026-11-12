@@ -23,10 +23,12 @@ export class Attention extends Context.Service<
       const sources = yield* Sources;
       const push = yield* Push;
 
-      const list = Effect.forEach(
-        sources.all,
-        (source) => source.attention,
-      ).pipe(Effect.map((lists) => lists.flat()));
+      const list = sources.all.pipe(
+        Effect.flatMap((all) =>
+          Effect.forEach(all, (source) => source.attention),
+        ),
+        Effect.map((lists) => lists.flat()),
+      );
 
       // The alerts already pushed, so each is pushed once when it starts
       let pushed = new Set<string>();

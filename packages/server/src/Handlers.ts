@@ -8,6 +8,7 @@
 import {
   cameraId,
   type Camera,
+  type CameraLabel,
   type LiveFeed,
   type RecordedDay,
   type RecordingReason,
@@ -49,18 +50,25 @@ const SourcesHandlers = HttpApiBuilder.group(
 
     return handlers
       .handle("list", () =>
-        Effect.forEach(sources.all, (source) =>
-          source.connection.pipe(
-            Effect.map((connection): SourceInfo => ({
-              id: source.id,
-              kind: source.kind,
-              name: source.name,
-              connection,
-              details: source.details !== undefined,
-            })),
+        sources.all.pipe(
+          Effect.flatMap((all) =>
+            Effect.forEach(all, (source) =>
+              source.connection.pipe(
+                Effect.map((connection): SourceInfo => ({
+                  id: source.id,
+                  kind: source.kind,
+                  name: source.name,
+                  connection,
+                  details: source.details !== undefined,
+                })),
+              ),
+            ),
           ),
         ),
       )
+      .handle("kinds", () => Effect.succeed(sources.kinds))
+      .handle("settings", () => sources.settings)
+      .handle("save", ({ payload }) => sources.save(payload))
       .handle("details", ({ params }) =>
         sources.find(params.source).pipe(
           Effect.flatMap((source) =>
@@ -82,8 +90,8 @@ const AttentionHandlers = HttpApiBuilder.group(
   }),
 );
 
-/** A source's cameras, with their stream names; a source that isn't ready yet has none. */
-const camerasOf = (source: Source) =>
+/** A source's cameras, with their stream names and labels; a source that isn't ready yet has none. */
+const camerasOf = (source: Source, labels: ReadonlyArray<CameraLabel>) =>
   Effect.gen(function* () {
     const cameras = yield* source.cameras;
 
@@ -98,6 +106,7 @@ const camerasOf = (source: Source) =>
         id: camera.id,
         source: source.id,
         name: camera.name,
+        label: labels.find((each) => each.camera === camera.id)?.label ?? null,
         channel: camera.channel,
         signal: camera.signal,
         live:
@@ -128,9 +137,17 @@ const CamerasHandlers = HttpApiBuilder.group(
 
     return handlers
       .handle("list", () =>
-        Effect.forEach(sources.all, camerasOf, {
-          concurrency: "unbounded",
-        }).pipe(Effect.map((lists) => lists.flat())),
+        Effect.gen(function* () {
+          const labels = yield* sources.labels;
+
+          const lists = yield* Effect.forEach(
+            yield* sources.all,
+            (source) => camerasOf(source, labels),
+            { concurrency: "unbounded" },
+          );
+
+          return lists.flat();
+        }),
       )
       .handle("recordings", ({ params, query }) =>
         recordingsOf(params.source).pipe(
@@ -183,13 +200,18 @@ const RecordingsHandlers = HttpApiBuilder.group(
     const sources = yield* Sources;
 
     return handlers.handle("days", ({ query }) =>
-      Effect.forEach(
-        sources.all.flatMap((source) =>
-          source.recordings === undefined ? [] : [source.recordings],
+      sources.all.pipe(
+        Effect.flatMap((all) =>
+          Effect.forEach(
+            all.flatMap((source) =>
+              source.recordings === undefined ? [] : [source.recordings],
+            ),
+            (recordings) => recordings.days(query.month),
+            { concurrency: "unbounded" },
+          ),
         ),
-        (recordings) => recordings.days(query.month),
-        { concurrency: "unbounded" },
-      ).pipe(Effect.map((lists) => mergeDays(lists.flat()))),
+        Effect.map((lists) => mergeDays(lists.flat())),
+      ),
     );
   }),
 );
@@ -200,13 +222,17 @@ const EventsHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const sources = yield* Sources;
 
-    const events = sources.all.flatMap((source) =>
-      source.events === undefined ? [] : [source.events],
-    );
+    const eventsOf = (all: ReadonlyArray<Source>) =>
+      all.flatMap((source) =>
+        source.events === undefined ? [] : [source.events],
+      );
 
     return handlers
       .handle("recent", () =>
-        Effect.forEach(events, (each) => each.recent).pipe(
+        sources.all.pipe(
+          Effect.flatMap((all) =>
+            Effect.forEach(eventsOf(all), (each) => each.recent),
+          ),
           // Newest first across every source
           Effect.map((lists) =>
             lists
@@ -216,10 +242,15 @@ const EventsHandlers = HttpApiBuilder.group(
         ),
       )
       .handle("live", () =>
+        // Follows the sources as a save changes them
         Effect.succeed(
-          Stream.mergeAll(
-            events.map((each) => each.live),
-            { concurrency: "unbounded" },
+          sources.changes.pipe(
+            Stream.switchMap((all) =>
+              Stream.mergeAll(
+                eventsOf(all).map((each) => each.live),
+                { concurrency: "unbounded" },
+              ),
+            ),
           ),
         ),
       );

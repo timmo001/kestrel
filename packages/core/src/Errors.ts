@@ -33,6 +33,13 @@ export class UnknownCamera extends Schema.TaggedError<UnknownCamera>()(
   { httpApiStatus: 404 },
 ) {}
 
+/** Settings that can't be used, such as two sources with one id or a missing address. */
+export class InvalidSettings extends Schema.TaggedError<InvalidSettings>()(
+  "InvalidSettings",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
 /** The source or camera can't do that, such as a stream with no recordings. */
 export class NotSupported extends Schema.TaggedError<NotSupported>()(
   "NotSupported",

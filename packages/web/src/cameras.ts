@@ -1,7 +1,7 @@
 /**
  * The cameras the server has, as the pages show them: loaded once the
- * sources are reachable, and labelled "Ch 3" for a recorder's channel or by
- * name otherwise.
+ * sources are reachable, and labelled by the name you gave them, else "Ch 3"
+ * for a recorder's channel, else by their source's name for them.
  */
 import type { Camera, CameraId } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
@@ -15,11 +15,13 @@ export const loadCameras = async () => {
   return known;
 };
 
-/** A camera's short label, such as "Ch 3", by its id. */
+/** A camera's short label by its id: the name you gave it, else "Ch 3" for a recorder's channel, else its source's name for it. */
 export const cameraLabel = (id: string) => {
   const camera = known.find((each) => each.id === id);
 
   if (camera === undefined) return id;
+
+  if (camera.label !== null) return camera.label;
 
   return camera.channel === null ? camera.name : `Ch ${camera.channel}`;
 };

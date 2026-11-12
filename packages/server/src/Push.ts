@@ -15,7 +15,6 @@ import {
 } from "@timmo001/groundwork-pwa/push";
 import {
   Cause,
-  Config,
   Context,
   Effect,
   FileSystem,
@@ -27,6 +26,7 @@ import {
 } from "effect";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import * as webPush from "web-push";
+import { stateFolder } from "./Folders.ts";
 
 const Stored = Schema.Struct({
   vapid: Schema.Struct({ publicKey: Schema.String, privateKey: Schema.String }),
@@ -56,17 +56,7 @@ export class Push extends Context.Service<
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-
-      const home = yield* Config.String("HOME").pipe(Config.withDefault("."));
-
-      const directory = yield* Config.String("KESTREL_STATE").pipe(
-        Config.orElse(() =>
-          Config.String("XDG_STATE_HOME").pipe(
-            Config.map((state) => path.join(state, "kestrel")),
-          ),
-        ),
-        Config.withDefault(path.join(home, ".local/state/kestrel")),
-      );
+      const directory = yield* stateFolder;
 
       const file = path.join(directory, "push.json");
 

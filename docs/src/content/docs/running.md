@@ -11,23 +11,56 @@ mise install
 mise run build
 ```
 
-## The recorder's details
+## Your sources
 
-Copy `.env.example` to `.env.local`, which git ignores, and fill it in:
+The server's sources, such as a recorder, and the names you give cameras are
+kept in `sources.json` in its config folder: `~/.config/kestrel` (or
+`$XDG_CONFIG_HOME/kestrel`) on Linux and macOS, `%APPDATA%\kestrel` on
+Windows, or the folder `KESTREL_CONFIG` names. The server writes it when you
+save from the Settings page, readable only by you, and you can edit it by
+hand too; restart the server after a hand edit.
 
-| Variable            | What it is                                          |
-| ------------------- | --------------------------------------------------- |
-| `DVR_HOST`          | The recorder's address on your network              |
-| `DVR_PORT`          | The control port, 9000 unless it was changed        |
-| `DVR_RTSP_PORT`     | The RTSP port, from the recorder's network settings |
-| `DVR_USERNAME`      | A user on the recorder                              |
-| `DVR_PASSWORD`      | That user's password                                |
-| `DVR_RTSP_USERNAME` | The RTSP user, when it isn't `DVR_USERNAME`         |
-| `DVR_RTSP_PASSWORD` | The RTSP password, when it isn't `DVR_PASSWORD`     |
+```json
+{
+  "sources": [
+    {
+      "id": "swann",
+      "kind": "raysharp",
+      "name": "Swann recorder",
+      "settings": { "host": "192.0.2.10", "username": "admin", "password": "…" }
+    }
+  ],
+  "cameras": [{ "camera": "swann/1", "label": "Front door" }]
+}
+```
 
-Live video logs in to the RTSP port with `DVR_RTSP_USERNAME` and
-`DVR_RTSP_PASSWORD` when they're set. Some recorders keep a separate RTSP
-password: if live players show `wrong user/pass`, set it there.
+A source's `id` names its cameras, such as `swann/3`, so links and labels
+keep working as long as it stays the same. It holds logins, so keep it to
+yourself. The API never sends a password back: the page shows which are set,
+and a save keeps each one you didn't change.
+
+## The recorder's details from the environment
+
+Before there's a sources file, the server runs one Raysharp recorder, `swann`,
+from the environment. A Raysharp source whose settings leave its address or
+login out falls back to the same variables, so the login can stay out of the
+file. Copy `.env.example` to `.env.local`, which git ignores, and fill it in:
+
+| Variable                         | What it is                                          |
+| -------------------------------- | --------------------------------------------------- |
+| `KESTREL_RAYSHARP_HOST`          | The recorder's address on your network              |
+| `KESTREL_RAYSHARP_PORT`          | The control port, 9000 unless it was changed        |
+| `KESTREL_RAYSHARP_RTSP_PORT`     | The RTSP port, from the recorder's network settings |
+| `KESTREL_RAYSHARP_USERNAME`      | A user on the recorder                              |
+| `KESTREL_RAYSHARP_PASSWORD`      | That user's password                                |
+| `KESTREL_RAYSHARP_RTSP_USERNAME` | The RTSP user, when it isn't the one above          |
+| `KESTREL_RAYSHARP_RTSP_PASSWORD` | The RTSP password, when it isn't the one above      |
+
+The old `DVR_*` names, such as `DVR_HOST`, still work for now.
+
+Live video logs in to the RTSP port with the RTSP user and password when
+they're set. Some recorders keep a separate RTSP password: if live players
+show `wrong user/pass`, set it there.
 
 `mise run serve:server` reads the file through 1Password's `op run`, so the
 login can be `op://vault/item/field` references rather than the values
@@ -47,16 +80,18 @@ mise run serve:server
 
 It runs in the background through Pitchfork, at
 <https://server.kestrel.localhost>, and serves the web client and its API.
-It logs in to the recorder as it starts, and logs in again, waiting longer
-each time, whenever the connection drops. `mise run serve:server:logs` follows
-its log.
+It starts each source as it starts, and a recorder logs in again, waiting
+longer each time, whenever the connection drops. A source that can't start,
+such as one with no address, shows as not connected with the reason. `mise
+run serve:server:logs` follows its log.
 
-The server listens on `127.0.0.1:7380`. go2rtc only listens on `127.0.0.1:1984`,
-and the server passes it through under `/go2rtc/`. Set `KESTREL_HOST` to
-listen on another address, such as your machine's address on your network to
-use it from a phone, and `PORT` and `GO2RTC_PORT` for other ports. The server
-doesn't ask for a login, so only listen where everyone who can reach it should
-see the cameras.
+The server listens on `127.0.0.1:7380`. go2rtc only listens on
+`127.0.0.1:1984`, and the server passes it through under `/go2rtc/`; it
+starts go2rtc again whenever the cameras' streams change. Set `KESTREL_HOST`
+to listen on another address, such as your machine's address on your network
+to use it from a phone, and `KESTREL_PORT` and `KESTREL_GO2RTC_PORT` for
+other ports. The server doesn't ask for a login, so only listen where everyone
+who can reach it should see the cameras and change its sources.
 
 After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
@@ -64,10 +99,12 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable       | Default             | What it sets                      |
-| -------------- | ------------------- | --------------------------------- |
-| `KESTREL_HOST` | `127.0.0.1`         | The address the server listens on |
-| `PORT`         | `7380`              | The server's port                 |
-| `GO2RTC_PORT`  | `1984`              | go2rtc's port                     |
-| `GO2RTC_BIN`   | `go2rtc`            | The go2rtc binary                 |
-| `KESTREL_WEB`  | `packages/web/dist` | The built web client              |
+| Variable              | Default                  | What it sets                                  |
+| --------------------- | ------------------------ | --------------------------------------------- |
+| `KESTREL_HOST`        | `127.0.0.1`              | The address the server listens on             |
+| `KESTREL_PORT`        | `7380`                   | The server's port (`PORT` too, for Pitchfork) |
+| `KESTREL_GO2RTC_PORT` | `1984`                   | go2rtc's port                                 |
+| `KESTREL_GO2RTC`      | `go2rtc`                 | The go2rtc binary                             |
+| `KESTREL_WEB`         | `packages/web/dist`      | The built web client                          |
+| `KESTREL_CONFIG`      | `~/.config/kestrel`      | Where `sources.json` is kept                  |
+| `KESTREL_STATE`       | `~/.local/state/kestrel` | Where push subscriptions are kept             |

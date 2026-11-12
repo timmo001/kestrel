@@ -2,17 +2,18 @@
  * A Raysharp recorder as a source: one logged-in session, opened when the
  * server starts and reopened with backoff whenever it drops, with the alarm
  * reports it sends kept and passed on. Each channel is a camera, such as
- * `swann/3`, with its RTSP streams for live view and its recordings. The
- * recorder's address and login come from the environment: `DVR_HOST`,
- * `DVR_USERNAME` and `DVR_PASSWORD`, with `DVR_PORT` and `DVR_RTSP_PORT`
- * when they aren't the defaults, and `DVR_RTSP_USERNAME` or
- * `DVR_RTSP_PASSWORD` for a separate RTSP login.
+ * `swann/3`, with its RTSP streams for live view and its recordings. Its
+ * address and login come from its settings, and any it leaves out from the
+ * environment: `KESTREL_RAYSHARP_HOST`, `_USERNAME` and `_PASSWORD`, with
+ * `_PORT` and `_RTSP_PORT` when they aren't the defaults, and
+ * `_RTSP_USERNAME` or `_RTSP_PASSWORD` for a separate RTSP login.
  *
  * @module
  */
 import {
   cameraId,
   cameraParts,
+  InvalidSettings,
   NoRecordings,
   SourceUnavailable,
   UnknownCamera,
@@ -21,11 +22,13 @@ import {
   type CameraInfo,
   type Connection,
   type Details,
+  type Kind,
   type LiveFeed,
   type RecordedFrame,
   type Recording,
   type Source,
   type SourceId,
+  type SourceSettings,
 } from "@timmo001/kestrel-core";
 import {
   Session,
@@ -42,6 +45,7 @@ import {
   Redacted,
   Ref,
   Schedule,
+  Schema,
   Stream,
 } from "effect";
 import { attentionFor } from "./Attention.ts";
@@ -124,32 +128,157 @@ const detailsOf = (
   })),
 });
 
-export interface Options {
-  /** The source's id, which its cameras' ids start with, such as `swann`. */
-  readonly id: SourceId;
-  readonly name: string;
-}
+/** The settings a recorder takes, each left out falling back to its environment variable. */
+const RecorderSettings = Schema.Struct({
+  host: Schema.optional(Schema.String),
+  port: Schema.optional(Schema.Number),
+  username: Schema.optional(Schema.String),
+  password: Schema.optional(Schema.String),
+  rtspPort: Schema.optional(Schema.Number),
+  rtspUsername: Schema.optional(Schema.String),
+  rtspPassword: Schema.optional(Schema.String),
+});
 
-/** A Raysharp recorder as a source, logged in for as long as the scope lasts. */
-export const make = Effect.fnUntraced(function* (options: Options) {
-  const id = options.id;
-  const host = yield* Config.String("DVR_HOST");
-  const port = yield* Config.Int("DVR_PORT").pipe(Config.withDefault(9000));
-  const username = yield* Config.Redacted("DVR_USERNAME");
-  const password = yield* Config.Redacted("DVR_PASSWORD");
+const decodeSettings = Schema.decodeUnknownEffect(RecorderSettings);
 
-  const rtspPort = yield* Config.Int("DVR_RTSP_PORT").pipe(
-    Config.withDefault(554),
+/** Where a recorder's settings come from when its own leave them out. */
+const prefix = "KESTREL_RAYSHARP_";
+
+/**
+ * A recorder's environment variable, such as `KESTREL_RAYSHARP_HOST`, or its
+ * old `DVR_*` name while saved logins move over.
+ */
+const env = <A>(read: (name: string) => Config.Config<A>, name: string) =>
+  read(`${prefix}${name}`).pipe(Config.orElse(() => read(`DVR_${name}`)));
+
+/** What the app shows when you add or change a recorder. */
+export const info: Kind["info"] = {
+  kind: "raysharp",
+  name: "Raysharp recorder",
+  description:
+    "A recorder made by Raysharp, such as a Swann DVR: live view, recordings, events and its disks",
+  fields: [
+    {
+      key: "host",
+      label: "Address",
+      type: "text",
+      required: false,
+      hint: "Its address on your network; KESTREL_RAYSHARP_HOST when left out",
+    },
+    {
+      key: "port",
+      label: "Control port",
+      type: "number",
+      required: false,
+      hint: "9000 when left out",
+    },
+    {
+      key: "username",
+      label: "Username",
+      type: "text",
+      required: false,
+      hint: "KESTREL_RAYSHARP_USERNAME when left out",
+    },
+    {
+      key: "password",
+      label: "Password",
+      type: "secret",
+      required: false,
+      hint: "KESTREL_RAYSHARP_PASSWORD when left out",
+    },
+    {
+      key: "rtspPort",
+      label: "RTSP port",
+      type: "number",
+      required: false,
+      hint: "554 when left out",
+    },
+    {
+      key: "rtspUsername",
+      label: "RTSP username",
+      type: "text",
+      required: false,
+      hint: "Only where its live streams take a different login",
+    },
+    {
+      key: "rtspPassword",
+      label: "RTSP password",
+      type: "secret",
+      required: false,
+      hint: "Only where its live streams take a different login",
+    },
+  ],
+  cameraFields: null,
+};
+
+/** A recorder as a source, logged in for as long as the scope lasts. */
+export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
+  const id = saved.id;
+  const name = saved.name;
+
+  const invalid = (message: string) =>
+    new InvalidSettings({ message: `${name}: ${message}` });
+
+  // A field left empty on the page counts as left out
+  const settings = yield* decodeSettings(
+    Object.fromEntries(
+      Object.entries(saved.settings).filter(([, value]) => value !== ""),
+    ),
+  ).pipe(Effect.mapError((error) => invalid(error.message)));
+
+  /** A setting, or its environment variable when it's left out. */
+  const orEnv = <A>(value: A | undefined, config: Config.Config<A>) =>
+    value === undefined
+      ? Effect.gen(function* () {
+          return yield* config;
+        })
+      : Effect.succeed(value);
+
+  const host = yield* orEnv(settings.host, env(Config.String, "HOST")).pipe(
+    Effect.mapError(() => invalid("it needs an address")),
   );
+
+  const port = yield* orEnv(
+    settings.port,
+    env(Config.Int, "PORT").pipe(Config.withDefault(9000)),
+  ).pipe(Effect.mapError(() => invalid(`${prefix}PORT isn't a port`)));
+
+  const login = Effect.mapError(() =>
+    invalid("it needs a username and password"),
+  );
+
+  const secret = (value: string | undefined) =>
+    value === undefined ? undefined : Redacted.make(value);
+
+  const username = yield* orEnv(
+    secret(settings.username),
+    env(Config.Redacted, "USERNAME"),
+  ).pipe(login);
+
+  const password = yield* orEnv(
+    secret(settings.password),
+    env(Config.Redacted, "PASSWORD"),
+  ).pipe(login);
+
+  const rtspPort = yield* orEnv(
+    settings.rtspPort,
+    env(Config.Int, "RTSP_PORT").pipe(Config.withDefault(554)),
+  ).pipe(Effect.mapError(() => invalid(`${prefix}RTSP_PORT isn't a port`)));
 
   // Some recorders keep a separate RTSP login; otherwise it's the same one
-  const rtspUsername = yield* Config.Redacted("DVR_RTSP_USERNAME").pipe(
-    Config.orElse(() => Config.Redacted("DVR_USERNAME")),
-  );
+  const rtspUsername = yield* orEnv(
+    secret(settings.rtspUsername),
+    env(Config.Redacted, "RTSP_USERNAME").pipe(
+      Config.orElse(() => Config.succeed(username)),
+    ),
+  ).pipe(login);
 
-  const rtspPassword = yield* Config.Redacted("DVR_RTSP_PASSWORD").pipe(
-    Config.orElse(() => Config.Redacted("DVR_PASSWORD")),
-  );
+  const rtspPassword = yield* orEnv(
+    secret(settings.rtspPassword),
+    env(Config.Redacted, "RTSP_PASSWORD").pipe(
+      Config.orElse(() => Config.succeed(password)),
+    ),
+  ).pipe(login);
 
   const rtsp = (channel: number, stream: 0 | 1) =>
     Redacted.make(
@@ -261,7 +390,7 @@ export const make = Effect.fnUntraced(function* (options: Options) {
       ? Effect.succeed(channel)
       : Effect.fail(
           new UnknownCamera({
-            message: `${options.name} has no camera ${camera}`,
+            message: `${name} has no camera ${camera}`,
           }),
         );
   };
@@ -299,11 +428,11 @@ export const make = Effect.fnUntraced(function* (options: Options) {
   const source: Source = {
     id,
     kind: "raysharp",
-    name: options.name,
+    name,
     connection: Ref.get(connection),
     attention: Effect.gen(function* () {
       return attentionFor(
-        { id, name: options.name },
+        { id, name },
         yield* Ref.get(connection),
         yield* Ref.get(latest),
         hadSignal,

@@ -13,6 +13,8 @@ import {
   CameraEvent,
   CameraKey,
   Details,
+  InvalidSettings,
+  KindInfo,
   LocalDate,
   LocalMonth,
   LocalTime,
@@ -20,6 +22,7 @@ import {
   NotSupported,
   RecordedDay,
   Recording,
+  Settings,
   SourceId,
   SourceInfo,
   SourceUnavailable,
@@ -62,6 +65,23 @@ export class SourcesGroup extends HttpApiGroup.make("sources")
       params: { source: SourceId },
       success: Details,
       error: [UnknownSource, NotSupported, SourceUnavailable],
+    }),
+    /** The kinds of source the server can run, and the settings each takes. */
+    HttpApiEndpoint.get("kinds", "/kinds", {
+      success: Schema.Array(KindInfo),
+    }),
+    /** Every source's settings and the camera labels, with secrets left out. */
+    HttpApiEndpoint.get("settings", "/settings", {
+      success: Settings,
+    }),
+    /**
+     * Saves every source's settings and the camera labels, keeping each
+     * secret left out, and restarts the sources that changed.
+     */
+    HttpApiEndpoint.put("save", "/settings", {
+      payload: Settings,
+      success: Settings,
+      error: InvalidSettings,
     }),
   )
   .prefix("/api/sources") {}

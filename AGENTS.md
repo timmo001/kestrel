@@ -49,10 +49,13 @@ and work that depends on one waits for it.
 ## Running it
 
 - Start the server only through `mise run serve:server`, never in the
-  foreground. It reads the recorder's address and login from the private file
-  `mise run auth:save` writes, `~/.config/kestrel/recorder.env`, or else
-  from `.env.local` (see `.env.example`) through `op run`, and starts go2rtc
-  beside it.
+  foreground. Its sources come from `sources.json` in the config folder
+  (`~/.config/kestrel`), written from the Settings page. Without one, or for
+  a Raysharp source that leaves them out, it reads the recorder's address
+  and login (`KESTREL_RAYSHARP_*`) from the private file `mise run
+  auth:save` writes, `~/.config/kestrel/recorder.env`, or else from
+  `.env.local` (see `.env.example`) through `op run`, and starts go2rtc
+  beside it. Never print or copy what's in `sources.json` either.
 - Scripts that talk to the recorder load the saved file with
   `bun --env-file="$HOME/.config/kestrel/recorder.env"`, so they don't
   ask 1Password each time. Never print or copy what's in it.

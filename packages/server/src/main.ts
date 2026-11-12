@@ -1,9 +1,9 @@
 /**
- * Starts the server. The recorder's address and login come from the
- * environment: `DVR_HOST`, `DVR_USERNAME` and `DVR_PASSWORD`, with
- * `DVR_PORT` and `DVR_RTSP_PORT` when they aren't the defaults, and
- * `DVR_RTSP_USERNAME` or `DVR_RTSP_PASSWORD` for a separate RTSP login. The
- * Raysharp source reads them.
+ * Starts the server. Its sources come from `sources.json` in the config
+ * folder (`KESTREL_CONFIG`, else `~/.config/kestrel` or `%APPDATA%\kestrel`),
+ * set up on the Settings page; without one, it's the Raysharp recorder from
+ * `KESTREL_RAYSHARP_HOST`, `KESTREL_RAYSHARP_USERNAME` and
+ * `KESTREL_RAYSHARP_PASSWORD`.
  */
 import path from "node:path";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
@@ -15,7 +15,11 @@ const main = Effect.gen(function* () {
     Config.withDefault("127.0.0.1"),
   );
 
-  const port = yield* Config.Int("PORT").pipe(Config.withDefault(7380));
+  // PORT is what Pitchfork hands its daemons
+  const port = yield* Config.Int("KESTREL_PORT").pipe(
+    Config.orElse(() => Config.Int("PORT")),
+    Config.withDefault(7380),
+  );
 
   const web = yield* Config.String("KESTREL_WEB").pipe(
     Config.withDefault(path.resolve(import.meta.dir, "../../web/dist")),

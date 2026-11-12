@@ -16,6 +16,9 @@ recorder's channel 3, and its routes take the two as path segments.
 | ---------------------------------------------------- | ------------------------------------------------------------- |
 | `GET /api/sources`                                   | Each source: its kind, name and whether it's connected        |
 | `GET /api/sources/:source/details`                   | Its facts, clock, storage and each camera's state             |
+| `GET /api/sources/kinds`                             | Each kind of source the server runs and the settings it takes |
+| `GET /api/sources/settings`                          | Every source's settings and the camera labels, no secrets     |
+| `PUT /api/sources/settings`                          | Saves them and restarts the sources that changed              |
 | `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source |
 | `GET /api/cameras`                                   | Each camera: its id, name and what it can do                  |
 | `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`        |
@@ -30,6 +33,18 @@ names, or is `null` for a camera with no live view; `recordings` and `events`
 say whether it has them; `signal` is whether it has a picture now, or `null`
 when its source can't tell. A source that isn't connected yet leaves its
 cameras out until it knows them.
+
+A camera's `name` is its source's name for it, such as `Channel 3`, and its
+`label` the name you gave it on the Settings page, or `null`.
+
+The settings are what `sources.json` keeps: each source's `id`, `kind`,
+`name` and `settings`, its `cameras` for a kind you list cameras for
+yourself, and the camera `label`s. Each kind in `/api/sources/kinds` lists
+its fields, each `text`, `number`, `secret` or `address`. Reading them back
+leaves secret fields out, naming the ones that are set in `secrets`, and
+hides the password in an address as `********`. A save keeps each secret it
+leaves out and each hidden password, checks the settings, and returns 400
+with `InvalidSettings` saying what's wrong, such as two sources with one id.
 
 A source's details are general, so any source can fill them in: `facts` are
 labelled values, such as the recorder's name, firmware and channel count;
@@ -113,4 +128,5 @@ every browser that subscribed. It follows Groundwork's push contract, outside
 
 The page's Notify me button subscribes. The keys and subscriptions are kept in
 `push.json`, readable only by you, under `KESTREL_STATE`, else
-`$XDG_STATE_HOME/kestrel`, else `~/.local/state/kestrel`.
+`$XDG_STATE_HOME/kestrel`, else `%LOCALAPPDATA%\kestrel` on Windows, else
+`~/.local/state/kestrel`.
