@@ -3,8 +3,12 @@
  * recorder's health, live view, recordings and events from the server. The
  * service worker keeps the shell so the app starts offline.
  */
+// Every theme's fonts; a browser only downloads the ones in use
 import "@fontsource-variable/mona-sans";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/geist";
 import "@fontsource-variable/geist-mono";
+import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
@@ -25,19 +29,45 @@ import {
   subscribePush,
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
-import { coreThemeChoices, pageTheme } from "@timmo001/groundwork-tokens/page";
+import { pageTheme, themeOptions } from "@timmo001/groundwork-tokens/page";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
-import { themeOptions } from "./theme.ts";
+import { themeSettings, themes } from "./theme.ts";
 
-// Base only, with the mode following the system, until the app's themes are
-// chosen (timmo001/dvr-revival#7)
-pageTheme({
-  ...themeOptions,
-  themes: coreThemeChoices.filter(({ id }) => id === themeOptions.defaultTheme),
-});
+// The theme picker in the app bar: every Groundwork theme and mode, with
+// nothing to import, so it's always one of the themes listed
+const theme = pageTheme({ ...themeSettings, themes });
+
+const isThemeMode = Schema.is(
+  Schema.Literals(["auto", "light", "dark", "darker"]),
+);
+
+const themePicker = document.querySelector("gw-theme-picker");
+
+const showTheme = () => {
+  if (themePicker === null) return;
+
+  const { mode, theme: current, only } = theme.state();
+
+  themePicker.mode = mode;
+  themePicker.theme = current;
+  themePicker.scheme = only ?? "";
+  themePicker.themes = themeOptions(themes);
+};
+
+theme.subscribe(showTheme);
+
+showTheme();
+
+if (themePicker !== null) {
+  on(themePicker, "mode", (event) => {
+    if (isThemeMode(event.detail.mode)) theme.setMode(event.detail.mode);
+  });
+  on(themePicker, "theme", (event) => theme.setTheme(event.detail.id));
+  on(themePicker, "reset", () => theme.reset());
+}
 
 const pwa = connectPwa(config);
 

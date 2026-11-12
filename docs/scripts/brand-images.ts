@@ -11,7 +11,7 @@ const written = await writeBrandImages({
   title: "DVR Revival",
   tagline: ["A web client and bridge for", "Raysharp-made recorders."],
   site: "dvr-revival.timmo.dev",
-  // Groundwork's Base theme, until the app's own is chosen
+  // Groundwork's Base theme, the app's default (timmo001/dvr-revival#7)
   // (timmo001/dvr-revival#7)
   background: "#1c1e22",
   accent: "#e7e9ee",

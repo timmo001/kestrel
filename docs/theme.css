@@ -1,10 +1,15 @@
 /*
- * The docs site's styles: docs-kit's Blume theme with Groundwork's Base
- * colours, until the app's own themes are chosen (timmo001/dvr-revival#7),
- * set in Mona Sans and Geist Mono as the app is.
+ * The docs site's styles: docs-kit's Blume theme with Groundwork's Base by
+ * default and every other theme to pick, as the app offers
+ * (timmo001/dvr-revival#7), with each theme's fonts. A browser only
+ * downloads the fonts in use.
  */
 @import "@timmo001/docs-kit/blume/theme.css";
 @import "@timmo001/docs-kit/blume/themes/base.css";
+@import "@timmo001/docs-kit/blume/themes/all.css";
 
 @import "@fontsource-variable/mona-sans";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/geist";
 @import "@fontsource-variable/geist-mono";
+@import "@fontsource-variable/jetbrains-mono";

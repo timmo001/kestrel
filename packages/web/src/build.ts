@@ -9,7 +9,7 @@ import path from "node:path";
 import { headTags, writePwa } from "@timmo001/groundwork-pwa/build";
 import { themeBootScript } from "@timmo001/groundwork-tokens/page";
 import config from "../pwa.config.ts";
-import { themeOptions } from "./theme.ts";
+import { themeSettings } from "./theme.ts";
 
 const root = path.join(import.meta.dir, "..");
 const outDir = path.join(root, "dist");
@@ -42,7 +42,7 @@ await Bun.write(
   path.join(outDir, "index.html"),
   html.replace(
     "<!-- pwa:head -->",
-    `${headTags(config)}\n    <script>${themeBootScript(themeOptions)}</script>`,
+    `${headTags(config)}\n    <script>${themeBootScript(themeSettings)}</script>`,
   ),
 );
 
