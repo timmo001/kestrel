@@ -149,6 +149,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   /** The version of the settings the page read, sent back with a save. */
   let revision = "";
 
+  /** The source whose panel is open, kept across redraws. */
+  let opened: Draft | undefined;
+
   const say = (message: string, tone: "danger" | "success") => {
     if (notice === null) return;
 
@@ -169,6 +172,8 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     }));
     labels = new Map(settings.cameras.map((each) => [each.camera, each.label]));
     revision = settings.revision ?? "";
+    // The panel open before a save stays open after it
+    opened = drafts.find((source) => source.id === opened?.id);
   };
 
   /** A field for each of a source's cameras' names, once the server has them. */
@@ -255,7 +260,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
 
   const sourceCard = (source: Draft, index: number) => {
     const kind = kinds.find((each) => each.kind === source.kind);
-    const card = element("gw-card");
+    const card = element("gw-expansion");
     const remove = button("Remove", phTrash);
     const name = element("gw-input");
 
@@ -270,6 +275,21 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       source.name === "" ? "New source" : source.name,
     );
     describe();
+    card.open = source === opened;
+
+    // One source open at a time: opening one closes the one open before
+    card.addEventListener("toggle", () => {
+      if (card.open) {
+        opened = source;
+
+        for (const other of list?.querySelectorAll("gw-expansion") ?? []) {
+          if (other !== card) other.open = false;
+        }
+      } else if (opened === source) {
+        opened = undefined;
+      }
+    });
+
     remove.slot = "actions";
     remove.setAttribute("variant", "danger");
     remove.setAttribute("appearance", "plain");
@@ -356,6 +376,8 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       secrets: [],
       saved: false,
     });
+    // A new source opens, ready to fill in
+    opened = drafts.at(-1);
     render();
     list?.lastElementChild?.scrollIntoView({ block: "start" });
   };

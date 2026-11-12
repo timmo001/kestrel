@@ -166,6 +166,18 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
     figure.className = "player-tile";
     figure.dataset.camera = camera;
+    // A shimmer from when a clip starts loading until its first frame, so
+    // the picture fades in rather than popping in
+    video.addEventListener("loadstart", () => {
+      figure.dataset.loading = "";
+    });
+
+    for (const type of ["loadeddata", "emptied"]) {
+      video.addEventListener(type, () => {
+        delete figure.dataset.loading;
+      });
+    }
+
     video.className = "player-video";
     video.muted = true;
     video.playsInline = true;

@@ -77,7 +77,7 @@
                 <gw-segmented
                   class="live-layout"
                   label="Cameras at once"
-                  value="4"
+                  value="all"
                 ></gw-segmented>
               </gw-row>
               <gw-row
@@ -109,6 +109,8 @@
                     <dd>Pause or play</dd>
                     <dt><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></dt>
                     <dd>Cameras at once</dd>
+                    <dt><kbd>A</kbd></dt>
+                    <dd>Every camera at once</dd>
                     <dt><kbd>←</kbd> <kbd>→</kbd></dt>
                     <dd>Previous or next cameras</dd>
                     <dt><kbd>Enter</kbd> or a double click</dt>
@@ -404,8 +406,10 @@
             <gw-button slot="actions" class="settings-save">Save</gw-button>
           </gw-page-header>
           <gw-alert class="settings-notice" hidden></gw-alert>
+          <!-- Placeholders the size of the folded panels until they load -->
           <gw-stack class="settings-list">
-            <gw-card heading="Sources" loading lines="4"></gw-card>
+            <gw-card loading lines="1"></gw-card>
+            <gw-card loading lines="1"></gw-card>
           </gw-stack>
         </section>
 

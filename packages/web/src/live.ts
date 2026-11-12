@@ -1,10 +1,11 @@
 /**
- * The Live page: the cameras with a signal, a layout's worth at a time (1, 2,
- * 3 or 4, and 6, 9 or 16 where there are more cameras), paged with Previous
- * and Next, under one set of controls: pause, a still of the picked camera,
- * full screen and keys. The layout, page and picked camera are kept in this
- * browser. The players only run while the page shows, so a hidden page
- * streams nothing.
+ * The Live page: every camera with a signal at once, or a layout's worth at a
+ * time (1, 2, 3 or 4, and 6, 9 or 16 where there are more cameras), paged
+ * with Previous and Next, under one set of controls: pause, a still of the
+ * picked camera, full screen and keys. The layout, page, picked camera and
+ * how many cameras there were are kept in this browser, so the placeholders
+ * take the cameras' places before they're known. The players only run while
+ * the page shows, so a hidden page streams nothing.
  */
 import type { Camera, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
@@ -64,25 +65,50 @@ const definePlayer = async (path: string) => {
   }
 };
 
-/** How many cameras each layout shows. */
+/** How many cameras each paged layout shows. */
 const layouts = [1, 2, 3, 4, 6, 9, 16];
 
-/**
- * The layouts worth offering for this many cameras: the ones they fill, and
- * the first that shows them all, so a four-camera recorder offers 1 to 4.
- */
-const layoutsFor = (cameras: number) => {
-  const all = layouts.find((size) => size >= cameras) ?? 16;
+/** A layout: how many cameras at once, or all of them. */
+type Layout = number | "all";
 
-  return layouts.filter((size) => size <= cameras || size === all);
+/**
+ * The layouts worth offering for this many cameras: the paged ones that
+ * show fewer than there are, then All, so five cameras offer 1 to 4 and All.
+ */
+const layoutsFor = (cameras: number): Array<Layout> => [
+  ...layouts.filter((size) => size < cameras),
+  "all",
+];
+
+/** A layout's tooltip. */
+const layoutHint = (layout: Layout) => {
+  if (layout === "all") return "Every camera at once";
+
+  return layout === 1 ? "One camera" : `${layout} cameras at once`;
+};
+
+/**
+ * The grid for `count` cameras at once: the smallest paged layout's grid
+ * that holds them, else columns and rows as near square as they go.
+ */
+const gridFor = (count: number) => {
+  const fits = layouts.find((size) => size >= count);
+
+  if (fits !== undefined) {
+    return { layout: String(fits), columns: null, rows: null };
+  }
+
+  const columns = Math.ceil(Math.sqrt(count));
+
+  return { layout: "all", columns, rows: Math.ceil(count / columns) };
 };
 
 /**
  * Past four at once, the small sub stream where there is one: the main one
  * is more than a small tile shows.
  */
-const streamFor = (live: LiveStreams, layout: number) =>
-  layout > 4 ? (live.sub ?? live.main) : live.main;
+const streamFor = (live: LiveStreams, count: number) =>
+  count > 4 ? (live.sub ?? live.main) : live.main;
 
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
@@ -116,11 +142,15 @@ const kept = () => {
   const values = keptAt(storageKey);
   const layout = Number(values?.["layout"]);
   const page = Number(values?.["page"]);
+  const count = Number(values?.["count"]);
+  /** All until a paged one's picked, so every camera shows at first. */
+  const keptLayout: Layout = layouts.includes(layout) ? layout : "all";
 
   return {
-    /** `undefined` until one's picked, so every camera shows at first. */
-    layout: layouts.includes(layout) ? layout : undefined,
+    layout: keptLayout,
     page: Number.isInteger(page) && page >= 0 ? page : 0,
+    /** How many cameras there were last time, for the placeholders' shape. */
+    count: Number.isInteger(count) && count > 0 ? count : 4,
     // Kept before camera ids, the recorder's channel by number
     picked: Option.getOrUndefined(decodeSavedCamera(values?.["picked"])),
   };
@@ -170,23 +200,77 @@ export const livePage = (): LivePage => {
   const section = stage?.closest("section");
 
   const saved = kept();
-  /** Whether a layout's been picked, rather than the one that shows them all. */
-  let chosen = saved.layout !== undefined;
-  let layout = saved.layout ?? 4;
+  let layout: Layout = saved.layout;
   let page = saved.page;
   let picked = saved.picked;
   /** Where to go back to from one camera alone, by Enter or a double click. */
-  let solo: { readonly layout: number; readonly page: number } | undefined;
+  let solo: { readonly layout: Layout; readonly page: number } | undefined;
   let paused = false;
   let streams: ReadonlyArray<Camera> = [];
   let tiles: ReadonlyArray<Tile> = [];
-
-  // The placeholders take the kept layout's shape from the first paint
-  if (grid !== null) grid.dataset.layout = String(layout);
+  /** Whether the cameras are known, rather than guessed from last time. */
+  let loaded = false;
 
   const shown = () => section?.hidden === false;
 
-  const pages = () => Math.max(1, Math.ceil(streams.length / layout));
+  /** How many cameras there are, or were last time until they're known. */
+  const count = () => (loaded ? streams.length : saved.count);
+
+  /** How many cameras a page shows. */
+  const size = () => (layout === "all" ? Math.max(count(), 1) : layout);
+
+  const pages = () => Math.max(1, Math.ceil(count() / size()));
+
+  /** Lays the grid out for a page's worth of cameras. */
+  const arrangeGrid = (target: HTMLElement) => {
+    const arrangement =
+      layout === "all"
+        ? gridFor(size())
+        : { layout: String(layout), columns: null, rows: null };
+
+    target.dataset.layout = arrangement.layout;
+    // The sub stream's pictures are squeezed, which the styles undo
+    target.dataset.stream = size() > 4 ? "sub" : "main";
+
+    const ratio =
+      arrangement.columns === null || arrangement.rows === null
+        ? null
+        : `calc(${arrangement.columns * 16} / ${arrangement.rows * 9})`;
+
+    for (const [name, value] of [
+      ["--live-columns", arrangement.columns],
+      ["--live-rows", arrangement.rows],
+      ["--live-ratio", ratio],
+    ] as const) {
+      if (value === null) target.style.removeProperty(name);
+      else target.style.setProperty(name, String(value));
+    }
+  };
+
+  /**
+   * Shimmering tiles in the shape the cameras will take, from how many there
+   * were last time, so nothing moves when they arrive.
+   */
+  const placeholders = () => {
+    if (grid === null) return;
+
+    page = Math.min(page, pages() - 1);
+    arrangeGrid(grid);
+    grid.setAttribute("aria-busy", "true");
+
+    const onPage = Math.max(1, Math.min(size(), count() - page * size()));
+
+    grid.replaceChildren(
+      ...Array.from({ length: onPage }, () => {
+        const tile = element("div");
+
+        tile.className = "live-tile";
+        tile.dataset.loading = "";
+
+        return tile;
+      }),
+    );
+  };
 
   const setIcon = (
     button: HTMLElementTagNameMap["gw-button"] | null,
@@ -222,19 +306,15 @@ export const livePage = (): LivePage => {
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
   const keepPlace = () =>
-    keep(storageKey, {
-      layout: chosen ? layout : null,
-      page,
-      picked: picked ?? null,
-    });
+    keep(storageKey, { layout, page, picked: picked ?? null });
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
     if (layoutToggle !== null) {
-      layoutToggle.options = layoutsFor(streams.length).map((size) => ({
-        value: String(size),
-        label: String(size),
-        hint: size === 1 ? "One camera" : `${size} cameras at once`,
+      layoutToggle.options = layoutsFor(count()).map((each) => ({
+        value: String(each),
+        label: each === "all" ? "All" : String(each),
+        hint: layoutHint(each),
       }));
       layoutToggle.value = String(layout);
     }
@@ -283,7 +363,7 @@ export const livePage = (): LivePage => {
     );
 
     tile.player.src = new URL(
-      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, layout))}`,
+      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, size()))}`,
       location.origin,
     ).href;
   };
@@ -303,13 +383,11 @@ export const livePage = (): LivePage => {
     if (grid === null || !shown()) return;
 
     page = Math.min(page, pages() - 1);
-    grid.dataset.layout = String(layout);
-    // The sub stream's pictures are squeezed, which the styles undo
-    grid.dataset.stream = layout > 4 ? "sub" : "main";
+    arrangeGrid(grid);
     grid.removeAttribute("aria-busy");
 
     tiles = streams
-      .slice(page * layout, page * layout + layout)
+      .slice(page * size(), page * size() + size())
       .map((stream) => {
         const figure = element("figure");
         const hold = element("canvas");
@@ -378,13 +456,12 @@ export const livePage = (): LivePage => {
     showControls();
   };
 
-  const setLayout = (size: number) => {
-    if (size === layout || !layoutsFor(streams.length).includes(size)) return;
+  const setLayout = (next: Layout) => {
+    if (next === layout || !layoutsFor(count()).includes(next)) return;
 
     // The first camera shown stays in view
-    page = Math.floor((page * layout) / size);
-    layout = size;
-    chosen = true;
+    page = next === "all" ? 0 : Math.floor((page * size()) / next);
+    layout = next;
     solo = undefined;
     keepPlace();
     render();
@@ -406,7 +483,7 @@ export const livePage = (): LivePage => {
       solo = undefined;
     } else {
       const index = streams.findIndex((stream) => stream.id === picked);
-      const at = index === -1 ? page * layout : index;
+      const at = index === -1 ? page * size() : index;
       const camera = streams[at];
 
       if (camera === undefined) return;
@@ -494,7 +571,11 @@ export const livePage = (): LivePage => {
   };
 
   if (layoutToggle !== null) {
-    on(layoutToggle, "change", () => setLayout(Number(layoutToggle.value)));
+    on(layoutToggle, "change", () =>
+      setLayout(
+        layoutToggle.value === "all" ? "all" : Number(layoutToggle.value),
+      ),
+    );
   }
 
   previousButton?.addEventListener("click", () => step(-1));
@@ -532,10 +613,11 @@ export const livePage = (): LivePage => {
     ["Enter", toggleSolo],
     ["s", capture],
     ["f", () => fullscreenButton?.click()],
-    // A digit key for each layout up to 9
-    ...layouts.flatMap((size): Array<[string, () => void]> =>
-      size < 10 ? [[String(size), () => setLayout(size)]] : [],
+    // A digit key for each layout up to 9, and A for All
+    ...layouts.flatMap((each): Array<[string, () => void]> =>
+      each < 10 ? [[String(each), () => setLayout(each)]] : [],
     ),
+    ["a", () => setLayout("all")],
   ]);
 
   document.addEventListener("keydown", (event) => {
@@ -569,6 +651,7 @@ export const livePage = (): LivePage => {
     requestAnimationFrame(focus);
   });
 
+  placeholders();
   showControls();
 
   return {
@@ -582,18 +665,21 @@ export const livePage = (): LivePage => {
           (camera.live !== null || camera.still) && camera.signal !== false,
       );
 
-      // Until a layout's picked, and for one bigger than there are cameras
-      // for, the one that shows them all
-      if (!chosen || !layoutsFor(streams.length).includes(layout)) {
-        layout = layoutsFor(streams.length).at(-1) ?? 1;
-      }
+      loaded = true;
+
+      // A paged layout as big as the cameras there are now shows them all
+      if (!layoutsFor(streams.length).includes(layout)) layout = "all";
+
+      // Kept for next time's placeholders
+      keep(storageKey, { count: streams.length });
 
       paused = false;
       render();
     },
     stop: () => {
-      grid?.replaceChildren();
       tiles = [];
+      // Back to placeholders, so the page comes back without a jump
+      placeholders();
     },
     focus,
   };

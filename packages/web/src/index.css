@@ -254,7 +254,8 @@ gw-page {
 }
 
 /* A shimmer until the camera's first frames play, then the video fades in */
-.live-tile[data-loading] {
+.live-tile[data-loading],
+.player-tile[data-loading] {
   background: linear-gradient(
       100deg,
       transparent 30%,
@@ -266,8 +267,13 @@ gw-page {
   animation: live-shimmer 1.4s linear infinite;
 }
 
-.live-tile[data-loading] dvr-live {
+.live-tile[data-loading] dvr-live,
+.player-tile[data-loading] > video {
   opacity: 0;
+}
+
+.player-tile > video {
+  transition: opacity 200ms ease-out;
 }
 
 @keyframes live-shimmer {
@@ -281,7 +287,8 @@ gw-page {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live-tile[data-loading] {
+  .live-tile[data-loading],
+  .player-tile[data-loading] {
     animation: none;
   }
 }
