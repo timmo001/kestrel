@@ -1,9 +1,10 @@
 /**
  * A Bambu Lab P1 or A1 printer as a source, with its camera as one camera
- * that has a still picture. It keeps the camera feed open on port 6000,
- * logged in with the printer's LAN access code, reopened with backoff when
- * it drops, and serves the newest picture. Its certificate is the
- * printer's own, so it isn't checked.
+ * that has a still picture and the footage it records during prints, and
+ * its timelapses as a camera of their own. It keeps the camera feed open
+ * on port 6000, logged in with the printer's LAN access code, reopened
+ * with backoff when it drops, and serves the newest picture. Its
+ * certificate is the printer's own, so it isn't checked.
  *
  * @module
  */
@@ -34,6 +35,7 @@ import {
 } from "effect";
 import * as Socket from "effect/socket/Socket";
 import { cameraPort, loginPacket, pictureReader } from "./Camera.ts";
+import { printerRecordings } from "./Recordings.ts";
 
 /** How long the feed can go without sending anything before it's reopened. */
 const quietFor = Duration.seconds(20);
@@ -63,7 +65,7 @@ export const info: Kind["info"] = {
   kind: "bambu",
   name: "Bambu Lab printer",
   description:
-    "A Bambu Lab P1 or A1 printer's camera, as a picture every few seconds, over your network",
+    "A Bambu Lab P1 or A1 printer's camera, as a picture every few seconds, with what it records and its timelapses, over your network",
   fields: [
     {
       key: "host",
@@ -88,6 +90,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
   const id = saved.id;
   const name = saved.name;
   const camera = cameraId(id, "camera");
+  const timelapse = cameraId(id, "timelapse");
 
   const settings = yield* decodeSettings(
     Object.fromEntries(
@@ -103,6 +106,12 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
   );
 
   const accessCode = Redacted.make(settings.accessCode);
+
+  const recordings = yield* printerRecordings({
+    name,
+    login: { host: settings.host, accessCode },
+    cameras: { recording: camera, timelapse },
+  });
 
   const latest = yield* Ref.make(
     Option.none<{ readonly picture: Uint8Array; readonly at: number }>(),
@@ -233,11 +242,22 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         signal: null,
         live: false,
         still: true,
-        recordings: false,
+        recordings: true,
+        events: false,
+      } satisfies CameraInfo,
+      {
+        id: timelapse,
+        name: `${name} timelapses`,
+        channel: null,
+        signal: null,
+        live: false,
+        still: false,
+        recordings: true,
         events: false,
       } satisfies CameraInfo,
     ]),
     live: Effect.succeed([]),
+    recordings,
     stills: {
       still: Effect.fnUntraced(function* (wanted) {
         if (wanted !== camera) {

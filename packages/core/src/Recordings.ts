@@ -16,6 +16,7 @@ export const RecordingReason = Schema.Literals([
   "alarm input",
   "PIR",
   "manual",
+  "timelapse",
 ]);
 
 export type RecordingReason = typeof RecordingReason.Type;

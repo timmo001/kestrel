@@ -94,6 +94,13 @@ port 6000, so the camera shows on the Live page as a still, a new one every
 few seconds. Turn on its LAN mode, or LAN-only liveview, for the feed to
 answer.
 
+The printer's recordings come from its storage over FTPS on port 990, with
+the same access code: what its camera records during prints, as the
+camera's continuous footage, and the timelapse of each print, as a second
+camera, such as `bambu/timelapse`. They're MJPEG, so each is converted to
+H.264 with ffmpeg as it's copied or played, one at a time. Set
+`KESTREL_FFMPEG` for an ffmpeg that isn't on the path; it needs `libx264`.
+
 A source's `id` names its cameras, such as `swann/3`, so links and labels
 keep working as long as it stays the same. It holds logins, so keep it to
 yourself. The API never sends a password back: the page shows which are set,

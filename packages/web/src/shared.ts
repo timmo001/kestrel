@@ -199,6 +199,7 @@ export const reasonTones: Record<RecordingReason, string> = {
   motion: "warning",
   "alarm input": "warning",
   PIR: "important",
+  timelapse: "accent",
 };
 
 /** Chips for a row's reasons, which the row keeps as one comma-separated value. */
