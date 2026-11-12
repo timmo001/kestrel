@@ -37,7 +37,10 @@ Every endpoint that needs the recorder returns 503 with a
 sends what a channel recorded between two recorder times as fragmented MP4,
 H.264 with no audio, which plays as it arrives. Add `stream=sub` for the small
 sub stream, and `download=true` to have a browser save it as a file rather
-than play it.
+than play it. `speedUp=2`, up to 4, shortens each frame so it plays that many
+times faster: browsers play no faster than 16 times, so the page plays 32
+times as the sub stream with `speedUp=2` at 16 times. The main stream only
+downloads at about 17 times real time, so it can't keep up past 16.
 
 - It runs across recordings, one after another, with the gaps between them
   closed up, so a range over a run of motion clips plays them back to back.

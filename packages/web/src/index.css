@@ -27,6 +27,7 @@ body {
    reckons that width from this padding */
 .nav-link {
   display: inline-flex;
+  gap: 6px;
   align-items: center;
   padding: var(--gw-space-2) 0.75rem;
   border-radius: var(--gw-radius-pill);
@@ -35,6 +36,14 @@ body {
   text-decoration: none;
   white-space: nowrap;
   transition: background-color var(--gw-motion-fast) var(--gw-motion-easing);
+}
+
+/* The page's icon, its size counted in the script's sum of the links */
+.nav-link .icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: currentcolor;
 }
 
 .nav-link:hover {
@@ -218,6 +227,35 @@ gw-page {
   touch-action: none;
 }
 
+/* The last frame, over the picture while the next clip loads. It shows at
+   once and fades out once the next clip draws its first frame */
+.player-hold {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease-out;
+}
+
+.player-hold[data-shown] {
+  opacity: 1;
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-hold {
+    transition: none;
+  }
+}
+
+/* It takes the focus for the keyboard controls, which needs no ring */
+.player-stage:focus {
+  outline: none;
+}
+
 /* Zoomed in, a drag pans the picture */
 .player-screen[data-zoomed] .player-video {
   cursor: grab;
@@ -305,6 +343,42 @@ gw-page {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* The keyboard controls, key beside what it does */
+.shortcuts {
+  --gw-popover-width: 24rem;
+}
+
+.shortcut-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--gw-space-2) var(--gw-space-4);
+  align-items: center;
+  margin: 0;
+}
+
+.shortcut-list dt {
+  white-space: nowrap;
+}
+
+.shortcut-list dd {
+  margin: 0;
+  color: var(--gw-color-text-secondary);
+}
+
+kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0.1em 0.4em;
+  border: 1px solid var(--gw-color-border-normal);
+  border-block-end-width: 2px;
+  border-radius: var(--gw-radius-sm, 4px);
+  background: var(--gw-color-surface-raised);
+  color: var(--gw-color-text-strong);
+  font-family: var(--gw-font-mono);
+  font-size: 0.8125rem;
+  text-align: center;
 }
 
 .control-speed-other {

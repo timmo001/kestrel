@@ -26,6 +26,7 @@ import {
   phDownloadSimple,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
+  phQuestion,
   phPause,
   phPlay,
   phScissors,
@@ -178,6 +179,8 @@ export interface PlaybackPage {
   readonly open: (search: RecordingsSearch) => void;
   /** Pauses, for when the page is left. */
   readonly pause: () => void;
+  /** Gives the player the focus, so the keyboard controls work at once. */
+  readonly focus: () => void;
 }
 
 /** The Recordings page, wired to its elements. */
@@ -210,6 +213,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   const zoomFitButton = find("gw-button", "control-zoom-fit");
   const zoomInButton = find("gw-button", "control-zoom-in");
   const fullscreenButton = find("gw-button", "control-fullscreen");
+  const helpButton = find("gw-button", "control-help");
+  const hold = find("canvas", "player-hold");
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
   const clipDownload = find("gw-button", "clip-download");
@@ -246,6 +251,9 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     clip: Clip,
     step: -1 | 1,
   ) => Promise<Recording | undefined> = async () => undefined;
+
+  /** Set below: holds the picture showing before the video loads another clip. */
+  let beforeLoad: () => void = () => undefined;
 
   /** Set below: loads a recording from `from` seconds in, playing unless told not to. */
   let playClip: (clip: Clip, from?: number, autoplay?: boolean) => void = () =>
@@ -509,7 +517,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       setIcon(
         playButton,
         playing ? icons.pause : icons.play,
-        playing ? "Pause" : "Play",
+        playing ? "Pause (K)" : "Play (K)",
       );
       playButton.disabled = idle && recordings.length === 0;
     }
@@ -552,6 +560,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
 
     if (problem !== null) problem.hidden = true;
 
+    beforeLoad();
     void player.play(clip, from, autoplay).then(() => keepPosition(true));
     showState();
   };
@@ -599,6 +608,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
   previousButton?.addEventListener("click", () => void skip(-1));
   nextButton?.addEventListener("click", () => void skip(1));
 
+  let shownView = fullView;
+
   const showSpeed = () => {
     const view = viewFor(Number(speed));
     // What's left of the speed after the server's part
@@ -609,6 +620,15 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       // and to the reload a change of view brings
       video.defaultPlaybackRate = rate;
       video.playbackRate = rate;
+    }
+
+    // Another view loads the clip again, from the other stream
+    if (
+      view.stream !== shownView.stream ||
+      view.speedUp !== shownView.speedUp
+    ) {
+      beforeLoad();
+      shownView = view;
     }
 
     player?.view(view);
@@ -839,7 +859,7 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     setIcon(
       fullscreenButton,
       full ? icons.exitFullscreen : icons.fullscreen,
-      full ? "Exit full screen" : "Full screen",
+      full ? "Exit full screen (F)" : "Full screen (F)",
     );
 
     // The picture's size changed, so the pan's reach did too
@@ -880,6 +900,8 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       actionsColumn((clip) => {
         playClip(clip);
         stage?.scrollIntoView({ behavior: "smooth", block: "start" });
+        // The keys then work the player, not the row's button
+        stage?.focus({ preventScroll: true });
       }),
       { id: "begin", header: "Start" },
       { id: "end", header: "End" },
@@ -1050,6 +1072,184 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
     resumed = true;
   };
 
+  // Keyboard controls, as YouTube's: they work anywhere on the page but in a
+  // field being typed in, and leave the arrows to the speed toggle and the
+  // table when either has the focus
+  const page = stage?.closest("section");
+
+  /** Moves the playhead by `by` seconds, within the recording. */
+  const seekBy = (by: number) => {
+    const clip = player?.clip();
+    const offset = player?.offset();
+
+    if (clip === undefined || offset === undefined) return;
+
+    const length = toSeconds(clip.end) - toSeconds(clip.begin);
+
+    player?.seek(Math.min(Math.max(offset + by, 0), length - 1));
+  };
+
+  /** The preset `step` along from the nearest one to the speed now. */
+  const stepSpeed = (step: -1 | 1) => {
+    const now = Number(speed);
+    const nearest = speeds.findIndex((preset) => Number(preset) >= now);
+    const index = (nearest === -1 ? speeds.length - 1 : nearest) + step;
+    const next = speeds[Math.min(Math.max(index, 0), speeds.length - 1)];
+
+    if (next !== undefined) setSpeed(next);
+  };
+
+  const keys = new Map<string, () => void>([
+    [" ", togglePlay],
+    ["k", togglePlay],
+    ["ArrowLeft", () => seekBy(-5)],
+    ["ArrowRight", () => seekBy(5)],
+    ["Shift+ArrowLeft", () => seekBy(-30)],
+    ["Shift+ArrowRight", () => seekBy(30)],
+    ["j", () => seekBy(-10)],
+    ["l", () => seekBy(10)],
+    [".", () => frameButton?.click()],
+    ["n", () => void skip(1)],
+    ["p", () => void skip(-1)],
+    ["[", () => stepSpeed(-1)],
+    ["]", () => stepSpeed(1)],
+    ["+", () => zoomStep(1)],
+    ["=", () => zoomStep(1)],
+    ["-", () => zoomStep(-1)],
+    ["0", () => zoomTo(1)],
+    ["f", () => fullscreenButton?.click()],
+    ["c", () => cutButton?.click()],
+    ["s", () => captureButton?.click()],
+  ]);
+
+  /** Where a key belongs to what has the focus rather than the player. */
+  // Inputs that take text: a toggle's radios don't, so keys pass them by
+  const typing =
+    "input:not([type=radio], [type=checkbox], [type=button], [type=range]), textarea, select, [contenteditable], gw-input, gw-select";
+
+  const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
+
+  document.addEventListener("keydown", (event) => {
+    if (
+      page?.hidden !== false ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.defaultPrevented
+    ) {
+      return;
+    }
+
+    const path = event
+      .composedPath()
+      .filter((target) => target instanceof Element);
+
+    if (path.some((target) => target.matches(typing))) return;
+
+    if (
+      event.key.startsWith("Arrow") &&
+      path.some((target) => target.matches(ownsArrows))
+    ) {
+      return;
+    }
+
+    // Space on a focused button presses that button, as it should
+    if (
+      event.key === " " &&
+      path.some((target) =>
+        target.matches("button, a, gw-button, [role=radio]"),
+      )
+    ) {
+      return;
+    }
+
+    const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+
+    const action = keys.get(
+      event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key,
+    );
+
+    if (action === undefined) return;
+
+    event.preventDefault();
+    action();
+  });
+
+  // Each control's key, in its tooltip and for assistive technology
+  const shortcuts: ReadonlyArray<
+    readonly [HTMLElementTagNameMap["gw-button"] | null, string, string]
+  > = [
+    [frameButton, ".", "."],
+    [previousButton, "P", "p"],
+    [nextButton, "N", "n"],
+    [cutButton, "C", "c"],
+    [captureButton, "S", "s"],
+    [zoomOutButton, "−", "-"],
+    [zoomInButton, "+", "+"],
+    [fullscreenButton, "F", "f"],
+  ];
+
+  for (const [button, shown, key] of shortcuts) {
+    if (button === null) continue;
+
+    const label = `${button.getAttribute("label") ?? ""} (${shown})`;
+
+    setIcon(button, button.getAttribute("icon") ?? "", label);
+    button.setAttribute("aria-keyshortcuts", key);
+  }
+
+  playButton?.setAttribute("aria-keyshortcuts", "Space k");
+
+  // A click on a control hands the focus back to the player, so the keys
+  // keep working rather than going to the button clicked. Fields keep it
+  // while they're typed in, and the keyboard's own Tab moves it as ever
+  const focusPlayer = () => stage?.focus({ preventScroll: true });
+
+  stage?.addEventListener("pointerup", (event) => {
+    const path = event
+      .composedPath()
+      .filter((target) => target instanceof Element);
+
+    if (path.some((target) => target.matches(`${typing}, gw-popover`))) return;
+
+    requestAnimationFrame(focusPlayer);
+  });
+
+  // The help button opens the keys, by the button
+  const shortcutsPopover = find("gw-popover", "shortcuts");
+
+  setIcon(helpButton, phQuestion);
+  helpButton?.addEventListener("click", () =>
+    shortcutsPopover?.show(helpButton),
+  );
+
+  // The last frame, held over the picture while the next clip loads, then
+  // faded out once the next one draws, rather than a flash of black
+  const holdFrame = () => {
+    if (hold === null || video === null || video.readyState < 2) return;
+
+    hold.width = video.videoWidth;
+    hold.height = video.videoHeight;
+    hold.getContext("2d")?.drawImage(video, 0, 0);
+    hold.style.transform = video.style.transform;
+    hold.toggleAttribute("data-shown", true);
+
+    const release = () => hold.removeAttribute("data-shown");
+    const timer = setTimeout(release, 4000);
+
+    video.addEventListener(
+      "loadeddata",
+      () =>
+        video.requestVideoFrameCallback(() => {
+          clearTimeout(timer);
+          release();
+        }),
+      { once: true },
+    );
+  };
+
+  beforeLoad = holdFrame;
+
   showState();
 
   return {
@@ -1076,5 +1276,6 @@ export const playbackPage = (options: PlaybackOptions): PlaybackPage => {
       video?.pause();
       keepPosition(true);
     },
+    focus: focusPlayer,
   };
 };

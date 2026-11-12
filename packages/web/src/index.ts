@@ -26,12 +26,24 @@ import {
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
 import { pageTheme, themeOptions } from "@timmo001/groundwork-tokens/page";
-import { on, type MenuItem, type TableRow } from "@timmo001/groundwork-ui";
+import {
+  createIcon,
+  on,
+  type MenuItem,
+  type TableRow,
+} from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
-import { phBell, phDotsThreeVertical } from "./icons.ts";
+import {
+  phBell,
+  phBellRinging,
+  phDotsThreeVertical,
+  phFilmStrip,
+  phHardDrives,
+  phVideoCamera,
+} from "./icons.ts";
 import { playbackPage } from "./playback.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import {
@@ -404,6 +416,10 @@ const showClips = async () => {
 // has an address of its own and back and forward move between them
 type Page = Location["name"];
 
+const isPage = Schema.is(
+  Schema.Literals(["live", "recordings", "events", "recorder", "notFound"]),
+);
+
 const pageTitles: Record<Page, string> = {
   live: "Live",
   recordings: "Recordings",
@@ -415,6 +431,22 @@ const pageTitles: Record<Page, string> = {
 const pages = [...document.querySelectorAll("section.page")];
 const navLinks = [...document.querySelectorAll("a.nav-link")];
 let currentPage: Page | undefined;
+
+// Each link's icon, before its name
+const pageIcons: Record<Page, string> = {
+  live: phVideoCamera,
+  recordings: phFilmStrip,
+  events: phBellRinging,
+  recorder: phHardDrives,
+  notFound: phVideoCamera,
+};
+
+for (const link of navLinks) {
+  const page = link instanceof HTMLElement ? link.dataset.page : undefined;
+  const icon = pageIcons[isPage(page) ? page : "notFound"];
+
+  link.prepend(createIcon(icon));
+}
 
 const showPage = (location: Location) => {
   const page = location.name;
@@ -447,6 +479,9 @@ const showPage = (location: Location) => {
 
   if (left === "recordings") playback.pause();
 
+  // Arriving at Recordings, the keyboard controls work straight away
+  if (page === "recordings") requestAnimationFrame(playback.focus);
+
   if (page === "live" && liveChannels !== undefined) {
     void showLive(liveChannels);
   }
@@ -466,6 +501,9 @@ const barExtras = 12 * 2 + 12 * 2 + 4 * (navLinks.length - 1) + 40 * 2 + 16;
 /** Each link's padding either side of its text. */
 const linkPadding = 12 * 2;
 
+/** Each link's icon and the gap after it. */
+const linkIcon = 20 + 6;
+
 const fitNav = () => {
   if (appBar === null || brand === null) return;
 
@@ -474,7 +512,8 @@ const fitNav = () => {
     (total, link) =>
       total +
       (link.querySelector("span")?.getBoundingClientRect().width ?? 0) +
-      linkPadding,
+      linkPadding +
+      linkIcon,
     0,
   );
 

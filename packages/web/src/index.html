@@ -109,9 +109,13 @@
             </div>
             <gw-alert class="player-problem" tone="warning" hidden></gw-alert>
             <!-- The video and its controls, which go full screen together -->
-            <div class="player-stage">
+            <!-- Focusable, so the keyboard controls reach it after a click -->
+            <div class="player-stage" tabindex="-1">
               <div class="player-screen">
                 <video class="player-video" muted playsinline></video>
+                <!-- The last frame, held while the next clip loads, then
+                     faded out over it -->
+                <canvas class="player-hold" aria-hidden="true"></canvas>
                 <p class="player-idle">
                   Pick a time on the timeline, or a recording below
                 </p>
@@ -200,9 +204,40 @@
                     label="Zoom in"
                   ></gw-button>
                   <gw-button
+                    class="control-help"
+                    label="Keyboard controls"
+                  ></gw-button>
+                  <gw-button
                     class="control-fullscreen"
                     label="Full screen"
                   ></gw-button>
+                  <!-- The keys, opened from the help button -->
+                  <gw-popover class="shortcuts" heading="Keyboard controls">
+                    <dl class="shortcut-list">
+                      <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
+                      <dd>Play or pause</dd>
+                      <dt><kbd>←</kbd> <kbd>→</kbd></dt>
+                      <dd>Back or on 5 seconds</dd>
+                      <dt><kbd>Shift</kbd> + <kbd>←</kbd> <kbd>→</kbd></dt>
+                      <dd>Back or on 30 seconds</dd>
+                      <dt><kbd>J</kbd> <kbd>L</kbd></dt>
+                      <dd>Back or on 10 seconds</dd>
+                      <dt><kbd>.</kbd></dt>
+                      <dd>Next frame</dd>
+                      <dt><kbd>P</kbd> <kbd>N</kbd></dt>
+                      <dd>Previous or next recording</dd>
+                      <dt><kbd>[</kbd> <kbd>]</kbd></dt>
+                      <dd>Slower or faster</dd>
+                      <dt><kbd>−</kbd> <kbd>+</kbd> <kbd>0</kbd></dt>
+                      <dd>Zoom out, in, or fit</dd>
+                      <dt><kbd>C</kbd></dt>
+                      <dd>Cut: the clip's start, then its end</dd>
+                      <dt><kbd>S</kbd></dt>
+                      <dd>Save a still</dd>
+                      <dt><kbd>F</kbd></dt>
+                      <dd>Full screen</dd>
+                    </dl>
+                  </gw-popover>
                 </gw-row>
               </div>
             </div>

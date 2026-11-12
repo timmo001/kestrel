@@ -10,6 +10,10 @@ import svgpath from "svgpath";
 
 const names = [
   "bell",
+  "bell-ringing",
+  "film-strip",
+  "hard-drives",
+  "video-camera",
   "camera",
   "caret-left",
   "caret-line-right",
@@ -22,6 +26,7 @@ const names = [
   "magnifying-glass-plus",
   "pause",
   "play",
+  "question",
   "scissors",
   "skip-back",
   "skip-forward",
