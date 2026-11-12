@@ -15,6 +15,7 @@ import {
   type Recording,
 } from "@timmo001/dvr-revival-rsnet/domain";
 import type {
+  Attention,
   LiveStream,
   ReceivedEvent,
 } from "@timmo001/dvr-revival-server/api";
@@ -85,6 +86,40 @@ const reasonChips = (row: TableRow) => {
 
   return chips;
 };
+
+// Dates and times in the browser's preferred language. Chrome formats with
+// its interface language by default, which can differ, such as US dates for
+// someone who prefers British English.
+const locales = navigator.languages;
+
+const dayFormat = new Intl.DateTimeFormat(locales, {
+  weekday: "short",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+});
+
+const dateTimeFormat = new Intl.DateTimeFormat(locales, {
+  dateStyle: "medium",
+  timeStyle: "medium",
+});
+
+const timeFormat = new Intl.DateTimeFormat(locales, { timeStyle: "medium" });
+
+/**
+ * A recorder time or day, such as `2026-11-12` or `2026-11-12T08:30:00`, as
+ * a local `Date`: the recorder keeps its clock in local time, with no zone.
+ */
+const localDate = (time: string) =>
+  new Date(time.length === 10 ? `${time}T00:00:00` : time);
+
+/** A local `Date`'s day as `YYYY-MM-DD`, the form the server takes. */
+const isoDay = (date: Date) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 
 const clock = (time: string) => time.slice(11, 19);
 
@@ -158,22 +193,35 @@ const showConnection = async () => {
 };
 
 // What needs you, from the server's attention list: alerts first, then
-// passive notes
+// passive notes. A passive disk note, such as a full disk, shows in the
+// Disks card instead.
 const attentionStack = find("gw-stack", "attention");
 
+const isDiskNote = (item: Attention) =>
+  item.level === "passive" && item.kind === "disk";
+
+const attentionAlert = (item: Attention) => {
+  const alert = element("gw-alert", item.message);
+
+  alert.setAttribute("tone", item.level === "alert" ? "warning" : "info");
+
+  return alert;
+};
+
+const fetchAttention = () =>
+  call((api) => api.recorder.attention()).catch(() => []);
+
 const showAttention = async () => {
-  const items = await call((api) => api.recorder.attention()).catch(() => []);
+  const items = (await fetchAttention()).filter((item) => !isDiskNote(item));
 
-  attentionStack?.replaceChildren(
-    ...[...items]
+  if (attentionStack === null) return;
+
+  // Hidden when empty, so it leaves no gap above the cameras
+  attentionStack.hidden = items.length === 0;
+  attentionStack.replaceChildren(
+    ...items
       .sort((a, b) => (a.level === b.level ? 0 : a.level === "alert" ? -1 : 1))
-      .map((item) => {
-        const alert = element("gw-alert", item.message);
-
-        alert.setAttribute("tone", item.level === "alert" ? "warning" : "info");
-
-        return alert;
-      }),
+      .map(attentionAlert),
   );
 };
 
@@ -201,9 +249,10 @@ const channelRow = (status: ChannelStatus): TableRow => ({
 });
 
 const showRecorder = async () => {
-  const [device, status] = await Promise.all([
+  const [device, status, attention] = await Promise.all([
     call((api) => api.recorder.device()),
     call((api) => api.recorder.status()),
+    fetchAttention(),
   ]);
 
   channelCount = device.channels;
@@ -218,7 +267,10 @@ const showRecorder = async () => {
       { label: "Channels", value: String(device.channels) },
       {
         label: "Recorder clock",
-        value: status.time?.replace("T", " ") ?? "Unknown",
+        value:
+          status.time === null
+            ? "Unknown"
+            : dateTimeFormat.format(localDate(status.time)),
       },
     ];
 
@@ -240,7 +292,10 @@ const showRecorder = async () => {
     if (status.disks.length === 0) row.append(element("span", "No disks"));
 
     disksCard.loading = false;
-    disksCard.replaceChildren(row);
+    disksCard.replaceChildren(
+      row,
+      ...attention.filter(isDiskNote).map(attentionAlert),
+    );
   }
 
   if (channelsTable !== null) {
@@ -306,6 +361,13 @@ const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
     const player = document.createElement("dvr-live");
 
     figure.className = "live-tile";
+    // Shimmers until the first frames play. Media events don't bubble, so
+    // the tile listens as they pass down to the player's video
+    figure.dataset.loading = "";
+    figure.addEventListener("playing", () => delete figure.dataset.loading, {
+      capture: true,
+      once: true,
+    });
     player.mode = "mse,hls";
     // Video only: the recorder offers an audio track but sends nothing on it,
     // and a player waiting for that audio never starts
@@ -316,6 +378,7 @@ const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
   });
 
   liveGrid?.replaceChildren(...tiles.map(({ figure }) => figure));
+  liveGrid?.removeAttribute("aria-busy");
 
   // Connect once they're on the page, where each player creates its video
   for (const { player, stream } of tiles) {
@@ -327,7 +390,10 @@ const showLive = async (channels: ReadonlyArray<ChannelStatus>) => {
 };
 
 // Recordings: a day and channel, the month's recorded days, and the clips
-const dayInput = find("gw-input", "day");
+const dayButton = find("gw-button", "day");
+const dayInput = find("input", "day-input");
+const previousDay = find("gw-button", "day-previous");
+const nextDay = find("gw-button", "day-next");
 const channelSelect = find("gw-select", "channel");
 const recordedDays = find("gw-row", "recorded-days");
 const recordingsTable = find("gw-table", "recordings");
@@ -378,6 +444,13 @@ const pickDay = async (picked: string) => {
 
   if (dayInput !== null) dayInput.value = picked;
 
+  if (dayButton !== null) {
+    dayButton.textContent = dayFormat.format(localDate(picked));
+  }
+
+  // Recordings stop at today, so there's no day after it to go to
+  if (nextDay !== null) nextDay.disabled = today !== "" && picked >= today;
+
   const days = await call((api) =>
     api.recorder.days({ query: { month: picked.slice(0, 7) } }),
   );
@@ -386,11 +459,38 @@ const pickDay = async (picked: string) => {
   await showRecordings();
 };
 
-// The input inside gw-input fires the native change, which bubbles
-dayInput?.addEventListener("change", (event) => {
-  if (event.target instanceof HTMLInputElement && event.target.value !== "") {
-    void pickDay(event.target.value);
+/** The day `by` days from the picked one. */
+const shiftDay = (by: number) => {
+  const date = localDate(day);
+
+  date.setDate(date.getDate() + by);
+
+  return isoDay(date);
+};
+
+dayButton?.addEventListener("click", () => {
+  if (dayInput === null) return;
+
+  if (today !== "") dayInput.max = today;
+
+  // The calendar opens from the click; where a browser can't, focus the input
+  try {
+    dayInput.showPicker();
+  } catch {
+    dayInput.focus();
   }
+});
+
+dayInput?.addEventListener("change", () => {
+  if (dayInput.value !== "") void pickDay(dayInput.value);
+});
+
+previousDay?.addEventListener("click", () => {
+  if (day !== "") void pickDay(shiftDay(-1));
+});
+
+nextDay?.addEventListener("click", () => {
+  if (day !== "") void pickDay(shiftDay(1));
 });
 
 if (channelSelect !== null) {
@@ -410,7 +510,7 @@ if (eventsTable !== null) {
     {
       id: "receivedAt",
       header: "Received",
-      cell: (row) => new Date(String(row.receivedAt)).toLocaleTimeString(),
+      cell: (row) => timeFormat.format(new Date(String(row.receivedAt))),
     },
     { id: "kind", header: "What" },
     { id: "channel", header: "Channel", numeric: true },

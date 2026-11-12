@@ -25,24 +25,76 @@ gw-page {
   padding-block: var(--gw-space-5);
 }
 
-/* Two cameras across on a wide screen, one on a phone */
+/* Two cameras across, even in a half-width window; one across on a phone */
 .live-grid {
+  --live-gap: var(--gw-space-3);
+  /* The app bar, the page's padding and the Live heading above the grid,
+     and the padding below it */
+  --live-chrome: 8.5rem;
+
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 32rem), 1fr));
-  gap: var(--gw-space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--live-gap);
+  /* Narrow enough that both rows of 16:9 tiles fit in the window */
+  max-width: calc(
+    (100dvh - var(--live-chrome) - var(--live-gap)) * 16 / 9 + var(--live-gap)
+  );
+  margin-inline: auto;
+}
+
+@media (width < 40rem) {
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+    max-width: none;
+  }
 }
 
 .live-tile {
   position: relative;
   margin: 0;
   overflow: hidden;
+  aspect-ratio: 16 / 9;
   border-radius: var(--gw-radius-md, 8px);
   background: #000;
 }
 
 .live-tile dvr-live {
   display: block;
-  aspect-ratio: 16 / 9;
+  height: 100%;
+  transition: opacity 200ms ease-out;
+}
+
+/* A shimmer until the camera's first frames play, then the video fades in */
+.live-tile[data-loading] {
+  background: linear-gradient(
+      100deg,
+      transparent 30%,
+      rgb(255 255 255 / 6%) 50%,
+      transparent 70%
+    )
+    var(--gw-color-surface-raised, #1b1f24);
+  background-size: 200% 100%;
+  animation: live-shimmer 1.4s linear infinite;
+}
+
+.live-tile[data-loading] dvr-live {
+  opacity: 0;
+}
+
+@keyframes live-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-tile[data-loading] {
+    animation: none;
+  }
 }
 
 .live-tile figcaption {
@@ -60,6 +112,23 @@ gw-page {
 
 .recording-filters {
   align-items: end;
+}
+
+.day-picker {
+  gap: var(--gw-space-1);
+}
+
+/* The native date input sits under the day button, so its calendar opens
+   there, but the button shows the day in the browser's language */
+.day-field {
+  position: relative;
+}
+
+.day-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .recorded-days {
