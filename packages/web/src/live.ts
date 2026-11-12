@@ -194,8 +194,13 @@ const kept = () => {
     count: Number.isInteger(count) && count > 0 ? count : 4,
     // Kept before camera ids, the recorder's channel by number
     picked: Option.getOrUndefined(decodeSavedCamera(values?.["picked"])),
-    /** Each camera's zoom and where it was moved to. */
+    /** Each camera's zoom and where it was moved to, in tiles of several. */
     views: Option.getOrElse(decodeKeptViews(values?.["views"]), () => ({})),
+    /** The same, with one camera at a time. */
+    singleViews: Option.getOrElse(
+      decodeKeptViews(values?.["singleViews"]),
+      () => ({}),
+    ),
   };
 };
 
@@ -271,24 +276,42 @@ export const livePage = (): LivePage => {
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
 
-  /** Each camera's zoom, kept from last time. */
-  const views = new Map<string, View>(
-    Object.entries(saved.views).map(([id, view]) => [
-      id,
-      { level: view.level, pan: { x: view.x, y: view.y } },
-    ]),
-  );
+  /** Each camera's zoom from a views kept, by camera id. */
+  const viewsFrom = (kept: typeof saved.views) =>
+    new Map<string, View>(
+      Object.entries(kept).map(([id, view]) => [
+        id,
+        { level: view.level, pan: { x: view.x, y: view.y } },
+      ]),
+    );
 
-  /** Keeps each camera's zoom that isn't its whole picture. */
+  /**
+   * Each camera's zoom, kept from last time: one set for the tiles of
+   * several at once, another for one camera at a time, so a camera zoomed
+   * in its tile can still show whole on its own.
+   */
+  const views = {
+    tiles: viewsFrom(saved.views),
+    single: viewsFrom(saved.singleViews),
+  };
+
+  /** The zooms the page shows now, by how many cameras it shows at once. */
+  const viewsNow = () => (size() === 1 ? views.single : views.tiles);
+
+  /** Each camera's zoom that isn't its whole picture, to keep. */
+  const keptOf = (shown: ReadonlyMap<string, View>) =>
+    Object.fromEntries(
+      [...shown].flatMap(([id, view]) =>
+        view.level === 1 && view.pan.x === 0 && view.pan.y === 0
+          ? []
+          : [[id, { level: view.level, x: view.pan.x, y: view.pan.y }]],
+      ),
+    );
+
   const keepViews = () =>
     keep(storageKey, {
-      views: Object.fromEntries(
-        [...views].flatMap(([id, view]) =>
-          view.level === 1 && view.pan.x === 0 && view.pan.y === 0
-            ? []
-            : [[id, { level: view.level, x: view.pan.x, y: view.pan.y }]],
-        ),
-      ),
+      views: keptOf(views.tiles),
+      singleViews: keptOf(views.single),
     });
 
   const shown = () => section?.hidden === false;
@@ -870,7 +893,7 @@ export const livePage = (): LivePage => {
 
     if (tile === undefined) return;
 
-    views.set(tile.stream.id, {
+    viewsNow().set(tile.stream.id, {
       level: next ? "fill" : 1,
       pan: { x: 0, y: 0 },
     });
@@ -896,7 +919,8 @@ export const livePage = (): LivePage => {
     });
   }
 
-  // Zoom, each camera's its own and kept: fitted whole, filling its tile,
+  // Zoom, each camera's its own and kept, once in tiles and once alone:
+  // fitted whole, filling its tile,
   // or zoomed on from either, the picked camera by Z and in steps from the
   // buttons and keys, or the one under the pointer with Ctrl and the wheel
   // or a pinch. A picture bigger than its tile, filled or zoomed, moves
@@ -904,14 +928,14 @@ export const livePage = (): LivePage => {
   const zoomed = () => tiles.find((tile) => tile.stream.id === picked);
 
   const viewOf = (tile: Tile) => {
-    const found = views.get(tile.stream.id);
+    const found = viewsNow().get(tile.stream.id);
 
     if (found !== undefined) return found;
 
     // Each picture starts whole
     const view: View = { level: 1, pan: { x: 0, y: 0 } };
 
-    views.set(tile.stream.id, view);
+    viewsNow().set(tile.stream.id, view);
 
     return view;
   };
