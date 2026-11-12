@@ -2,8 +2,8 @@
  * The playback timeline under the player: one day's recordings as a bar,
  * a track per channel when several play, zoomed from the whole day down to
  * minutes. It follows the playhead, pans when dragged, and calls back with
- * the second of the day that's clicked. It only draws; what plays is the
- * page's to decide.
+ * the second of the day that's clicked, snapped to a recording just beside
+ * it. It only draws; what plays is the page's to decide.
  */
 
 /** A recording on the timeline, in seconds of its day. */
@@ -52,6 +52,9 @@ const daySeconds = 24 * 60 * 60;
 
 /** How far a press moves before it's a drag rather than a click, in pixels. */
 const dragAfter = 4;
+
+/** How near a recording a press snaps to it, in pixels. */
+const snapWithin = 12;
 
 /** Seconds of the day as `HH:MM:SS`. */
 export const clockOf = (second: number) =>
@@ -173,6 +176,43 @@ export const timelineFor = (
     return Math.min(Math.floor(start + share * span), daySeconds - 1);
   };
 
+  /**
+   * The second a press at `x` picks: off every recording, the nearest point
+   * of the closest one within reach, as a short clip is a sliver across a day.
+   */
+  const pickAt = (x: number) => {
+    const second = secondAt(x);
+    const width = elements.track.getBoundingClientRect().width;
+    const reach = width === 0 ? 0 : (snapWithin / width) * span;
+
+    const nearest = rows
+      .flatMap((row) => row.spans)
+      .map((recording) => {
+        if (second < recording.start) {
+          return { at: recording.start, off: recording.start - second };
+        }
+
+        // Past a sliver, its start; past a long one, its last second
+        if (second >= recording.end) {
+          return {
+            at:
+              recording.end - recording.start <= reach
+                ? recording.start
+                : Math.max(recording.start, Math.ceil(recording.end) - 1),
+            off: second - recording.end,
+          };
+        }
+
+        return { at: second, off: 0 };
+      })
+      .reduce<{ at: number; off: number } | undefined>(
+        (best, one) => (best === undefined || one.off < best.off ? one : best),
+        undefined,
+      );
+
+    return nearest !== undefined && nearest.off <= reach ? nearest.at : second;
+  };
+
   let press: { x: number; start: number; dragged: boolean } | undefined;
 
   elements.track.addEventListener("pointerdown", (event) => {
@@ -194,7 +234,7 @@ export const timelineFor = (
       }
     }
 
-    const second = secondAt(event.clientX);
+    const second = pickAt(event.clientX);
 
     elements.hover.hidden = press?.dragged === true;
     elements.hover.style.left = percent(second);
@@ -206,7 +246,7 @@ export const timelineFor = (
 
     press = undefined;
 
-    if (picked) onPick(secondAt(event.clientX));
+    if (picked) onPick(pickAt(event.clientX));
   });
 
   elements.track.addEventListener("pointercancel", () => {
