@@ -70,6 +70,12 @@ gw-page {
   display: none;
 }
 
+/* Events' two tables each scroll in their own frame, so neither runs the
+   page on as events arrive */
+.page[data-page="events"] gw-table {
+  --gw-table-max-height: 50vh;
+}
+
 .page {
   display: grid;
   gap: var(--gw-space-4);
