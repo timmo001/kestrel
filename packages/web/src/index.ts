@@ -30,7 +30,7 @@ import {
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
 import { pageTheme, themeOptions } from "@timmo001/groundwork-tokens/page";
-import { on, type TableRow } from "@timmo001/groundwork-ui";
+import { on, type MenuItem, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import config from "../pwa.config.ts";
 import { call, listenForEvents } from "./api.ts";
@@ -66,7 +66,6 @@ if (themePicker !== null) {
     if (isThemeMode(event.detail.mode)) theme.setMode(event.detail.mode);
   });
   on(themePicker, "theme", (event) => theme.setTheme(event.detail.id));
-  on(themePicker, "reset", () => theme.reset());
 }
 
 const pwa = connectPwa(config);
@@ -185,9 +184,8 @@ const recordingRow = (recording: Recording): TableRow => ({
   size: size(recording.bytes),
 });
 
-// Connection: the chip in the bar, and the banner while the server can't
-// reach the recorder
-const connectionChip = find("gw-chip", "connection");
+// Connection: a banner while the server can't reach the recorder, and
+// nothing while it can
 const offline = find("gw-banner", "offline");
 
 const offlineMessage = document.querySelector("p.offline-message");
@@ -198,12 +196,6 @@ const showConnection = async () => {
   );
 
   const connected = connection?.connected === true;
-
-  if (connectionChip !== null) {
-    connectionChip.loading = false;
-    connectionChip.textContent = connected ? "Connected" : "Disconnected";
-    connectionChip.setAttribute("tone", connected ? "success" : "danger");
-  }
 
   if (offline !== null) offline.open = !connected;
 
@@ -597,9 +589,37 @@ const showClips = async () => {
     .map(recordingRow);
 };
 
-// Notifications: a button in the bar subscribes this browser to the server's
-// pushes, shown only while it can and hasn't yet
-const notify = find("gw-button", "notify");
+// Notifications: the bar's overflow menu subscribes this browser to the
+// server's pushes and says where they stand, hidden where it can't push
+const more = find("gw-menu-button", "more");
+
+// mdi's bell-outline
+const bell =
+  "M10 21H14C14 22.1 13.1 23 12 23S10 22.1 10 21M21 19V20H3V19L5 17V11C5 7.9 7 5.2 10 4.3V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.3C17 5.2 19 7.9 19 11V17L21 19M17 11C17 8.2 14.8 6 12 6S7 8.2 7 11V18H17V11Z";
+
+const notifyItems: Record<Exclude<PushState, "unsupported">, MenuItem> = {
+  default: {
+    value: "notify",
+    label: "Notify me",
+    description: "Alerts about the recorder, pushed to this browser",
+    icon: bell,
+  },
+  subscribed: {
+    value: "notify",
+    label: "Notifying this browser",
+    description: "Alerts about the recorder are pushed here",
+    icon: bell,
+    disabled: true,
+  },
+  denied: {
+    value: "notify",
+    label: "Notifications are blocked",
+    description: "Allow them in this site's settings to get alerts",
+    icon: bell,
+    disabled: true,
+  },
+};
+
 const clientKey = "dvr-revival:push-client";
 const clientId = localStorage.getItem(clientKey) ?? crypto.randomUUID();
 
@@ -615,15 +635,22 @@ const pushService = {
 };
 
 const showNotify = (state: PushState) => {
-  if (notify !== null) notify.hidden = state !== "default";
+  if (more === null) return;
+
+  more.hidden = state === "unsupported";
+  more.items = state === "unsupported" ? [] : [notifyItems[state]];
 };
 
 void pwa.worker.then(async (registration) => {
   showNotify(await pushState(registration));
 
-  notify?.addEventListener("click", async () => {
-    showNotify(await subscribePush(registration, pushService));
-  });
+  if (more !== null) {
+    on(more, "select", async (event) => {
+      if (event.detail.value === "notify") {
+        showNotify(await subscribePush(registration, pushService));
+      }
+    });
+  }
 });
 
 // Start once the recorder is reachable, then keep the health fresh
