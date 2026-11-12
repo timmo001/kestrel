@@ -15,8 +15,11 @@ import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
-import type { ChannelStatus } from "@timmo001/kestrel-rsnet/domain";
-import type { Attention, ReceivedEvent } from "@timmo001/kestrel-server/api";
+import type {
+  ChannelStatus,
+  ReceivedEvent,
+} from "@timmo001/kestrel-core/domain";
+import type { Attention } from "@timmo001/kestrel-server/api";
 import {
   connectPwa,
   pushState,

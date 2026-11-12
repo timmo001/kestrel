@@ -1,5 +1,5 @@
 /** Checks which recorder states need you, which are pushed as alerts. */
-import type { ChannelStatus } from "@timmo001/kestrel-rsnet/domain";
+import type { ChannelStatus } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
 import { attentionFor } from "./Attention.ts";
 

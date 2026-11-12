@@ -17,8 +17,9 @@
   },
   "dependencies": {
     "@effect/platform-bun": "4.1.4",
-    "@timmo001/kestrel-rsnet": "workspace:*",
     "@timmo001/groundwork-pwa": "0.24.0",
+    "@timmo001/kestrel-core": "workspace:*",
+    "@timmo001/kestrel-source-raysharp": "workspace:*",
     "effect": "4.1.4",
     "mediabunny": "1.65.2",
     "web-push": "4.0.0"

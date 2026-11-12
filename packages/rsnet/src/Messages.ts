@@ -4,7 +4,6 @@
  *
  * @module
  */
-import { reader, writer, type Reader, type Writer } from "./Codec.ts";
 import type {
   AlarmEvent,
   AlarmKind,
@@ -16,7 +15,8 @@ import type {
   Recording,
   RecordingMode,
   RecordingReason,
-} from "./Domain.ts";
+} from "@timmo001/kestrel-core/domain";
+import { reader, writer, type Reader, type Writer } from "./Codec.ts";
 
 /** Message types. */
 export const MessageType = {

@@ -53,13 +53,15 @@ sessions, passes on what they report, and runs go2rtc for the video. See
 
 ## Parts
 
-| Part              | What it is                                                      |
-| ----------------- | --------------------------------------------------------------- |
-| `packages/rsnet`  | The recorder's control protocol, in TypeScript with Effect      |
-| `packages/server` | The server: the recorder session, go2rtc and the [API](/api)    |
-| `packages/web`    | The web client, installable on a phone                          |
-| `packages/cli`    | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents) |
-| `docs`            | This site                                                       |
+| Part                       | What it is                                                        |
+| -------------------------- | ----------------------------------------------------------------- |
+| `packages/core`            | What every source shares, in TypeScript with Effect               |
+| `packages/rsnet`           | The Raysharp recorders' control protocol                          |
+| `packages/source-raysharp` | Raysharp recorders as a source, over that protocol and their RTSP |
+| `packages/server`          | The server: go2rtc and the [API](/api)                            |
+| `packages/web`             | The web client, installable on a phone                            |
+| `packages/cli`             | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents)   |
+| `docs`                     | This site                                                         |
 
 ## Machine-readable docs
 

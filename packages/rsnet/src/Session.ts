@@ -7,6 +7,14 @@
  * @module
  */
 import * as NodeSocket from "@effect/platform-node-shared/NodeSocket";
+import type {
+  AlarmEvent,
+  DeviceInfo,
+  LocalTime,
+  RecordedDay,
+  RecorderStatus,
+  Recording,
+} from "@timmo001/kestrel-core/domain";
 import {
   Array as Arr,
   Cause,
@@ -22,14 +30,6 @@ import {
 import * as Socket from "effect/socket/Socket";
 import { encodeFrame, frameDecoder, type Frame } from "./Codec.ts";
 import { recordingDecoder, type RecordedFrame } from "./Recorded.ts";
-import type {
-  AlarmEvent,
-  DeviceInfo,
-  LocalTime,
-  RecordedDay,
-  RecorderStatus,
-  Recording,
-} from "./Domain.ts";
 import {
   MessageType,
   Subtype,

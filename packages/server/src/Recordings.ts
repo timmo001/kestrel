@@ -1,11 +1,10 @@
 /**
- * Recorded video as MP4: which stretches of which files to ask the recorder
- * for, and the frames it sends written as fragmented MP4, which a browser
- * plays as it arrives and any player opens as a file.
+ * Recorded video as MP4: the frames a source sends written as fragmented
+ * MP4, which a browser plays as it arrives and any player opens as a file.
  *
  * @module
  */
-import type { LocalTime, Recorded, Recording } from "@timmo001/kestrel-rsnet";
+import type { RecordedFrame } from "@timmo001/kestrel-core";
 import { Effect, Schema, Stream } from "effect";
 import {
   EncodedPacket,
@@ -15,54 +14,6 @@ import {
   StreamTarget,
   type StreamTargetChunk,
 } from "mediabunny";
-
-/** A recorder time as seconds since 1970, read as UTC: the recorder keeps no zone. */
-export const toSeconds = (time: LocalTime) => Date.parse(`${time}Z`) / 1000;
-
-/** Seconds since 1970 as a recorder time. */
-export const fromSeconds = (seconds: number): LocalTime =>
-  new Date(seconds * 1000).toISOString().slice(0, 19);
-
-/** One stretch to download, inside one recorded file. */
-export interface Stretch {
-  readonly begin: LocalTime;
-  readonly end: LocalTime;
-}
-
-/**
- * The stretches of the files a search found between `begin` and `end`, one
- * per file, in order. The recorder picks a download's file by its end, and
- * where the next file starts as one ends, a range ending there gets the next
- * file. So a file followed straight on stops a second short; its last key
- * frame group runs to its end anyway.
- */
-export const stretches = (
-  recordings: ReadonlyArray<Recording>,
-  begin: LocalTime,
-  end: LocalTime,
-): Array<Stretch> => {
-  const from = toSeconds(begin);
-  const to = toSeconds(end);
-
-  const sorted = recordings.toSorted((a, b) => a.begin.localeCompare(b.begin));
-
-  return sorted.flatMap((recording, index) => {
-    const next = sorted[index + 1];
-    const fileEnd = toSeconds(recording.end);
-
-    const last =
-      next !== undefined && toSeconds(next.begin) <= fileEnd
-        ? fileEnd - 1
-        : fileEnd;
-
-    const start = Math.max(from, toSeconds(recording.begin));
-    const stop = Math.min(to, last);
-
-    return stop > start
-      ? [{ begin: fromSeconds(start), end: fromSeconds(stop) }]
-      : [];
-  });
-};
 
 /** The frames couldn't be written as MP4. */
 export class Mp4Error extends Schema.TaggedError<Mp4Error>()("Mp4Error", {
@@ -87,8 +38,6 @@ export const avcCodec = (data: Uint8Array) => {
 
   return "avc1.640028";
 };
-
-type RecordedFrame = Recorded.RecordedFrame;
 
 /** Gaps longer than this, such as between motion clips, play as one frame. */
 const longestGap = 2;

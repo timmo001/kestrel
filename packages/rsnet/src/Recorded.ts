@@ -6,25 +6,11 @@
  *
  * @module
  */
+import type { RecordedFrame } from "@timmo001/kestrel-core";
 import { concat, readHeader, reader } from "./Codec.ts";
 import { ackReasons } from "./Messages.ts";
 
-/** One frame of recorded H.264 video. */
-export interface RecordedFrame {
-  /** A key frame, which starts with its SPS, PPS and SEI. */
-  readonly key: boolean;
-  /**
-   * When it was recorded, in microseconds since 1970, on the recorder's own
-   * clock: local time with no zone, so read it as if it were UTC.
-   */
-  readonly time: number;
-  readonly width: number;
-  readonly height: number;
-  /** The frame rate the stream was recorded at. */
-  readonly fps: number;
-  /** The frame in Annex B form, with start codes. */
-  readonly data: Uint8Array;
-}
+export type { RecordedFrame };
 
 /** What a chunk completed: frames, whether the file has ended, and why reading stopped if it can't go on. */
 export interface DecodedRecording {

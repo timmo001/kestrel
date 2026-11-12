@@ -20,10 +20,14 @@ and work that depends on one waits for it.
   paths, host names or addresses from anyone's network.
 - Recorder credentials are never printed, logged or passed on a command line.
 - Each part is a private Bun workspace package under `packages/<name>/`:
-  `rsnet` is the protocol library, `server` holds the recorder session, `web`
-  is the app and `cli` is the `kestrel` CLI with its Code Mode and MCP
-  surface. Its skill is `skills/kestrel/SKILL.md`; keep it in step with
-  the CLI's operations.
+  `core` holds what every source shares (the shapes, errors and the
+  `Recorder` service), `rsnet` is the protocol library, `source-raysharp`
+  provides the `Recorder` for Raysharp recorders, `server` runs go2rtc and
+  the API, `web` is the app and `cli` is the `kestrel` CLI with its Code
+  Mode and MCP surface. Its skill is `skills/kestrel/SKILL.md`; keep it in
+  step with the CLI's operations.
+- Recorder-specific code belongs in its source package, never in `server`,
+  `web` or `cli`.
 - Use mise-pinned tools and Bun. Pin dependencies to exact versions
   (`bun add -E`) and keep `bun.lock` in sync.
 - Open each hand-written source file with a short `/** */` header saying what

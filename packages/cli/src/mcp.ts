@@ -6,17 +6,17 @@
  */
 import { BunStdio } from "@effect/platform-bun";
 import {
+  Connection,
   DeviceInfo,
   LocalDate,
+  ReceivedEvent,
   RecordedDay,
   RecorderStatus,
   Recording,
-} from "@timmo001/kestrel-rsnet/domain";
+} from "@timmo001/kestrel-core/domain";
 import {
   Attention,
-  Connection,
   LocalMonth,
-  ReceivedEvent,
   VideoSources,
 } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Schema } from "effect";

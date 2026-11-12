@@ -2,10 +2,7 @@
  * What the pages share: finding and making elements, dates and times in the
  * browser's language, and recordings as table rows with Play and Download.
  */
-import {
-  RecordingReason,
-  type Recording,
-} from "@timmo001/kestrel-rsnet/domain";
+import { RecordingReason, type Recording } from "@timmo001/kestrel-core/domain";
 import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { phDownloadSimple, phPlay } from "./icons.ts";

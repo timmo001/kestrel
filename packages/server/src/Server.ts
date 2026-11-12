@@ -4,6 +4,8 @@
  * @module
  */
 import { BunHttpServer } from "@effect/platform-bun";
+import { Recorder } from "@timmo001/kestrel-core";
+import * as Raysharp from "@timmo001/kestrel-source-raysharp";
 import { Effect, FileSystem, Layer, Path, Stream } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
@@ -11,7 +13,6 @@ import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import * as Go2rtc from "./Go2rtc.ts";
 import { Push } from "./Push.ts";
-import { Recorder } from "./Recorder.ts";
 import { toMp4 } from "./Recordings.ts";
 import { Video } from "./Video.ts";
 
@@ -187,5 +188,5 @@ export const layer = (options: ServeOptions) =>
     Layer.provide([Video.layer, Attention.layer]),
     Layer.provide(Push.layer),
     // Last, so the routes and the video share one recorder session.
-    Layer.provide(Recorder.layer),
+    Layer.provide(Raysharp.layer),
   );

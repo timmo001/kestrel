@@ -1,12 +1,18 @@
 /**
  * Live video through go2rtc. Browsers can't play RTSP, so the server runs
- * go2rtc beside it with a stream for each channel's main and sub stream, and
- * the web client plays them through the server, under `/go2rtc/`. The config holds the recorder's
+ * go2rtc beside it with the source's live streams, each channel's main and
+ * sub stream, and the web client plays them through the server, under
+ * `/go2rtc/`. The config holds the source's addresses, which can carry its
  * login, so it's written to a private temporary file rather than passed on
  * the command line, and go2rtc's own logging is kept off.
  *
  * @module
  */
+import {
+  Recorder,
+  type LiveFeed,
+  type RecorderUnavailable,
+} from "@timmo001/kestrel-core";
 import {
   Config,
   Context,
@@ -19,29 +25,13 @@ import {
   Schedule,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import type { LiveStream, RecorderUnavailable, VideoSources } from "./Api.ts";
+import type { VideoSources } from "./Api.ts";
 import { basePath } from "./Go2rtc.ts";
-import { Recorder } from "./Recorder.ts";
 
 const restart = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
   Schedule.spaced(Duration.seconds(30)),
 ]);
-
-const twoDigits = (channel: number) => String(channel).padStart(2, "0");
-
-/** A channel's go2rtc stream names. */
-export const streamsFor = (channels: number): Array<LiveStream> =>
-  Array.from({ length: channels }, (_, index) => {
-    const channel = index + 1;
-
-    return {
-      channel,
-      name: `Channel ${channel}`,
-      main: `ch${twoDigits(channel)}`,
-      sub: `ch${twoDigits(channel)}_sub`,
-    };
-  });
 
 export class Video extends Context.Service<
   Video,
@@ -67,45 +57,26 @@ export class Video extends Context.Service<
         Config.withDefault(1984),
       );
 
-      const host = yield* Config.String("DVR_HOST");
-
-      const rtspPort = yield* Config.Int("DVR_RTSP_PORT").pipe(
-        Config.withDefault(554),
-      );
-
-      // Some recorders keep a separate RTSP login; otherwise it's the same one
-      const username = yield* Config.Redacted("DVR_RTSP_USERNAME").pipe(
-        Config.orElse(() => Config.Redacted("DVR_USERNAME")),
-      );
-
-      const password = yield* Config.Redacted("DVR_RTSP_PASSWORD").pipe(
-        Config.orElse(() => Config.Redacted("DVR_PASSWORD")),
-      );
-
-      const login = `${encodeURIComponent(Redacted.value(username))}:${encodeURIComponent(Redacted.value(password))}`;
-
-      const rtsp = (channel: number, stream: 0 | 1) =>
-        `rtsp://${login}@${host}:${rtspPort}/ch${twoDigits(channel)}/${stream}`;
-
       // JSON is valid YAML, which is what go2rtc reads.
-      const configFor = (channels: number) =>
+      const configFor = (feeds: ReadonlyArray<LiveFeed>) =>
         JSON.stringify({
           log: { level: "error" },
           // Only the server reaches it, under the same path it serves it on
           api: { listen: `127.0.0.1:${port}`, base_path: basePath },
           rtsp: { listen: "" },
           streams: Object.fromEntries(
-            streamsFor(channels).flatMap((stream) => [
-              [stream.main, rtsp(stream.channel, 0)],
-              [stream.sub, rtsp(stream.channel, 1)],
+            feeds.flatMap((feed) => [
+              [feed.stream.main, Redacted.value(feed.main)],
+              [feed.stream.sub, Redacted.value(feed.sub)],
             ]),
           ),
         });
 
       const run = Effect.scoped(
         Effect.gen(function* () {
-          // The channel count comes from the login, so wait for one.
-          const device = yield* recorder.device.pipe(
+          // The streams come from the source once it's ready, such as after
+          // a recorder's login, so wait for them.
+          const feeds = yield* recorder.live.pipe(
             Effect.retry(Schedule.spaced(Duration.seconds(5))),
           );
 
@@ -115,7 +86,7 @@ export class Video extends Context.Service<
 
           const file = path.join(directory, "go2rtc.yaml");
 
-          yield* fs.writeFileString(file, configFor(device.channels), {
+          yield* fs.writeFileString(file, configFor(feeds), {
             mode: 0o600,
           });
 
@@ -147,7 +118,7 @@ export class Video extends Context.Service<
           yield* fs.remove(file).pipe(Effect.ignore);
 
           yield* Effect.logInfo(
-            `go2rtc is serving ${device.channels} channels on port ${port}`,
+            `go2rtc is serving ${feeds.length} channels on port ${port}`,
           );
 
           const code = yield* handle.exitCode;
@@ -163,10 +134,10 @@ export class Video extends Context.Service<
 
       return Video.of({
         port,
-        sources: recorder.device.pipe(
-          Effect.map((device) => ({
+        sources: recorder.live.pipe(
+          Effect.map((feeds) => ({
             path: `${basePath}/`,
-            streams: streamsFor(device.channels),
+            streams: feeds.map((feed) => feed.stream),
           })),
         ),
       });

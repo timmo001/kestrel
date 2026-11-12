@@ -6,8 +6,7 @@
  * browser. The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { ChannelStatus } from "@timmo001/kestrel-rsnet/domain";
-import type { LiveStream } from "@timmo001/kestrel-server/api";
+import type { ChannelStatus, LiveStream } from "@timmo001/kestrel-core/domain";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { call } from "./api.ts";

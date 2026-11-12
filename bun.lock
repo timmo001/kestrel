@@ -36,8 +36,24 @@
       },
       "dependencies": {
         "@effect/platform-bun": "4.1.4",
-        "@timmo001/kestrel-rsnet": "workspace:*",
+        "@timmo001/kestrel-core": "workspace:*",
         "@timmo001/kestrel-server": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
+    "packages/core": {
+      "name": "@timmo001/kestrel-core",
+      "version": "0.0.0",
+      "dependencies": {
         "effect": "4.1.4",
       },
       "devDependencies": {
@@ -55,6 +71,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@effect/platform-node-shared": "4.1.4",
+        "@timmo001/kestrel-core": "workspace:*",
         "effect": "4.1.4",
       },
       "devDependencies": {
@@ -73,7 +90,8 @@
       "dependencies": {
         "@effect/platform-bun": "4.1.4",
         "@timmo001/groundwork-pwa": "0.24.0",
-        "@timmo001/kestrel-rsnet": "workspace:*",
+        "@timmo001/kestrel-core": "workspace:*",
+        "@timmo001/kestrel-source-raysharp": "workspace:*",
         "effect": "4.1.4",
         "mediabunny": "1.65.2",
         "web-push": "4.0.0",
@@ -84,6 +102,24 @@
         "@timmo001/oxlint-rules": "0.6.5",
         "@types/bun": "1.4.4",
         "@types/web-push": "3.6.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2006",
+        "typescript": "7.0.2",
+      },
+    },
+    "packages/source-raysharp": {
+      "name": "@timmo001/kestrel-source-raysharp",
+      "version": "0.0.0",
+      "dependencies": {
+        "@timmo001/kestrel-core": "workspace:*",
+        "@timmo001/kestrel-rsnet": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.0",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
         "oxlint": "1.93.0",
         "oxlint-tsgolint": "7.0.2006",
         "typescript": "7.0.2",
@@ -101,7 +137,7 @@
         "@timmo001/groundwork-pwa": "0.24.0",
         "@timmo001/groundwork-tokens": "0.24.0",
         "@timmo001/groundwork-ui": "0.24.0",
-        "@timmo001/kestrel-rsnet": "workspace:*",
+        "@timmo001/kestrel-core": "workspace:*",
         "@timmo001/kestrel-server": "workspace:*",
         "effect": "4.1.4",
       },
@@ -759,9 +795,13 @@
 
     "@timmo001/kestrel-cli": ["@timmo001/kestrel-cli@workspace:packages/cli"],
 
+    "@timmo001/kestrel-core": ["@timmo001/kestrel-core@workspace:packages/core"],
+
     "@timmo001/kestrel-rsnet": ["@timmo001/kestrel-rsnet@workspace:packages/rsnet"],
 
     "@timmo001/kestrel-server": ["@timmo001/kestrel-server@workspace:packages/server"],
+
+    "@timmo001/kestrel-source-raysharp": ["@timmo001/kestrel-source-raysharp@workspace:packages/source-raysharp"],
 
     "@timmo001/kestrel-web": ["@timmo001/kestrel-web@workspace:packages/web"],
 

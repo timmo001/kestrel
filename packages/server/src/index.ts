@@ -1,12 +1,10 @@
 /**
- * The server between the recorder and the web client: the recorder session,
- * live video through go2rtc, and the HTTP API.
+ * The server between the sources and the web client: live video through
+ * go2rtc, and the HTTP API over the source's `Recorder`.
  *
  * @module
  */
 export * as Api from "./Api.ts";
-
-export { Recorder } from "./Recorder.ts";
 
 export * as Server from "./Server.ts";
 

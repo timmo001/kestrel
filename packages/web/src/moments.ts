@@ -4,7 +4,7 @@
  * video keeps the time, and the next moment any of them recorded. Plain
  * functions with no page in them, so they can be tested.
  */
-import type { Recording } from "@timmo001/kestrel-rsnet/domain";
+import type { Recording } from "@timmo001/kestrel-core/domain";
 import { toSeconds } from "./player.ts";
 
 /** A channel and its day's recordings, earliest first. */

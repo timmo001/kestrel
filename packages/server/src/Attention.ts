@@ -7,11 +7,14 @@
  *
  * @module
  */
-import type { RecorderStatus } from "@timmo001/kestrel-rsnet/domain";
+import {
+  Recorder,
+  type Connection,
+  type RecorderStatus,
+} from "@timmo001/kestrel-core";
 import { Context, Duration, Effect, Layer, Ref, Schedule } from "effect";
-import type { Attention as AttentionItem, Connection } from "./Api.ts";
+import type { Attention as AttentionItem } from "./Api.ts";
 import { Push } from "./Push.ts";
-import { Recorder } from "./Recorder.ts";
 
 const pollEvery = Duration.minutes(1);
 

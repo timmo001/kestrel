@@ -3,9 +3,9 @@
  * gets wrong silently: a range ending where the next file starts sends that
  * file instead.
  */
-import type { Recording } from "@timmo001/kestrel-rsnet/domain";
+import type { Recording } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
-import { stretches } from "./Recordings.ts";
+import { stretches } from "./Stretches.ts";
 
 const recording = (begin: string, end: string): Recording => ({
   channel: 1,

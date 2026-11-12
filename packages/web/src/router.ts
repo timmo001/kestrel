@@ -8,7 +8,7 @@
  *
  * @module
  */
-import { LocalDate, LocalTime } from "@timmo001/kestrel-rsnet/domain";
+import { LocalDate, LocalTime } from "@timmo001/kestrel-core/domain";
 import { Option, Schema, SchemaGetter } from "effect";
 import { Atom } from "effect/reactivity";
 

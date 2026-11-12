@@ -11,7 +11,7 @@ import {
   LocalDate,
   LocalTime,
   type Recording,
-} from "@timmo001/kestrel-rsnet/domain";
+} from "@timmo001/kestrel-core/domain";
 import { on, type TableRow } from "@timmo001/groundwork-ui";
 import { isText, keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";

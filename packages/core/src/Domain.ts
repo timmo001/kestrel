@@ -1,6 +1,8 @@
 /**
- * What the recorder reports, as Schemas the server and web client share. Times
- * are the recorder's own local wall-clock time, with no zone, as it keeps them.
+ * What a source reports, as Schemas the sources, the server and the web
+ * client share. The shapes are the Raysharp recorder's for now, the first
+ * source. Times are the source's own local wall-clock time, with no zone, as
+ * a recorder keeps them.
  *
  * @module
  */
@@ -159,3 +161,46 @@ export const AlarmEvent = Schema.Struct({
 });
 
 export interface AlarmEvent extends Schema.Schema.Type<typeof AlarmEvent> {}
+
+/** An alarm report with the time the server received it, in UTC. */
+export const ReceivedEvent = Schema.Struct({
+  ...AlarmEvent.fields,
+  receivedAt: Schema.String,
+});
+
+export interface ReceivedEvent extends Schema.Schema.Type<
+  typeof ReceivedEvent
+> {}
+
+/** Whether the server is logged in to the recorder, and why not. */
+export const Connection = Schema.Struct({
+  connected: Schema.Boolean,
+  since: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+});
+
+export interface Connection extends Schema.Schema.Type<typeof Connection> {}
+
+/** A live stream the web client can play through go2rtc. */
+export const LiveStream = Schema.Struct({
+  channel: Schema.Number,
+  name: Schema.String,
+  main: Schema.String,
+  sub: Schema.String,
+});
+
+export interface LiveStream extends Schema.Schema.Type<typeof LiveStream> {}
+
+/** The server has no working session with the recorder right now. */
+export class RecorderUnavailable extends Schema.TaggedError<RecorderUnavailable>()(
+  "RecorderUnavailable",
+  { message: Schema.String },
+  { httpApiStatus: 503 },
+) {}
+
+/** Nothing was recorded on that channel in that range. */
+export class NoRecordings extends Schema.TaggedError<NoRecordings>()(
+  "NoRecordings",
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}

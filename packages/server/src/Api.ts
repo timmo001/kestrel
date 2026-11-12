@@ -5,14 +5,18 @@
  * @module
  */
 import {
-  AlarmEvent,
+  Connection,
   DeviceInfo,
+  LiveStream,
   LocalDate,
   LocalTime,
+  NoRecordings,
+  ReceivedEvent,
   RecordedDay,
   RecorderStatus,
+  RecorderUnavailable,
   Recording,
-} from "@timmo001/kestrel-rsnet/domain";
+} from "@timmo001/kestrel-core/domain";
 import { Schema } from "effect";
 import {
   HttpApi,
@@ -21,20 +25,6 @@ import {
   HttpApiSchema,
 } from "effect/http-api";
 
-/** The server has no working session with the recorder right now. */
-export class RecorderUnavailable extends Schema.TaggedError<RecorderUnavailable>()(
-  "RecorderUnavailable",
-  { message: Schema.String },
-  { httpApiStatus: 503 },
-) {}
-
-/** Nothing was recorded on that channel in that range. */
-export class NoRecordings extends Schema.TaggedError<NoRecordings>()(
-  "NoRecordings",
-  { message: Schema.String },
-  { httpApiStatus: 404 },
-) {}
-
 /** Which of a channel's streams: the full one or the small sub stream. */
 export const RecordedStream = Schema.Literals(["main", "sub"]);
 
@@ -42,25 +32,6 @@ export const RecordedStream = Schema.Literals(["main", "sub"]);
 export const LocalMonth = Schema.String.check(
   Schema.isPattern(/^\d{4}-\d{2}$/),
 );
-
-/** An alarm report with the time the server received it, in UTC. */
-export const ReceivedEvent = Schema.Struct({
-  ...AlarmEvent.fields,
-  receivedAt: Schema.String,
-});
-
-export interface ReceivedEvent extends Schema.Schema.Type<
-  typeof ReceivedEvent
-> {}
-
-/** Whether the server is logged in to the recorder, and why not. */
-export const Connection = Schema.Struct({
-  connected: Schema.Boolean,
-  since: Schema.NullOr(Schema.String),
-  error: Schema.NullOr(Schema.String),
-});
-
-export interface Connection extends Schema.Schema.Type<typeof Connection> {}
 
 /**
  * Something about the recorder that needs you. An alert is pushed and
@@ -73,16 +44,6 @@ export const Attention = Schema.Struct({
 });
 
 export interface Attention extends Schema.Schema.Type<typeof Attention> {}
-
-/** A live stream the web client can play through go2rtc. */
-export const LiveStream = Schema.Struct({
-  channel: Schema.Number,
-  name: Schema.String,
-  main: Schema.String,
-  sub: Schema.String,
-});
-
-export interface LiveStream extends Schema.Schema.Type<typeof LiveStream> {}
 
 /** The path the server serves go2rtc under, and the streams it has. */
 export const VideoSources = Schema.Struct({

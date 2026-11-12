@@ -9,17 +9,14 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   LocalTime,
+  type Connection,
   type DeviceInfo,
+  type ReceivedEvent,
   type RecordedDay,
   type RecorderStatus,
   type Recording,
-} from "@timmo001/kestrel-rsnet/domain";
-import type {
-  Attention,
-  Connection,
-  ReceivedEvent,
-  VideoSources,
-} from "@timmo001/kestrel-server/api";
+} from "@timmo001/kestrel-core/domain";
+import type { Attention, VideoSources } from "@timmo001/kestrel-server/api";
 import {
   Console,
   Effect,

@@ -7,8 +7,6 @@
  */
 export * as Codec from "./Codec.ts";
 
-export * from "./Domain.ts";
-
 export * as Messages from "./Messages.ts";
 
 export * as Recorded from "./Recorded.ts";
