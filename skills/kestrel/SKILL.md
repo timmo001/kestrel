@@ -30,8 +30,10 @@ for the recorder's channel 3.
    camera and a day. Each recording's `reasons` say why it was made: `PIR`
    and `motion` are events, `normal` is continuous recording.
 4. `events` lists the events since the server started, each with its source
-   and camera. They aren't confirmed on every firmware yet, so when it's
-   empty, look for `PIR` and `motion` recordings instead.
+   and camera, and its kind: `motion`, `PIR`, or a camera's `person`,
+   `vehicle` or `animal` detection, among others. They aren't confirmed on
+   every firmware yet, so when it's empty, look for `PIR` and `motion`
+   recordings instead.
 5. A camera's `live` gives its stream names. Live view is at
    `<server>/go2rtc/stream.html?src=<stream>`.
 6. To save footage, find it with `recordings` first, then run

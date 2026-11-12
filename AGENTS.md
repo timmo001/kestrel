@@ -24,6 +24,8 @@ and work that depends on one waits for it.
   `Source` interface), `protocol-raysharp` is the Raysharp protocol
   library, `source-raysharp` implements `Source` for Raysharp recorders,
   `source-stream` for cameras listed by their stream addresses,
+  `source-reolink` for Reolink cameras and hubs, `source-bambu` for the
+  camera in a Bambu Lab printer,
   `server` serves the API and runs go2rtc, `web` is the app and `cli` is the
   `kestrel` CLI with its Code Mode and MCP surface. Its skill is
   `skills/kestrel/SKILL.md`; keep it in step with the CLI's operations.

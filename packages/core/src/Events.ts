@@ -12,6 +12,9 @@ import { LocalTime } from "./Times.ts";
 export const EventKind = Schema.Literals([
   "motion",
   "PIR",
+  "person",
+  "vehicle",
+  "animal",
   "video loss",
   "alarm input",
   "disk alarm",

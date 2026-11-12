@@ -63,7 +63,8 @@ records over its oldest recordings; the page shows it in the source's
 Storage card.
 
 An event in `/api/events` has its source, its camera where it's about one,
-its kind (such as `motion` or `PIR`), whether it started or ended, the
+its kind (such as `motion`, `PIR`, or a camera's own `person`, `vehicle` or
+`animal` detection), whether it started or ended, the
 source's own time for it, and when the server received it.
 
 Every endpoint that needs a source returns 503 with a `SourceUnavailable`

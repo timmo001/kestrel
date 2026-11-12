@@ -13,23 +13,23 @@ stop working.
 - **Raysharp-made recorders**, such as the Swann DVR8-4575, which are sold
   under several brands. Their own apps and browser plugins no longer work in
   modern browsers.
+- **Any camera with a stream address**, such as RTSP, or a still picture.
+- **Reolink cameras, hubs and recorders**: live view, stills, and motion and
+  person, vehicle and animal detections. Not yet tried on real hardware
+  ([#12](https://github.com/timmo001/kestrel/issues/12)).
+- **The camera in a Bambu Lab P1 or A1 printer**, as a picture every few
+  seconds. Not yet tried on real hardware
+  ([#13](https://github.com/timmo001/kestrel/issues/13)).
 
-On the way, each behind the same pages:
-
-- Reolink cameras ([#12](https://github.com/timmo001/kestrel/issues/12))
-- the camera in a Bambu Lab printer
-  ([#13](https://github.com/timmo001/kestrel/issues/13))
-- any camera with a stream address
-  ([#14](https://github.com/timmo001/kestrel/issues/14))
-- recording any of them itself
-  ([#15](https://github.com/timmo001/kestrel/issues/15))
+On the way, behind the same pages: recording any of them itself
+([#15](https://github.com/timmo001/kestrel/issues/15)).
 
 ## What it does
 
 - **Live:** every camera in 1 to 4 at once, with its own controls.
 - **Recordings:** a day's timeline, with several channels played together on
   one clock, playback up to 32 times, clips, stills and MP4 downloads.
-- **Events:** motion, PIR and alarms as they happen.
+- **Events:** motion, PIR, detections and alarms as they happen.
 - **Health:** whether each system is reachable, its disks and each camera's
   signal, with problems pushed to your phone.
 - **For agents:** the `kestrel` CLI, with Code Mode and MCP.
@@ -67,6 +67,10 @@ login is planned for when remote access arrives, in
   as a source, over that protocol and their RTSP streams
 - [`packages/source-stream`](packages/source-stream): cameras you list by
   their stream addresses, such as RTSP, or a still picture, for live view
+- [`packages/source-reolink`](packages/source-reolink): Reolink cameras, hubs
+  and recorders, over their HTTP API and RTSP streams
+- [`packages/source-bambu`](packages/source-bambu): the camera in a Bambu Lab
+  P1 or A1 printer, over its own picture feed
 - [`packages/server`](packages/server): the server, with the API and go2rtc
 - [`packages/web`](packages/web): the web client, installable on a phone
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and

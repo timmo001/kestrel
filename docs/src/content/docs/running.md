@@ -67,6 +67,21 @@ and more), with an optional `sub` stream for small tiles. A camera with only
 a `still` address shows that picture on the Live page, a new one every few
 seconds. Streams have live view only: no recordings or events.
 
+A `reolink` source is a Reolink camera, or a Reolink Home Hub or recorder
+with a camera on each channel, from its `host`, `username` and `password`.
+Start the host with `https://` where its HTTP port is off. It has live view
+from each camera's RTSP main and sub streams, so turn RTSP on in the
+camera's network settings, and stills, motion and person, vehicle and animal
+detections, read every couple of seconds, and its disks or SD card. Its
+recordings aren't read yet.
+
+A `bambu` source is a Bambu Lab P1 or A1 printer's camera, from its `host`
+and the LAN `accessCode` on its network settings screen. These printers
+have no video stream on the network, only a picture every second or two on
+port 6000, so the camera shows on the Live page as a still, a new one every
+few seconds. Turn on its LAN mode, or LAN-only liveview, for the feed to
+answer.
+
 A source's `id` names its cameras, such as `swann/3`, so links and labels
 keep working as long as it stays the same. It holds logins, so keep it to
 yourself. The API never sends a password back: the page shows which are set,
