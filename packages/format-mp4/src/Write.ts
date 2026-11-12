@@ -92,6 +92,9 @@ export const toMp4 = <E>(
 
         const frameLength = 1 / Math.max(previous.fps, 1);
 
+        // A stream with a frame every few seconds keeps gaps of up to two of them
+        const usual = previous.fps > 0 ? 1 / previous.fps : frameLength;
+
         const gap =
           frame === undefined
             ? frameLength
@@ -100,7 +103,8 @@ export const toMp4 = <E>(
         // Out of order or repeated, such as where two files overlap
         if (frame !== undefined && gap <= 0) return;
 
-        const duration = (gap > longestGap ? frameLength : gap) / speedUp;
+        const duration =
+          (gap > Math.max(longestGap, 2 * usual) ? frameLength : gap) / speedUp;
 
         await source.add(
           new EncodedPacket(
