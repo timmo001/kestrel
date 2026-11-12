@@ -144,12 +144,9 @@ const decodeSettings = Schema.decodeUnknownEffect(RecorderSettings);
 /** Where a recorder's settings come from when its own leave them out. */
 const prefix = "KESTREL_RAYSHARP_";
 
-/**
- * A recorder's environment variable, such as `KESTREL_RAYSHARP_HOST`, or its
- * old `DVR_*` name while saved logins move over.
- */
+/** A recorder's environment variable, such as `KESTREL_RAYSHARP_HOST`. */
 const env = <A>(read: (name: string) => Config.Config<A>, name: string) =>
-  read(`${prefix}${name}`).pipe(Config.orElse(() => read(`DVR_${name}`)));
+  read(`${prefix}${name}`);
 
 /** What the app shows when you add or change a recorder. */
 export const info: Kind["info"] = {

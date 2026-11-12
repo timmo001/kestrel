@@ -83,7 +83,8 @@ file. Copy `.env.example` to `.env.local`, which git ignores, and fill it in:
 | `KESTREL_RAYSHARP_RTSP_USERNAME` | The RTSP user, when it isn't the one above          |
 | `KESTREL_RAYSHARP_RTSP_PASSWORD` | The RTSP password, when it isn't the one above      |
 
-The old `DVR_*` names, such as `DVR_HOST`, still work for now.
+The old `DVR_*` names, such as `DVR_HOST`, no longer work: `mise run
+auth:rename` renames them in `.env.local` and the saved login.
 
 Live video logs in to the RTSP port with the RTSP user and password when
 they're set. Some recorders keep a separate RTSP password: if live players
