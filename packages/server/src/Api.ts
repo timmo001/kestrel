@@ -8,6 +8,7 @@ import {
   AlarmEvent,
   DeviceInfo,
   LocalDate,
+  LocalTime,
   RecordedDay,
   RecorderStatus,
   Recording,
@@ -26,6 +27,16 @@ export class RecorderUnavailable extends Schema.TaggedError<RecorderUnavailable>
   { message: Schema.String },
   { httpApiStatus: 503 },
 ) {}
+
+/** Nothing was recorded on that channel in that range. */
+export class NoRecordings extends Schema.TaggedError<NoRecordings>()(
+  "NoRecordings",
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
+/** Which of a channel's streams: the full one or the small sub stream. */
+export const RecordedStream = Schema.Literals(["main", "sub"]);
 
 /** A month, such as `2026-11`. */
 export const LocalMonth = Schema.String.check(
@@ -100,6 +111,26 @@ export class RecorderGroup extends HttpApiGroup.make("recorder")
       query: { channel: Schema.FiniteFromString, date: LocalDate },
       success: Schema.Array(Recording),
       error: RecorderUnavailable,
+    }),
+    /**
+     * What a channel recorded between two recorder times, as fragmented MP4
+     * that plays as it arrives. It runs across files, with the gaps between
+     * them closed up, and starts at the key frame group at `begin`. With
+     * `download`, it comes as a file to save.
+     */
+    HttpApiEndpoint.get("video", "/recordings/video", {
+      query: {
+        channel: Schema.FiniteFromString,
+        begin: LocalTime,
+        end: LocalTime,
+        stream: Schema.optional(RecordedStream),
+        download: Schema.optional(Schema.Literals(["true", "false"])),
+      },
+      success: HttpApiSchema.WithHeaders(
+        HttpApiSchema.StreamUint8Array({ contentType: "video/mp4" }),
+        { "content-disposition": Schema.String },
+      ),
+      error: [RecorderUnavailable, NoRecordings],
     }),
     HttpApiEndpoint.get("days", "/days", {
       query: { month: LocalMonth },

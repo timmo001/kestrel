@@ -9,6 +9,8 @@ import {
   Session,
   type AlarmEvent,
   type DeviceInfo,
+  type LocalTime,
+  type Recorded,
   type RecordedDay,
   type RecorderStatus,
   type Recording,
@@ -27,10 +29,12 @@ import {
   Stream,
 } from "effect";
 import {
+  NoRecordings,
   RecorderUnavailable,
   type Connection,
   type ReceivedEvent,
 } from "./Api.ts";
+import { fromSeconds, stretches, toSeconds } from "./Recordings.ts";
 
 /** How many alarm reports the server keeps for a page that opens later. */
 const keptEvents = 200;
@@ -55,6 +59,20 @@ export class Recorder extends Context.Service<
     readonly recordedDays: (
       month: string,
     ) => Effect.Effect<Array<RecordedDay>, RecorderUnavailable>;
+    /**
+     * What a channel (from 1) recorded between two recorder times, as its
+     * frames, downloaded one file at a time. Fails up front when nothing was
+     * recorded then.
+     */
+    readonly recorded: (options: {
+      readonly channel: number;
+      readonly begin: LocalTime;
+      readonly end: LocalTime;
+      readonly stream: "main" | "sub";
+    }) => Effect.Effect<
+      Stream.Stream<Recorded.RecordedFrame, RecorderUnavailable>,
+      RecorderUnavailable | NoRecordings
+    >;
     /** The newest alarm reports, newest first. */
     readonly recentEvents: Effect.Effect<ReadonlyArray<ReceivedEvent>>;
     /** Alarm reports as they arrive. */
@@ -196,6 +214,42 @@ export class Recorder extends Context.Service<
               end: `${month}-${lastDay(month)}T23:59:59`,
             }),
           ),
+        recorded: Effect.fnUntraced(function* (options) {
+          const { opened, found } = yield* withSession((opened) =>
+            opened
+              .recordings({
+                channel: options.channel,
+                // From an hour before, for a file that starts earlier and
+                // runs into the range, to a minute after, for whether the
+                // next file follows straight on
+                begin: fromSeconds(toSeconds(options.begin) - 3600),
+                end: fromSeconds(toSeconds(options.end) + 60),
+              })
+              .pipe(Effect.map((list) => ({ opened, found: list }))),
+          );
+
+          const parts = stretches(found, options.begin, options.end);
+
+          if (parts.length === 0) {
+            return yield* new NoRecordings({
+              message: `Nothing was recorded on channel ${options.channel} from ${options.begin} to ${options.end}`,
+            });
+          }
+
+          return Stream.fromIterable(parts).pipe(
+            Stream.flatMap((part) =>
+              opened.download({
+                channel: options.channel,
+                stream: options.stream,
+                begin: part.begin,
+                end: part.end,
+              }),
+            ),
+            Stream.mapError(
+              (error) => new RecorderUnavailable({ message: error.message }),
+            ),
+          );
+        }),
         recentEvents: Ref.get(recent),
         events: Stream.fromPubSub(events),
       });

@@ -4,14 +4,15 @@
  * @module
  */
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, FileSystem, Layer, Path } from "effect";
+import { Effect, FileSystem, Layer, Path, Stream } from "effect";
 import { HttpMiddleware, HttpRouter, HttpServerResponse } from "effect/http";
-import { HttpApiBuilder } from "effect/http-api";
+import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
 import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import * as Go2rtc from "./Go2rtc.ts";
 import { Push } from "./Push.ts";
 import { Recorder } from "./Recorder.ts";
+import { toMp4 } from "./Recordings.ts";
 import { Video } from "./Video.ts";
 
 const RecorderHandlers = HttpApiBuilder.group(
@@ -28,6 +29,37 @@ const RecorderHandlers = HttpApiBuilder.group(
       .handle("status", () => recorder.status)
       .handle("recordings", ({ query }) =>
         recorder.recordings(query.channel, query.date),
+      )
+      .handle(
+        "video",
+        Effect.fnUntraced(function* ({ query }) {
+          const frames = yield* recorder.recorded({
+            channel: query.channel,
+            begin: query.begin,
+            end: query.end,
+            stream: query.stream ?? "main",
+          });
+
+          const name = `channel-${query.channel}_${query.begin.replaceAll(":", "-")}.mp4`;
+
+          const disposition =
+            query.download === "true" ? "attachment" : "inline";
+
+          return HttpApiSchema.withHeaders({
+            // Headers are already sent by the time anything fails, so a
+            // failure ends the response early and is only logged
+            body: toMp4(frames).pipe(
+              Stream.tapError((error) =>
+                Effect.logWarning(
+                  `Recording ${query.begin} to ${query.end} stopped: ${error.message}`,
+                ),
+              ),
+            ),
+            headers: {
+              "content-disposition": `${disposition}; filename="${name}"`,
+            },
+          });
+        }),
       )
       .handle("days", ({ query }) => recorder.recordedDays(query.month));
   }),

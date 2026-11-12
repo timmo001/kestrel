@@ -20,6 +20,7 @@
     "@timmo001/dvr-revival-rsnet": "workspace:*",
     "@timmo001/groundwork-pwa": "0.23.0",
     "effect": "4.1.4",
+    "mediabunny": "1.65.2",
     "web-push": "4.0.0"
   },
   "devDependencies": {
