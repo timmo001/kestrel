@@ -101,11 +101,16 @@ interface HrefOptions<P, S> {
   readonly hash?: string;
 }
 
-interface RouterOptions {
+interface RouterOptions<R extends AnyRoutes> {
   /** Where the app lives. */
   readonly basePath?: string;
   /** The sessionStorage key scroll positions are kept under. */
   readonly scrollKey?: string;
+  /**
+   * Pages that always open at the top, rather than where they were left on
+   * back, forward or a reload.
+   */
+  readonly startAtTop?: ReadonlyArray<keyof R>;
   /** A new address for an old one, so old links and bookmarks still land. */
   readonly redirect?: (url: URL) => string | undefined;
   /**
@@ -171,10 +176,11 @@ const decodeSearch = <S>(
  */
 const makeRouter = <const R extends AnyRoutes>(
   routeTable: R,
-  options: RouterOptions = {},
+  options: RouterOptions<R> = {},
 ) => {
   const basePath = (options.basePath ?? "").replace(/\/$/, "");
   const scrollKey = options.scrollKey ?? "gw-scroll";
+  const startAtTop = new Set<keyof R | "notFound">(options.startAtTop);
   const navigationEvent = "gw-navigate";
 
   const compiled = Object.entries(routeTable).map(([name, definition]) => ({
@@ -319,7 +325,9 @@ const makeRouter = <const R extends AnyRoutes>(
   };
 
   const restoreScroll = () => {
-    const target = scrollPositions()[location.href] ?? 0;
+    const target = startAtTop.has(parse(new URL(location.href)).name)
+      ? 0
+      : (scrollPositions()[location.href] ?? 0);
 
     if (target <= 0) {
       cancelRestore?.();
@@ -499,6 +507,8 @@ const pageNames = new Set(Object.keys(routes));
 export const { href, navigate, currentLocation } = makeRouter(routes, {
   // Old addresses, such as `/#recordings`, `/recorder` or `channel=3`, still land
   redirect: (url) => newAddress(url, pageNames),
+  // Events grow as they arrive, so where it was left is somewhere else now
+  startAtTop: ["events"],
   // Settings asks before you leave it with changes you haven't saved
   beforeLeave: () => !hasUnsavedChanges() || confirmLeave(),
 });
