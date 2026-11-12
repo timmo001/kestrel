@@ -23,6 +23,7 @@ export const MessageType = {
   login: 31,
   heartbeat: 32,
   queryRecord: 111,
+  downloadRecordFile: 131,
   status: 890,
   alarmReport: 891,
   alarmSubscribe: 896,
@@ -148,6 +149,12 @@ export const parseLogin = (bytes: Uint8Array): DeviceInfo => {
   };
 };
 
+/**
+ * The user key from a login reply. Requests on a second connection, such as
+ * downloads, carry it in place of a login of their own.
+ */
+export const parseUserKey = (bytes: Uint8Array) => reader(bytes).u32(160);
+
 const diskStates: ReadonlyArray<DiskState> = [
   "none",
   "ok",
@@ -250,6 +257,41 @@ export const recordQuery = (
   writeTime(body, 4, timeParts(options.begin));
   writeTime(body, 12, timeParts(options.end));
   body.u32(20, allTypes);
+
+  return body.bytes;
+};
+
+/** Which of a channel's streams to send: the full one or the small sub stream. */
+export type RecordedStream = "main" | "sub";
+
+/**
+ * A download (DownloadRecordFileReq, 24 bytes) of one stretch of recording:
+ * its size, the user key, the channel (from 0 on the wire) and the stream,
+ * then one 28-byte record of the kind a search returns.
+ *
+ * The record is sent as "all types, size unknown", which firmware SRV7.1.0
+ * takes for any range. It picks the file by the range's end, so a range must
+ * end inside one file: one that ends on a file's last second gets the next
+ * file instead, from that file's start. The SDK allows several records in one
+ * request, but this firmware only sends the first.
+ */
+export const downloadRequest = (options: {
+  readonly userKey: number;
+  readonly channel: number;
+  readonly stream: RecordedStream;
+  readonly begin: LocalTime;
+  readonly end: LocalTime;
+}): Uint8Array => {
+  const body = writer(52);
+  body.u32(0, 24);
+  body.u32(4, options.userKey);
+  body.u32(8, options.channel - 1);
+  body.u8(12, options.stream === "sub" ? 1 : 0);
+  body.u32(24, 28);
+  writeTime(body, 28, timeParts(options.begin));
+  writeTime(body, 36, timeParts(options.end));
+  body.u32(44, allTypes);
+  body.u32(48, 0);
 
   return body.bytes;
 };

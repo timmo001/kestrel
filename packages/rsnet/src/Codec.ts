@@ -62,7 +62,8 @@ export const permute = (input: Uint8Array, decode = false): Uint8Array => {
   return result;
 };
 
-const concat = (...parts: ReadonlyArray<Uint8Array>) => {
+/** Joins byte arrays into a new one. */
+export const concat = (...parts: ReadonlyArray<Uint8Array>) => {
   const result = new Uint8Array(
     parts.reduce((total, part) => total + part.length, 0),
   );
@@ -102,6 +103,51 @@ export const encodeFrame = (options: {
     : concat(header, options.body);
 };
 
+/** A frame's header, unscrambled: everything but the body, with the body's size. */
+export interface Header extends Omit<Frame, "body"> {
+  /** How many bytes the header takes, with its extra words. */
+  readonly length: number;
+  readonly bodySize: number;
+}
+
+/**
+ * Reads the header at the start of `bytes`: undefined until all of it has
+ * arrived, or why it can't be read.
+ */
+export const readHeader = (
+  bytes: Uint8Array,
+): Header | { readonly problem: string } | undefined => {
+  if (bytes.length < headerSize) return undefined;
+
+  const first = bytes[0] ?? 0;
+  // The top six bits of the first byte count extra 4-byte header words.
+  const length = headerSize + (first >> 2) * 4;
+
+  if (bytes.length < length) return undefined;
+
+  const mode = first & 3;
+
+  if (mode !== 0 && mode !== 2) {
+    return { problem: `Unsupported protocol mode ${mode}` };
+  }
+
+  const fields = view(
+    mode === 2
+      ? concat(bytes.subarray(0, 2), permute(bytes.subarray(2, length), true))
+      : bytes.subarray(0, length),
+  );
+
+  return {
+    length,
+    mode,
+    ack: fields.getUint16(2, true),
+    type: fields.getUint16(4, true),
+    subtype: fields.getUint16(6, true),
+    bodySize: fields.getUint32(8, true),
+    sequence: fields.getUint32(12, true),
+  };
+};
+
 /** The frames a chunk completed, and why reading stopped if the bytes made no sense. */
 export interface Decoded {
   readonly frames: Array<Frame>;
@@ -114,7 +160,7 @@ export interface Decoded {
  */
 export const frameDecoder = () => {
   let pending = new Uint8Array(0);
-  let header: Uint8Array | undefined;
+  let header: Header | undefined;
 
   return (chunk: Uint8Array): Decoded => {
     pending = concat(pending, chunk);
@@ -122,42 +168,29 @@ export const frameDecoder = () => {
 
     for (;;) {
       if (header === undefined) {
-        if (pending.length < headerSize) return { frames };
-        const first = pending[0] ?? 0;
-        // The top six bits of the first byte count extra 4-byte header words.
-        const size = headerSize + (first >> 2) * 4;
+        const read = readHeader(pending);
 
-        if (pending.length < size) return { frames };
-        const mode = first & 3;
+        if (read === undefined) return { frames };
 
-        if (mode !== 0 && mode !== 2)
-          return { frames, problem: `Unsupported protocol mode ${mode}` };
-        header =
-          mode === 2
-            ? concat(
-                pending.subarray(0, 2),
-                permute(pending.subarray(2, size), true),
-              )
-            : pending.slice(0, size);
-        pending = pending.subarray(size);
+        if ("problem" in read) return { frames, problem: read.problem };
+        header = read;
+        pending = pending.subarray(read.length);
       }
 
-      const fields = view(header);
-      const size = fields.getUint32(8, true);
+      const size = header.bodySize;
 
       if (size > maxBodySize)
         return { frames, problem: `Reply too large (${size} bytes)` };
 
       if (pending.length < size) return { frames };
-      const mode = (header[0] ?? 0) & 3;
       const body = pending.subarray(0, size);
       frames.push({
-        mode,
-        ack: fields.getUint16(2, true),
-        type: fields.getUint16(4, true),
-        subtype: fields.getUint16(6, true),
-        sequence: fields.getUint32(12, true),
-        body: mode === 2 ? permute(body, true) : body.slice(),
+        mode: header.mode,
+        ack: header.ack,
+        type: header.type,
+        subtype: header.subtype,
+        sequence: header.sequence,
+        body: header.mode === 2 ? permute(body, true) : body.slice(),
       });
       pending = pending.subarray(size);
       header = undefined;

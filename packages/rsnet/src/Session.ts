@@ -1,12 +1,15 @@
 /**
  * One logged-in control connection to a recorder: it sends heartbeats, matches
  * replies to requests by sequence number, and passes alarm reports on as a
- * stream. The connection closes with the scope it was opened in.
+ * stream. Downloads each open a second connection under the session's login.
+ * The connection closes with the scope it was opened in.
  *
  * @module
  */
 import * as NodeSocket from "@effect/platform-node-shared/NodeSocket";
 import {
+  Array as Arr,
+  Cause,
   Deferred,
   Duration,
   Effect,
@@ -18,6 +21,7 @@ import {
 } from "effect";
 import * as Socket from "effect/socket/Socket";
 import { encodeFrame, frameDecoder, type Frame } from "./Codec.ts";
+import { recordingDecoder, type RecordedFrame } from "./Recorded.ts";
 import type {
   AlarmEvent,
   DeviceInfo,
@@ -30,6 +34,7 @@ import {
   MessageType,
   Subtype,
   ackReasons,
+  downloadRequest,
   isRaysharpLogin,
   loginRequest,
   parseAlarm,
@@ -37,8 +42,10 @@ import {
   parseRecordedDays,
   parseRecordings,
   parseStatus,
+  parseUserKey,
   recordQuery,
   statusMinimumSize,
+  type RecordedStream,
 } from "./Messages.ts";
 
 /** The recorder turned the login down. */
@@ -133,6 +140,19 @@ export interface Session {
     readonly begin: LocalTime;
     readonly end: LocalTime;
   }) => Effect.Effect<Array<RecordedDay>, SessionError>;
+  /**
+   * One stretch of recording on a channel (from 1), as its frames, on a
+   * connection of its own. It must lie inside one recorded file and end at
+   * least a second before the file does; see `Messages.downloadRequest`. The
+   * recorder sends from the first key frame in the second at `begin` to the
+   * end of the key frame's group at `end`, faster than real time.
+   */
+  readonly download: (options: {
+    readonly channel: number;
+    readonly begin: LocalTime;
+    readonly end: LocalTime;
+    readonly stream?: RecordedStream | undefined;
+  }) => Stream.Stream<RecordedFrame, SessionError>;
   /** Alarm reports, when the session asked for them. Ends when the connection closes. */
   readonly alarms: Stream.Stream<AlarmEvent>;
   /** Waits until the connection closes, failing with why. */
@@ -146,10 +166,14 @@ const empty = new Uint8Array(0);
 const closedBy = (error: Socket.SocketError) =>
   new ConnectionClosed({ message: error.message });
 
-/** Logs in over an open socket. */
+/**
+ * Logs in over an open socket. `openAnother` opens another connection to the
+ * same recorder, for downloads; without it, downloads fail.
+ */
 export const make = Effect.fnUntraced(function* (
   socket: Socket.Socket,
   options: SessionOptions,
+  openAnother?: Effect.Effect<Socket.Socket>,
 ) {
   const timeout = options.timeout ?? defaultTimeout;
 
@@ -272,6 +296,92 @@ export const make = Effect.fnUntraced(function* (
   if (!isRaysharpLogin(login.body)) return yield* new NotRaysharp();
   mode = login.mode;
   const device = parseLogin(login.body);
+  const userKey = parseUserKey(login.body);
+
+  const download: Session["download"] = (search) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        if (openAnother === undefined) {
+          return yield* new ConnectionClosed({
+            message: "This session can't open a connection for downloads",
+          });
+        }
+
+        const connection = yield* openAnother;
+
+        const pull = yield* Socket.readerBytes(connection).pipe(
+          Effect.mapError(closedBy),
+        );
+
+        const writer = yield* connection.writer;
+
+        yield* writer
+          .write(
+            encodeFrame({
+              mode,
+              type: MessageType.downloadRecordFile,
+              subtype: 0,
+              sequence: 1,
+              body: downloadRequest({
+                userKey,
+                channel: search.channel,
+                stream: search.stream ?? "main",
+                begin: search.begin,
+                end: search.end,
+              }),
+            }),
+          )
+          .pipe(Effect.mapError(closedBy));
+
+        const decode = recordingDecoder();
+        let ended = false;
+
+        const next = Effect.gen(function* () {
+          for (;;) {
+            if (ended) return yield* Cause.done();
+
+            const chunks = yield* pull.pipe(
+              // A close is the end of what the recorder will send, even
+              // without the end-of-file pack
+              Effect.catchReason("SocketError", "SocketCloseError", () =>
+                Effect.succeed([]),
+              ),
+              Effect.mapError(closedBy),
+              Effect.timeoutOrElse({
+                duration: timeout,
+                orElse: () =>
+                  Effect.fail(
+                    new RequestTimedOut({
+                      type: MessageType.downloadRecordFile,
+                      subtype: 0,
+                    }),
+                  ),
+              }),
+            );
+
+            if (chunks.length === 0) ended = true;
+
+            const frames: Array<RecordedFrame> = [];
+
+            for (const chunk of chunks) {
+              const decoded = decode(chunk);
+
+              frames.push(...decoded.frames);
+
+              if (decoded.problem !== undefined) {
+                return yield* new ProtocolError({ message: decoded.problem });
+              }
+
+              if (decoded.ended) ended = true;
+            }
+
+            if (Arr.isArrayNonEmpty(frames)) return frames;
+          }
+        });
+
+        return Stream.fromPull(Effect.succeed(next));
+      }),
+    );
 
   yield* Effect.suspend(() =>
     send(nextSequence(), MessageType.heartbeat, 0, empty),
@@ -316,6 +426,7 @@ export const make = Effect.fnUntraced(function* (
         Subtype.recordDayOutline,
         recordQuery({ kind: "outline", ...search }),
       ).pipe(Effect.map((reply) => parseRecordedDays(reply.body))),
+    download,
     alarms: Stream.fromPubSub(alarms),
     closed: Deferred.await(closed),
   } satisfies Session;
@@ -327,9 +438,12 @@ export const connect = (
     readonly host: string;
     readonly port?: number | undefined;
   },
-) =>
-  NodeSocket.makeNet({
+) => {
+  const open = NodeSocket.makeNet({
     host: options.host,
     port: options.port ?? 9000,
     openTimeout: Duration.seconds(10),
-  }).pipe(Effect.flatMap((socket) => make(socket, options)));
+  });
+
+  return Effect.flatMap(open, (socket) => make(socket, options, open));
+};
