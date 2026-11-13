@@ -4,6 +4,8 @@
  * never reaches a source. Every few minutes it lists what each source has
  * from within the hours kept, and copies what isn't there yet one file at a
  * time, at full quality: clips first, then continuous footage, newest first.
+ * A long queue hands back every few minutes and lists again, so clips that
+ * came in meanwhile go ahead of older ones still waiting.
  * Past the disk share, a file is only copied when something older would be
  * cleared out for it, and the clear-out runs straight after, so the newest
  * are kept and nothing is copied only to be deleted. Copies read no faster
@@ -23,7 +25,6 @@ import {
   FileSystem,
   Layer,
   Ref,
-  Schedule,
   Stream,
 } from "effect";
 import type { CopySource, Job } from "./Api.ts";
@@ -33,7 +34,7 @@ import { reasonTag } from "./Library.ts";
 import { Sources } from "./Sources.ts";
 import { Usage } from "./Usage.ts";
 
-/** How long between looks at what the sources have. */
+/** How long between looks at what the sources have, and the longest a look's copying runs before looking again. */
 const every = Duration.minutes(10);
 
 /** A recording that ended this recently may still be being written. */
@@ -138,6 +139,7 @@ const copy = (
       begin: want.recording.begin,
       end: want.recording.end,
       stream: "main",
+      pace: { bytesPerSecond: rate * megabyte, room },
     });
 
     const perSecond = rate * megabyte;
@@ -341,11 +343,25 @@ export const layer = Layer.effectDiscard(
 
       const stored = yield* Ref.make(yield* Nvr.stored(folder));
       const copied = yield* Ref.make({ files: 0, bytes: 0 });
+      const started = yield* Clock.currentTimeMillis;
+
+      // A long queue hands back now and then, so newer clips go first
+      let cut = false;
 
       yield* Effect.forEach(
         queue,
         (want) =>
           Effect.gen(function* () {
+            if (cut) return;
+
+            const now = yield* Clock.currentTimeMillis;
+
+            if (now - started > Duration.toMillis(every)) {
+              cut = true;
+
+              return;
+            }
+
             const files = yield* Ref.get(stored);
             const used = sum(files);
             const space = yield* Nvr.disk(folder);
@@ -353,8 +369,6 @@ export const layer = Layer.effectDiscard(
             const fits =
               used + (want.recording.bytes ?? 0) <=
               Nvr.budget(settings, space, used);
-
-            const now = yield* Clock.currentTimeMillis;
 
             if (!fits && !roomFor(files, want, settings, now)) {
               return yield* tally(want, 0);
@@ -423,15 +437,23 @@ export const layer = Layer.effectDiscard(
       const now = yield* at;
 
       if (queue.length > 0) {
-        yield* Effect.logInfo(`${summary} from sources`);
+        yield* Effect.logInfo(
+          cut
+            ? `${summary} from sources, looking again for newer ones`
+            : `${summary} from sources`,
+        );
       }
 
       yield* report((job) => ({
         ...job,
-        state: "idle",
-        detail: "Looks again in 10 minutes",
+        state: cut ? "running" : "idle",
+        detail: cut
+          ? "Looking again for newer recordings"
+          : "Looks again in 10 minutes",
         lastRun: { at: now, summary },
       }));
+
+      return cut;
     }).pipe(
       Effect.catch((error) =>
         Effect.gen(function* () {
@@ -445,16 +467,24 @@ export const layer = Layer.effectDiscard(
             detail: "Tries again in 10 minutes",
             lastError: { at: now, message },
           }));
+
+          return false;
         }),
       ),
     );
 
     yield* report((job) => job);
 
-    // Gives the sources a moment to connect first
+    // Gives the sources a moment to connect first, and goes straight on
+    // after a look that handed back with more to copy
     yield* Effect.sleep(Duration.seconds(30)).pipe(
-      Effect.andThen(pass),
-      Effect.repeat(Schedule.spaced(every)),
+      Effect.andThen(
+        Effect.gen(function* () {
+          for (;;) {
+            if (!(yield* pass)) yield* Effect.sleep(every);
+          }
+        }),
+      ),
       Effect.forkScoped,
     );
   }),
