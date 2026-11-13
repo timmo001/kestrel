@@ -173,6 +173,7 @@
         "@timmo001/kestrel-source-raysharp": "workspace:*",
         "@timmo001/kestrel-source-reolink": "workspace:*",
         "@timmo001/kestrel-source-stream": "workspace:*",
+        "@timmo001/kestrel-source-web": "workspace:*",
         "effect": "4.1.4",
         "web-push": "4.0.0",
       },
@@ -249,6 +250,24 @@
       "name": "@timmo001/kestrel-source-stream",
       "version": "0.0.0",
       "dependencies": {
+        "@timmo001/kestrel-core": "workspace:*",
+        "effect": "4.1.4",
+      },
+      "devDependencies": {
+        "@effect/tsgo": "0.68.1",
+        "@oxlint/plugins": "1.93.0",
+        "@timmo001/oxlint-rules": "0.6.5",
+        "@types/bun": "1.4.4",
+        "oxlint": "1.93.0",
+        "oxlint-tsgolint": "7.0.2007",
+        "typescript": "7.0.2",
+      },
+    },
+    "packages/source-web": {
+      "name": "@timmo001/kestrel-source-web",
+      "version": "0.0.0",
+      "dependencies": {
+        "@effect/platform-node-shared": "4.1.4",
         "@timmo001/kestrel-core": "workspace:*",
         "effect": "4.1.4",
       },
@@ -958,6 +977,8 @@
     "@timmo001/kestrel-source-reolink": ["@timmo001/kestrel-source-reolink@workspace:packages/source-reolink"],
 
     "@timmo001/kestrel-source-stream": ["@timmo001/kestrel-source-stream@workspace:packages/source-stream"],
+
+    "@timmo001/kestrel-source-web": ["@timmo001/kestrel-source-web@workspace:packages/source-web"],
 
     "@timmo001/kestrel-web": ["@timmo001/kestrel-web@workspace:packages/web"],
 

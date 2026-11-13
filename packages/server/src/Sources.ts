@@ -31,6 +31,7 @@ import * as Bambu from "@timmo001/kestrel-source-bambu";
 import * as Raysharp from "@timmo001/kestrel-source-raysharp";
 import * as Reolink from "@timmo001/kestrel-source-reolink";
 import * as Streams from "@timmo001/kestrel-source-stream";
+import * as Web from "@timmo001/kestrel-source-web";
 import {
   Context,
   Effect,
@@ -53,6 +54,7 @@ const kinds: ReadonlyArray<Kind> = [
   Reolink.kind,
   Bambu.kind,
   Streams.kind,
+  Web.kind,
 ];
 
 const kindInfos = kinds.map((kind) => kind.info);

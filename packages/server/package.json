@@ -26,6 +26,7 @@
     "@timmo001/kestrel-source-raysharp": "workspace:*",
     "@timmo001/kestrel-source-reolink": "workspace:*",
     "@timmo001/kestrel-source-stream": "workspace:*",
+    "@timmo001/kestrel-source-web": "workspace:*",
     "effect": "4.1.4",
     "web-push": "4.0.0"
   },
