@@ -29,6 +29,7 @@ import {
   phCaretRight,
   phCornersIn,
   phCornersOut,
+  phDotsThreeVertical,
   phDownloadSimple,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
@@ -256,6 +257,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const fitToggle = find("gw-segmented", "control-fit");
   const fullscreenButton = find("gw-button", "control-fullscreen");
   const helpButton = find("gw-button", "control-help");
+  const moreMenu = find("gw-menu-button", "control-more");
   const hold = find("canvas", "player-hold");
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
@@ -517,6 +519,51 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     field?.addEventListener("input", showClip);
   }
 
+  /**
+   * On a phone, the controls left out of the bar, in the More menu, as they
+   * stand: Cut's item says which end of the clip a press marks.
+   */
+  const showMore = () => {
+    if (moreMenu === null) return;
+
+    const idle = player?.clip() === undefined;
+
+    moreMenu.items = [
+      { value: "stop", label: "Stop", icon: icons.stop, disabled: idle },
+      {
+        value: "frame",
+        label: "Next frame",
+        icon: icons.frame,
+        disabled: idle,
+      },
+      {
+        value: "cut",
+        label: cutButton?.pressed === true ? "End the clip here" : "Cut a clip",
+        icon: icons.cut,
+        disabled: idle,
+      },
+      {
+        value: "download",
+        label: "Download this recording",
+        icon: icons.download,
+        disabled: idle,
+      },
+    ];
+  };
+
+  moreMenu?.setAttribute("icon", phDotsThreeVertical);
+
+  if (moreMenu !== null) {
+    on(moreMenu, "select", (event) => {
+      const href = downloadButton?.getAttribute("href");
+
+      if (event.detail.value === "stop") stopButton?.click();
+      else if (event.detail.value === "frame") frameButton?.click();
+      else if (event.detail.value === "cut") cutButton?.click();
+      else if (event.detail.value === "download" && href) save(href);
+    });
+  }
+
   cutButton?.addEventListener("click", () => {
     const time = player?.time();
 
@@ -537,6 +584,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     }
 
     cutButton.pressed = !cutButton.pressed;
+    showMore();
   });
 
   // The controls
@@ -631,6 +679,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     }
 
     if (idle && playerClock !== null) playerClock.textContent = "--:--:--";
+
+    showMore();
   };
 
   playClip = (clip, from, autoplay = true) => {
