@@ -55,4 +55,6 @@ if [ "$1" = "serve" ]; then
   export KESTREL_WEB KESTREL_GO2RTC
 fi
 
-exec "$bundle/bin/bun" "$app/cli/kestrel.js" "$@"
+# Settings come from the config folder and the environment, never from a .env
+# file wherever kestrel happens to be run
+exec "$bundle/bin/bun" --no-env-file "$app/cli/kestrel.js" "$@"

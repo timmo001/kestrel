@@ -16,5 +16,7 @@ if /i "%~1"=="serve" (
   if not defined KESTREL_GO2RTC set "KESTREL_GO2RTC=%app%go2rtc\go2rtc.exe"
 )
 
-"%bundle%\bin\bun.exe" "%app%cli\kestrel.js" %*
+rem Settings come from the config folder and the environment, never from a
+rem .env file wherever kestrel happens to be run
+"%bundle%\bin\bun.exe" --no-env-file "%app%cli\kestrel.js" %*
 exit /b %errorlevel%
