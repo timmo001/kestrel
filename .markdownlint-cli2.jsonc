@@ -4,5 +4,11 @@
     "MD013": false,
   },
   "globs": ["**/*.md"],
-  "ignores": ["**/node_modules/**", "**/dist/**", ".agents/**"],
+  "ignores": [
+    "**/node_modules/**",
+    "**/dist/**",
+    ".agents/**",
+    "packages/desktop/.hutch/**",
+    "packages/desktop/build/**",
+  ],
 }
