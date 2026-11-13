@@ -22,6 +22,7 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel pair`                                         | A one-time code and QR code for another device              |
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
 | `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |
+| `kestrel servers`                                      | The Kestrel servers on this network, found over mDNS        |
 
 `-c` takes a camera's id, such as `swann/1`; while there's one source, its
 camera's own id, such as `1`, is enough. `details` shows the only source
@@ -37,7 +38,10 @@ talks to this machine's own server at `http://127.0.0.1:7380`, signing in
 with the owner token in the state folder when it can read it. A server
 answers only devices paired with it, so pair the CLI first: get a code
 from Settings, Devices on a paired browser, then run
-`kestrel pair <code> --server <address>`. With no code, `kestrel pair`
+`kestrel pair <code> --server <address>`. Servers announce themselves on
+the network, so `--server` can be left out while there's only one, and
+`kestrel servers` lists them. When a paired server moves to a new address,
+the CLI finds it again by its id and keeps the new address. With no code, `kestrel pair`
 on the server shows a code and QR code for another device; for a server
 running as its own user, run it as that user, such as
 `sudo -u kestrel kestrel pair`.

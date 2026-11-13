@@ -20,6 +20,7 @@ import {
   SourceInfo,
   version,
 } from "@timmo001/kestrel-core";
+import { browse } from "@timmo001/kestrel-core/discovery";
 import { Device } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
@@ -116,6 +117,24 @@ const DevicesTool = Tool.make("devices", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
+const ServersTool = Tool.make("servers", {
+  description: "The Kestrel servers on this network, found over mDNS",
+  success: Schema.Struct({
+    servers: Schema.Array(
+      Schema.Struct({
+        id: Schema.String,
+        name: Schema.String,
+        version: Schema.String,
+        url: Schema.String,
+        addresses: Schema.Array(Schema.String),
+        port: Schema.Number,
+      }),
+    ),
+  }),
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
 const Tools = Toolkit.make(
   Status,
   DetailsTool,
@@ -125,6 +144,7 @@ const Tools = Toolkit.make(
   Days,
   Events,
   DevicesTool,
+  ServersTool,
 );
 
 const handlers = Effect.gen(function* () {
@@ -193,6 +213,8 @@ const handlers = Effect.gen(function* () {
       client
         .call((api) => api.devices.list())
         .pipe(Effect.map((list) => ({ devices: list }))),
+    servers: () =>
+      browse("3 seconds").pipe(Effect.map((found) => ({ servers: found }))),
   });
 });
 

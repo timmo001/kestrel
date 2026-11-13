@@ -30,6 +30,7 @@ import type {
   PairingCode,
   ServerInfo,
 } from "@timmo001/kestrel-server/api";
+import { browse, type FoundServer } from "@timmo001/kestrel-core/discovery";
 import { hostname } from "node:os";
 import {
   Console,
@@ -89,6 +90,7 @@ type Output =
   | { readonly events: ReadonlyArray<CameraEvent> }
   | { readonly devices: ReadonlyArray<Device> }
   | { readonly pairing: PairingCode }
+  | { readonly servers: ReadonlyArray<FoundServer> }
   | {
       readonly copied: {
         readonly server: string;
@@ -514,6 +516,21 @@ const download = Command.make(
   ),
 );
 
+/** The one Kestrel server on the network, failing where there's none or several. */
+const onlyServer = Effect.gen(function* () {
+  const found = yield* browse("3 seconds");
+  const [only] = found;
+
+  if (found.length === 1 && only !== undefined) return only.url;
+
+  return yield* new ClientError({
+    message:
+      found.length === 0
+        ? "No Kestrel server answered on this network: name it with --server"
+        : `More than one Kestrel server answered (${found.map((each) => `${each.name} at ${each.url}`).join(", ")}): name one with --server`,
+  });
+});
+
 const pair = Command.make(
   "pair",
   {
@@ -526,7 +543,7 @@ const pair = Command.make(
     ),
     server: Flag.String("server").pipe(
       Flag.withDescription(
-        "The server's address, such as http://192.168.1.20:7380; the saved one or this machine's by default",
+        "The server's address, such as http://192.168.1.20:7380; the saved one, or the only one on the network, by default",
       ),
       Flag.optional,
     ),
@@ -567,7 +584,14 @@ const pair = Command.make(
     }
 
     const { server: current } = yield* connection;
-    const target = Option.getOrElse(server, () => current).replace(/\/+$/, "");
+
+    // Without an address, the server set or saved before, else the only one
+    // on the network
+    const target = Option.isSome(server)
+      ? server.value.replace(/\/+$/, "")
+      : current !== localServer
+        ? current
+        : yield* onlyServer;
 
     const paired = yield* clientFor(target, Option.none()).pipe(
       Effect.flatMap((client) =>
@@ -676,6 +700,32 @@ const devices = devicesList.pipe(
     "The devices paired with the server, such as browsers, phones and this CLI",
   ),
   Command.withSubcommands([devicesRemove]),
+);
+
+const servers = Command.make(
+  "servers",
+  { json },
+  Effect.fn("servers")(function* ({ json }) {
+    const found = yield* browse("3 seconds");
+
+    if (json) return yield* printJson({ servers: found });
+
+    if (found.length === 0) {
+      return yield* Console.log(
+        "No Kestrel servers answered on this network in 3 seconds",
+      );
+    }
+
+    for (const server of found) {
+      yield* Console.log(
+        `${server.name}  ${server.url}  ${server.version}${server.version === version ? "" : "  (another version)"}`,
+      );
+    }
+  }),
+).pipe(
+  Command.withDescription(
+    "The Kestrel servers on this network, found over mDNS",
+  ),
 );
 
 const configCopy = Command.make(
@@ -809,6 +859,7 @@ const cli = Command.make("kestrel").pipe(
     events,
     devices,
     pair,
+    servers,
     config,
     agent,
     mcp,

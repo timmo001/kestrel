@@ -114,6 +114,13 @@ read that folder owns the server. `POST /api/devices/link` returns a path,
 such as the desktop app's window: opening it sets the cookie and goes to the
 page.
 
+## Finding servers
+
+A server listening beyond this machine announces itself on the home
+network over mDNS as `_kestrel._tcp`, named after the machine (or
+`KESTREL_NAME`), with its `id` and `version` in the TXT record.
+`KESTREL_ANNOUNCE=false` keeps it quiet.
+
 ## Versions
 
 A client only works with a server of its own version, so the two never

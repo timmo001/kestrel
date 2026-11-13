@@ -17,7 +17,18 @@ import {
   type SourceInfo,
 } from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
-import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
+import { browse } from "@timmo001/kestrel-core/discovery";
+import {
+  Context,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Predicate,
+  Redacted,
+  Schema,
+} from "effect";
 import {
   FetchHttpClient,
   HttpClient,
@@ -25,11 +36,17 @@ import {
   HttpClientRequest,
 } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
-import { connection } from "./connection.ts";
+import { connection, writeSaved, type SavedConnection } from "./connection.ts";
 
 /** The server couldn't be reached or couldn't reach a source, or the input doesn't read. */
 export class ClientError extends Schema.TaggedError<ClientError>()(
   "ClientError",
+  { message: Schema.String },
+) {}
+
+/** Nothing answered at the server's address, such as after it moved. */
+export class ServerUnreachable extends Schema.TaggedError<ServerUnreachable>()(
+  "ServerUnreachable",
   { message: Schema.String },
 ) {}
 
@@ -95,6 +112,11 @@ export const operations: ReadonlyArray<Operation> = [
     access: "read",
   },
   {
+    name: "servers",
+    description: "The Kestrel servers on this network, found over mDNS",
+    access: "read",
+  },
+  {
     name: "config copy",
     description:
       "Copy this machine's sources, logins and camera names to another paired server, replacing its own",
@@ -152,9 +174,16 @@ export const matchVersion = Effect.fn("matchVersion")(function* (
   client: Client,
   server: string,
 ) {
-  const info = yield* client.devices
-    .server()
-    .pipe(Effect.mapError(asClientError(server)));
+  const info = yield* client.devices.server().pipe(
+    Effect.mapError((error) =>
+      HttpClientError.isHttpClientError(error) &&
+      Predicate.isTagged(error.reason, "TransportError")
+        ? new ServerUnreachable({
+            message: `Can't reach a Kestrel server at ${server}`,
+          })
+        : asClientError(server)(error),
+    ),
+  );
 
   if (info.version !== version) {
     return yield* new ClientError({
@@ -183,18 +212,71 @@ export class ServerClient extends Context.Service<
   static readonly layer = Layer.effect(
     ServerClient,
     Effect.gen(function* () {
-      const { server, token } = yield* connection;
-      const client = yield* clientFor(server, token);
+      const { server, token, saved } = yield* connection;
+
+      const services = yield* Effect.context<
+        HttpClient.HttpClient | FileSystem.FileSystem | Path.Path
+      >();
+
+      const attempt = (at: string) =>
+        clientFor(at, token).pipe(
+          Effect.tap((client) => matchVersion(client, at)),
+          Effect.map((client) => ({ client, server: at })),
+        );
+
+      // The paired server isn't at its saved address any more, such as after
+      // its router gave it a new one: find it by its id and keep where it is
+      const refind = (kept: SavedConnection, unreachable: ServerUnreachable) =>
+        Effect.gen(function* () {
+          const servers = yield* browse("3 seconds");
+          const moved = servers.find((each) => each.id === kept.serverId);
+
+          if (moved === undefined) return yield* unreachable;
+
+          yield* writeSaved({
+            server: moved.url,
+            serverId: kept.serverId,
+            token: kept.token,
+          }).pipe(
+            Effect.catch((error) =>
+              Effect.logWarning(
+                `Couldn't save where the server is now: ${error.message}`,
+              ),
+            ),
+          );
+
+          return yield* attempt(moved.url);
+        });
 
       // Once, before the first call, so commands that don't call the server
       // don't need it
-      const matched = yield* Effect.cached(matchVersion(client, server));
+      const ready = yield* Effect.cached(
+        attempt(server).pipe(
+          Effect.catchTag("ServerUnreachable", (unreachable) =>
+            Option.match(
+              Option.filter(saved, (kept) => kept.server === server),
+              {
+                onNone: () => Effect.fail(unreachable),
+                onSome: (kept) => refind(kept, unreachable),
+              },
+            ),
+          ),
+          Effect.mapError((error) =>
+            error instanceof ServerUnreachable
+              ? new ClientError({ message: error.message })
+              : error,
+          ),
+          Effect.provideContext(services),
+        ),
+      );
 
       return ServerClient.of({
         call: (use) =>
-          matched.pipe(
-            Effect.andThen(
-              use(client).pipe(Effect.mapError(asClientError(server))),
+          ready.pipe(
+            Effect.flatMap((found) =>
+              use(found.client).pipe(
+                Effect.mapError(asClientError(found.server)),
+              ),
             ),
           ),
       });
