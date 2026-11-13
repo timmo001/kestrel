@@ -23,6 +23,13 @@ body {
   border-radius: var(--gw-radius-sm, 4px);
 }
 
+.brand-version {
+  color: var(--gw-color-text-secondary);
+  font-size: var(--gw-font-size-s);
+  font-weight: 400;
+  font-variant-numeric: var(--gw-font-figures);
+}
+
 /* The pages in the app bar, or in its menu when they don't fit. The script
    reckons that width from this padding */
 .nav-link {

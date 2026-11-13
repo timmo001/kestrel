@@ -33,6 +33,7 @@ import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
+import { aboutPanel } from "./about.ts";
 import { call, onMismatched, onUnpaired } from "./api.ts";
 import { loadCameras } from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
@@ -219,6 +220,8 @@ const devices = devicesPanel();
 
 void devices.start();
 
+void aboutPanel().start();
+
 // Pairing: once paired, the app starts again with the server's cookie, so
 // every page loads as a paired browser
 const pair = pairPage({ onPaired: () => location.assign(href("live")) });
@@ -376,6 +379,9 @@ AtomRegistry.make().subscribe(currentLocation, showPage, { immediate: true });
 // stay in the bar for as long as they fit beside them
 const appBar = document.querySelector("gw-app-bar");
 const brand = find("a", "brand");
+const brandVersion = find("span", "brand-version");
+
+if (brandVersion !== null) brandVersion.textContent = version;
 
 /** The bar's padding, the gaps between its parts and the links, and the two action buttons at their smallest. */
 const barExtras = 12 * 2 + 12 * 2 + 4 * (navLinks.length - 1) + 40 * 2 + 16;

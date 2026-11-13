@@ -26,7 +26,11 @@ for (const entry of ["src/index.ts", "src/sw.ts"]) {
     target: "browser",
     minify: true,
     naming: { entry: "[name].[ext]", asset: "assets/[name]-[hash].[ext]" },
-    define: { "process.env.GROUNDWORK_PWA_VERSION": JSON.stringify(version) },
+    define: {
+      "process.env.GROUNDWORK_PWA_VERSION": JSON.stringify(version),
+      // Shown in Settings, beside the version
+      "process.env.KESTREL_BUILT": JSON.stringify(new Date().toISOString()),
+    },
   });
 
   if (!result.success) {

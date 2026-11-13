@@ -47,6 +47,8 @@
       <a slot="brand" class="brand" href="./">
         <img src="icons/icon-192.png" alt="" width="24" height="24" />
         Kestrel
+        <!-- The version, which the script fills in -->
+        <span class="brand-version"></span>
       </a>
       <!-- The pages, followed by the router. The script folds them into the
            bar's menu when they don't fit beside the actions. Their links are
@@ -651,6 +653,21 @@
             <gw-card loading lines="1"></gw-card>
             <gw-card loading lines="1"></gw-card>
           </gw-stack>
+          <!-- This page's version and the server's, last -->
+          <gw-section-title level="3">About</gw-section-title>
+          <gw-card class="settings-about">
+            <gw-stack gap="m">
+              <gw-facts class="about-facts" loading rows="5"></gw-facts>
+              <gw-row>
+                <gw-button
+                  class="about-notes"
+                  appearance="outlined"
+                  variant="neutral"
+                  >Release notes</gw-button
+                >
+              </gw-row>
+            </gw-stack>
+          </gw-card>
         </section>
 
         <!-- Pairing: a browser the server doesn't know yet lands here, with a
