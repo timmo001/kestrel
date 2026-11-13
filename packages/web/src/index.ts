@@ -64,6 +64,7 @@ import {
   themeSettings,
   themes,
 } from "./theme.ts";
+import { reloadForUpdate } from "./update.ts";
 
 // The theme picker in the app bar: Kestrel's own theme, then every Groundwork
 // theme and mode, with nothing to import, so it's always one of those listed
@@ -223,20 +224,23 @@ void devices.start();
 const pair = pairPage({ onPaired: () => location.assign(href("live")) });
 
 // Another version: the server was updated since the browser kept this page.
-// It reloads once by itself, and says so where the reload didn't help
+// It moves onto the new release once by itself, and says so where that
+// didn't help. Every call refused meanwhile waits on the same move
 const versionBanner = find("gw-banner", "version");
 const reloadedKey = "kestrel:reloaded-for-version";
+let updating = false;
 
 find("gw-button", "version-reload")?.addEventListener("click", () =>
   location.reload(),
 );
 
 onMismatched(() => {
-  if (versionBanner === null || versionBanner.open) return;
+  if (updating || versionBanner === null || versionBanner.open) return;
 
   if (sessionStorage.getItem(reloadedKey) !== version) {
     sessionStorage.setItem(reloadedKey, version);
-    location.reload();
+    updating = true;
+    void reloadForUpdate(pwa);
 
     return;
   }
