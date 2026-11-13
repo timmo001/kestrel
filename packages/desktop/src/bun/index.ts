@@ -2,7 +2,8 @@
  * The desktop app's main process: runs the Kestrel server, opens its page in
  * a window with Groundwork's desktop defaults and keeps running in the tray
  * once the window closes. The tray shows how the server is doing and opens
- * the docs built into the app.
+ * the docs built into the app, and the page asks where they are for its own
+ * docs link.
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -26,6 +27,7 @@ import {
 } from "@timmo001/groundwork-desktop/main";
 
 import config from "../../desktop.config.ts";
+import type { AppRequests } from "../requests.ts";
 import { DesktopDocs } from "./docs.ts";
 import { DesktopServer, type Status } from "./server.ts";
 
@@ -100,6 +102,8 @@ const trayItems = (status: Status): TrayItem[] => [
   { type: "normal", label: "Docs", action: "docs" },
 ];
 
+const docsUrl = () => runtime.runPromise(DesktopDocs.useSync(({ url }) => url));
+
 const desktop = await openDesktopWindow(Electrobun, {
   title: "Kestrel",
   url: `${origin}/`,
@@ -123,14 +127,12 @@ const desktop = await openDesktopWindow(Electrobun, {
   onTrayAction: (action) => {
     if (action !== "docs") return;
 
-    void runtime.runPromise(
-      DesktopDocs.useSync(({ url }) => Electrobun.Utils.openExternal(url)),
-    );
+    void docsUrl().then((url) => Electrobun.Utils.openExternal(url));
   },
   createRPC: (requests: DesktopRequests) =>
-    BrowserView.defineRPC<DesktopSchema>({
+    BrowserView.defineRPC<DesktopSchema<AppRequests>>({
       maxRequestTime: 10_000,
-      handlers: { requests },
+      handlers: { requests: { ...requests, docs: docsUrl } },
     }),
 });
 

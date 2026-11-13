@@ -1,7 +1,8 @@
 /**
  * Runs in Kestrel's page before its own scripts: connects it to the main
  * process for Groundwork's desktop defaults, such as find in page, the zoom
- * and reload keys and the right-click menu.
+ * and reload keys and the right-click menu, and points the page's docs link
+ * at the docs built into the app.
  */
 import {
   connectDesktop,
@@ -9,12 +10,11 @@ import {
 } from "@timmo001/groundwork-desktop/view";
 import { Electroview } from "electrobun/view";
 
-// The page asks the main process for nothing beyond the desktop defaults
-type NoRequests = Record<never, never>;
+import type { AppRequests } from "../requests.ts";
 
-const connect = () =>
-  connectDesktop<NoRequests>((messages) => {
-    const rpc = Electroview.defineRPC<DesktopSchema<NoRequests>>({
+const connect = async () => {
+  const { request } = await connectDesktop<AppRequests>((messages) => {
+    const rpc = Electroview.defineRPC<DesktopSchema<AppRequests>>({
       maxRequestTime: 10_000,
       handlers: { messages },
     });
@@ -23,6 +23,10 @@ const connect = () =>
 
     return rpc;
   });
+
+  // The page opens this in place of the hosted docs, so they read offline
+  document.documentElement.dataset.docs = await request.docs();
+};
 
 // The defaults add to the page's body, which isn't there yet
 if (document.readyState === "loading") {

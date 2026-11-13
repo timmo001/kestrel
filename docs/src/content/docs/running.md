@@ -193,8 +193,8 @@ Closing the window leaves it running in the tray. The tray menu opens the
 window again, shows whether the server is running, how many sources are
 connected and how many cameras it records, opens these docs and quits. The
 docs are built into the app, so they open in your browser without a
-connection. If the server stops, the app starts it again, waiting longer
-each time up to 30 seconds.
+connection, from the tray or the page's More menu. If the server stops, the
+app starts it again, waiting longer each time up to 30 seconds.
 Opening the app again while it runs brings its window to the front.
 
 Tick Start at login in the tray to start it in the tray when you log in. It

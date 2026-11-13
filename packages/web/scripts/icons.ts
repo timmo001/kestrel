@@ -13,6 +13,7 @@ const names = [
   "arrows-out-simple",
   "bell",
   "bell-ringing",
+  "book-open",
   "film-strip",
   "hard-drives",
   "video-camera",

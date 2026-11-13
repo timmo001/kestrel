@@ -34,6 +34,7 @@ import { eventsPage } from "./events.ts";
 import {
   phBell,
   phBellRinging,
+  phBookOpen,
   phDotsThreeVertical,
   phFilmStrip,
   phGear,
@@ -335,11 +336,32 @@ void document.fonts.ready.then(fitNav);
 // A theme can change the font, and with it the links' widths
 theme.subscribe(() => requestAnimationFrame(fitNav));
 
-// Notifications: the bar's overflow menu subscribes this browser to the
-// server's pushes and says where they stand, hidden where it can't push
+// The bar's overflow menu: the docs, and notifications where the browser can
+// push, subscribing it to the server's pushes and saying where they stand
 const more = find("gw-menu-button", "more");
 
 more?.setAttribute("icon", phDotsThreeVertical);
+
+const docsItem: MenuItem = {
+  value: "docs",
+  label: "Docs",
+  description: "Setting up and using Kestrel",
+  icon: phBookOpen,
+};
+
+// The desktop app sets the docs built into it, which read offline
+const docsUrl = () =>
+  document.documentElement.dataset.docs ?? "https://kestrel.timmo.dev/";
+
+if (more !== null) {
+  more.items = [docsItem];
+
+  on(more, "select", (event) => {
+    if (event.detail.value === "docs") {
+      window.open(docsUrl(), "_blank", "noopener");
+    }
+  });
+}
 
 const bell = phBell;
 
@@ -384,8 +406,10 @@ const pushService = {
 const showNotify = (state: PushState) => {
   if (more === null) return;
 
-  more.hidden = state === "unsupported";
-  more.items = state === "unsupported" ? [] : [notifyItems[state]];
+  more.items =
+    state === "unsupported"
+      ? [docsItem]
+      : [notifyItems[state], { ...docsItem, separator: true }];
 };
 
 void pwa.worker.then(async (registration) => {
