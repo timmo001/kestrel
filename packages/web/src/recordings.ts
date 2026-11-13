@@ -236,6 +236,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const recordedDays = find("gw-row", "recorded-days");
   const table = find("gw-table", "recordings");
   const grid = find("div", "player-grid");
+  const view = find("div", "playback-view");
   const stage = find("div", "player-stage");
   const screen = find("div", "player-screen");
   const caption = find("span", "player-caption");
@@ -918,9 +919,10 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   screen?.addEventListener("dblclick", () => fullscreenButton?.click());
 
+  // The video, its controls and the timeline go full screen together
   fullscreenButton?.addEventListener("click", () => {
     if (document.fullscreenElement === null) {
-      void stage?.requestFullscreen().catch(() => undefined);
+      void view?.requestFullscreen().catch(() => undefined);
     } else {
       void document.exitFullscreen();
     }

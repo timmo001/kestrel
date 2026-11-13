@@ -987,7 +987,7 @@ gw-table gw-sheet {
     aspect-ratio: 16 / 9;
   }
 
-  .player-stage:fullscreen .player-screen {
+  .playback-view:fullscreen .player-screen {
     aspect-ratio: auto;
   }
 }
@@ -1172,10 +1172,21 @@ kbd {
   display: none;
 }
 
-/* Full screen: the picture takes the screen, with the controls under it */
-.player-stage:fullscreen {
-  grid-template-rows: 1fr auto;
-  border-radius: 0;
+/* Full screen: the picture takes the screen, with the controls and the
+   day's timeline under it, and the day and cameras left out */
+.playback-view:fullscreen {
+  height: 100dvh;
+  min-height: 0;
+  padding: var(--gw-space-3);
+  background: var(--gw-color-surface-default);
+}
+
+.playback-view:fullscreen .playback-bar {
+  display: none;
+}
+
+.playback-view:fullscreen .player-stage {
+  flex: 1 1 auto;
 }
 
 /* The timeline and its legend keep their height; the video gives way */
