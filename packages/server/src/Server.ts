@@ -41,12 +41,19 @@ import * as Recording from "./Recording.ts";
 import { Sources } from "./Sources.ts";
 import * as Sync from "./Sync.ts";
 
+/** Home Assistant's ingress path, as the Supervisor sends it in `X-Ingress-Path`. */
+const ingressPath = /^\/api\/hassio_ingress\/[\w-]+$/;
+
+/** The page's `<base>` as the build writes it. */
+const rootBase = '<base href="/" />';
+
 /**
  * The built web client from `directory`. A path outside the API that names a
  * file gets that file, and any other gets the page, which the service worker
- * and the page's own links work from.
+ * and the page's own links work from. Under Home Assistant's ingress, the
+ * page's `<base>` is its ingress path, so its links and calls stay under it.
  */
-const webClient = (directory: string) =>
+const webClient = (directory: string, options: { readonly ingress: boolean }) =>
   HttpRouter.add("GET", "/*", (request) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -66,12 +73,26 @@ const webClient = (directory: string) =>
           Effect.orElseSucceed(() => false),
         ));
 
+      const page = path.join(directory, "index.html");
+      const prefix = request.headers["x-ingress-path"];
+
+      if (
+        options.ingress &&
+        (!isFile || file === page) &&
+        prefix !== undefined &&
+        ingressPath.test(prefix)
+      ) {
+        const html = yield* fs.readFileString(page);
+
+        return HttpServerResponse.html(
+          html.replace(rootBase, `<base href="${prefix}/" />`),
+        ).pipe(HttpServerResponse.setHeader("cache-control", "no-cache"));
+      }
+
       // Checked with the browser each time, by ETag, so a new build reaches
       // the page and its service worker at once rather than when the
       // browser's own guess at freshness runs out
-      return yield* HttpServerResponse.file(
-        isFile ? file : path.join(directory, "index.html"),
-      ).pipe(
+      return yield* HttpServerResponse.file(isFile ? file : page).pipe(
         Effect.map(HttpServerResponse.setHeader("cache-control", "no-cache")),
       );
     }).pipe(
@@ -91,7 +112,33 @@ export interface ServeOptions {
   readonly port: number;
   /** Where the built web client is. */
   readonly web: string;
+  /**
+   * The port Home Assistant's ingress reaches the page on, for the app. It
+   * only answers the Supervisor, and needs no pairing, since Home Assistant
+   * has already signed the user in.
+   */
+  readonly ingressPort?: number | undefined;
+  /** The address ingress requests come from: the Supervisor's by default. */
+  readonly ingressFrom?: string | undefined;
 }
+
+/** The Supervisor's address, the only one the ingress port answers by default. */
+const supervisor = "172.30.32.2";
+
+/** Answers only `from` on the ingress port, refusing everyone else. */
+const ingressGuard =
+  (from: string) =>
+  <E, R>(
+    httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
+  ) =>
+    Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
+      Option.exists(
+        request.remoteAddress,
+        (remote) => remote === from || remote === `::ffff:${from}`,
+      )
+        ? httpEffect
+        : Effect.succeed(HttpServerResponse.empty({ status: 403 })),
+    );
 
 /** go2rtc under `/go2rtc/`, at the port the `Go2rtc` service runs it on. */
 const go2rtc = Layer.unwrap(
@@ -236,8 +283,10 @@ const connect = HttpRouter.add("GET", `/${connectPath}*`, (request) =>
  * The server as `kestrel serve` and `mise run serve:server` run it, set from
  * the environment: `KESTREL_HOST`, all addresses (`::`) by default, so other
  * devices reach it once paired; `KESTREL_PORT` or `PORT`, 7380 by default;
- * and `KESTREL_WEB`, the built web client, `packages/web/dist` beside this
- * package by default.
+ * `KESTREL_WEB`, the built web client, `packages/web/dist` beside this
+ * package by default; and for the Home Assistant app, `KESTREL_INGRESS_PORT`,
+ * with `KESTREL_INGRESS_FROM` for where ingress comes from, the Supervisor by
+ * default.
  */
 export const fromEnvironment = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -256,8 +305,23 @@ export const fromEnvironment = Effect.gen(function* () {
     Config.withDefault(path.resolve(import.meta.dir, "../../web/dist")),
   );
 
-  return layer({ hostname, port, web });
+  // Set by the Home Assistant app
+  const ingressPort = yield* Config.option(Config.Int("KESTREL_INGRESS_PORT"));
+
+  const ingressFrom = yield* Config.option(
+    Config.String("KESTREL_INGRESS_FROM"),
+  );
+
+  return layer({
+    hostname,
+    port,
+    web,
+    ingressPort: Option.getOrUndefined(ingressPort),
+    ingressFrom: Option.getOrUndefined(ingressFrom),
+  });
 });
+
+const gracefulShutdownTimeout = "2 seconds";
 
 /**
  * Serves the API and the web client over plain HTTP, with the sources behind
@@ -265,20 +329,48 @@ export const fromEnvironment = Effect.gen(function* () {
  * such as the desktop app, to read without going through HTTP.
  */
 export const layer = (options: ServeOptions) =>
-  HttpRouter.serve(
-    Layer.mergeAll(routes, go2rtc, push, connect, webClient(options.web)),
-    { middleware: signIn({ trustLoopback: loopback.has(options.hostname) }) },
-  ).pipe(
-    Layer.provide(
-      BunHttpServer.layer({
-        hostname: options.hostname,
-        port: options.port,
-        // The page's live events and go2rtc's sockets never finish, so the
-        // default 20 seconds for open requests held up every stop with a
-        // page open
-        gracefulShutdownTimeout: "2 seconds",
-      }),
+  Layer.mergeAll(
+    HttpRouter.serve(
+      Layer.mergeAll(
+        routes,
+        go2rtc,
+        push,
+        connect,
+        webClient(options.web, { ingress: false }),
+      ),
+      { middleware: signIn({ trustLoopback: loopback.has(options.hostname) }) },
+    ).pipe(
+      Layer.provide(
+        BunHttpServer.layer({
+          hostname: options.hostname,
+          port: options.port,
+          // The page's live events and go2rtc's sockets never finish, so the
+          // default 20 seconds for open requests held up every stop with a
+          // page open
+          gracefulShutdownTimeout,
+        }),
+      ),
     ),
+    options.ingressPort === undefined
+      ? Layer.empty
+      : HttpRouter.serve(
+          Layer.mergeAll(
+            routes,
+            go2rtc,
+            push,
+            webClient(options.web, { ingress: true }),
+          ),
+          { middleware: ingressGuard(options.ingressFrom ?? supervisor) },
+        ).pipe(
+          Layer.provide(
+            BunHttpServer.layer({
+              hostname: options.hostname,
+              port: options.ingressPort,
+              gracefulShutdownTimeout,
+            }),
+          ),
+        ),
+  ).pipe(
     Layer.merge(Recording.layer),
     Layer.merge(Sync.layer),
     Layer.merge(Announce.layer(options)),
