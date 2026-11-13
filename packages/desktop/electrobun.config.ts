@@ -39,6 +39,8 @@ export default {
       "../../docs/dist/client": "docs",
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
       [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
+      "licenses/go2rtc.LICENSE": "go2rtc/LICENSE",
+      "../../LICENSE": "LICENSE",
       // The one `kestrel` command and the CLI it runs, with the server in it
       "vendor/kestrel.js": "cli/kestrel.js",
       "scripts/kestrel": "kestrel",
