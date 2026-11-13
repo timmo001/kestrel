@@ -30,13 +30,15 @@ and work that depends on one waits for it.
   video as MP4, `nvr` records streams to disk with ffmpeg and reads the
   recordings folder back, knowing nothing of sources,
   `server` serves the API, runs go2rtc and recording, and serves
-  recordings only from the recordings folder, `web` is the app and `cli` is the
+  recordings only from the recordings folder, `web` is the app, `desktop`
+  is the Electrobun desktop app that runs the server and keeps it in the
+  tray, on `@timmo001/groundwork-desktop`, and `cli` is the
   `kestrel` CLI with its Code Mode and MCP surface. Its skill is
   `skills/kestrel/SKILL.md`; keep it in step with the CLI's operations.
 - Name packages type first, then thing: `source-<kind>` for a source,
   `protocol-<kind>` for a protocol library.
 - Anything only one kind of source has belongs in its own packages, never in
-  `core`, `server`, `web` or `cli`; those speak only in sources, cameras and
+  `core`, `server`, `web`, `desktop` or `cli`; those speak only in sources, cameras and
   the general shapes in `core`.
 - Use mise-pinned tools and Bun. Pin dependencies to exact versions
   (`bun add -E`) and keep `bun.lock` in sync.

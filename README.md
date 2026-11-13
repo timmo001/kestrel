@@ -51,6 +51,10 @@ mise run serve:server
 Open <https://server.kestrel.localhost>. The docs in [`docs/`](docs) cover
 the settings, the API and the protocol.
 
+To keep it running without a terminal, `mise run desktop:install` installs
+the desktop app, which runs the server itself and stays in the tray (Linux
+only for now).
+
 The server has no login and listens on `127.0.0.1` by default, so only open it
 up to a network where everyone who can reach it should see your cameras. A
 login is planned for when remote access arrives, in
@@ -82,6 +86,8 @@ login is planned for when remote access arrives, in
 - [`packages/server`](packages/server): the server, with the API, go2rtc and
   recording
 - [`packages/web`](packages/web): the web client, installable on a phone
+- [`packages/desktop`](packages/desktop): the desktop app, which runs the
+  server and keeps it running in the tray
 - [`packages/cli`](packages/cli): the `kestrel` CLI, with Code Mode and
   MCP for agents, and its [skill](skills/kestrel/SKILL.md)
 - [`docs`](docs): the docs site

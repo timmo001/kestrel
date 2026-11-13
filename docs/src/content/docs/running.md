@@ -164,6 +164,36 @@ to use it from a phone, and `KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and
 login, so only listen where everyone
 who can reach it should see the cameras and change its sources.
 
+## Desktop app
+
+The desktop app runs the server itself and opens the web client in a
+window, so Kestrel keeps running without Pitchfork or a terminal. It
+listens on `127.0.0.1:7380` like `serve:server`, with go2rtc built in, and
+takes its sources from `sources.json`. For a recorder that leaves its
+address and login out there, it reads the file `mise run auth:save` keeps;
+it doesn't read `.env.local`, since that needs 1Password. Linux only for
+now.
+
+Closing the window leaves it running in the tray. The tray menu opens the
+window again, shows whether the server is running, how many sources are
+connected and how many cameras it records, and quits. If the server stops,
+the app starts it again, waiting longer each time up to 30 seconds.
+Opening the app again while it runs brings its window to the front.
+
+Tick Start at login in the tray to start it in the tray when you log in. It
+adds `~/.config/autostart/dev.timmo.kestrel.desktop`; untick it to remove
+that again.
+
+The app is the always-on server, so stop the background one with `mise run
+serve:server:stop` while the app runs: both use ports 7380 and 1984 and the
+same recordings folder.
+
+| Task                       | What it does                                                                      |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `mise run desktop:start`   | Builds the app for development and opens it                                       |
+| `mise run desktop:build`   | Builds the release, in `packages/desktop/artifacts`                               |
+| `mise run desktop:install` | Builds the release and installs it for you, in `~/.local/share/dev.timmo.kestrel` |
+
 ## Recordings
 
 Recordings are local first: the web client and CLI play from the
@@ -226,14 +256,14 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable                   | Default                  | What it sets                                  |
-| -------------------------- | ------------------------ | --------------------------------------------- |
-| `KESTREL_HOST`             | `127.0.0.1`              | The address the server listens on             |
-| `KESTREL_PORT`             | `7380`                   | The server's port (`PORT` too, for Pitchfork) |
-| `KESTREL_GO2RTC_PORT`      | `1984`                   | go2rtc's port                                 |
-| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                   | go2rtc's RTSP port, on 127.0.0.1 only         |
-| `KESTREL_GO2RTC`           | `go2rtc`                 | The go2rtc binary                             |
-| `KESTREL_FFMPEG`           | `ffmpeg`                 | The ffmpeg binary, for recording cameras      |
-| `KESTREL_WEB`              | `packages/web/dist`      | The built web client                          |
-| `KESTREL_CONFIG`           | `~/.config/kestrel`      | Where `sources.json` is kept                  |
-| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions and recordings go    |
+| Variable                   | Default                  | What it sets                                       |
+| -------------------------- | ------------------------ | -------------------------------------------------- |
+| `KESTREL_HOST`             | `127.0.0.1`              | The address the server listens on                  |
+| `KESTREL_PORT`             | `7380`                   | The server's port (`PORT` too, for Pitchfork)      |
+| `KESTREL_GO2RTC_PORT`      | `1984`                   | go2rtc's port                                      |
+| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                   | go2rtc's RTSP port, on 127.0.0.1 only              |
+| `KESTREL_GO2RTC`           | `go2rtc`                 | The go2rtc binary; the desktop app uses its own    |
+| `KESTREL_FFMPEG`           | `ffmpeg`                 | The ffmpeg binary, for recording cameras           |
+| `KESTREL_WEB`              | `packages/web/dist`      | The built web client; the desktop app uses its own |
+| `KESTREL_CONFIG`           | `~/.config/kestrel`      | Where `sources.json` is kept                       |
+| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions and recordings go         |
