@@ -1,6 +1,6 @@
 # Kestrel
 
-Runs the Kestrel server: your cameras, recordings and events in one place, from Raysharp-made recorders such as Swann's, Reolink cameras and hubs, Bambu Lab printers and any camera with a stream address. Every other device, such as the desktop app, a browser or the `kestrel` command, uses this server, so there's one copy of the footage.
+Runs the Kestrel server: your cameras, recordings and events in one place, from Raysharp-made recorders such as Swann's, Reolink cameras and hubs, Bambu Lab printers, any camera with a stream address and live streams on web pages such as Twitch. Every other device, such as the desktop app, a browser or the `kestrel` command, uses this server, so there's one copy of the footage.
 
 The full documentation is at [kestrel.timmo.dev](https://kestrel.timmo.dev), including [this app](https://kestrel.timmo.dev/running/#home-assistant) and [installing Kestrel](https://kestrel.timmo.dev/install/) on your other devices.
 

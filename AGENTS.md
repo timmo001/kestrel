@@ -26,7 +26,8 @@ and work that depends on one waits for it.
   `source-stream` for cameras listed by their stream addresses,
   `source-reolink` for Reolink cameras and hubs, `protocol-baichuan` is
   Reolink's own protocol library, `source-bambu` for the
-  camera in a Bambu Lab printer, `format-mp4` reads and writes recorded
+  camera in a Bambu Lab printer, `source-web` for live streams on web
+  pages through yt-dlp, `format-mp4` reads and writes recorded
   video as MP4, `nvr` records streams to disk with ffmpeg and reads the
   recordings folder back, knowing nothing of sources,
   `server` serves the API, runs go2rtc and recording, and serves

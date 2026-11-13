@@ -188,6 +188,27 @@ camera, such as `bambu/timelapse`. They're MJPEG, so each is converted to
 H.264 with ffmpeg as it's copied or played, one at a time. Set
 `KESTREL_FFMPEG` for an ffmpeg that isn't on the path; it needs `libx264`.
 
+A `web` source is live streams from web pages you list, each with an `id`,
+a `name` and a `page`: a Twitch channel, a YouTube live stream, or any other
+page [yt-dlp](https://github.com/yt-dlp/yt-dlp) reads, from an `http://` or
+`https://` address. A page's stream address carries a token that soon runs
+out, so go2rtc runs yt-dlp each time a stream starts, or starts again after
+it drops, for the address that works then. That makes a web camera slower
+to start than one on your network, a few seconds or more. They have live
+view only: no recordings, events or stills.
+
+The desktop app, the release archives, the Linux packages and the Home
+Assistant app have their own yt-dlp; elsewhere, set `KESTREL_YT_DLP` for one
+that isn't on the path. go2rtc copies each stream through ffmpeg, the one
+`KESTREL_FFMPEG` names or the one on the path. YouTube needs a JavaScript runtime for yt-dlp to
+read its streams: [Deno](https://deno.com) or Node.js on the server's path.
+Kestrel doesn't bring one, and the Home Assistant app has neither, so
+YouTube pages may not play there. Sites change, and yt-dlp catches up in its
+releases, so a page that stops playing may need a newer one.
+
+Keep to each site's terms. Some don't allow their streams to be shown
+elsewhere, and Twitch's ads play in the stream as they would on its page.
+
 A source's `id` names its cameras, such as `swann/3`, so links and labels
 keep working as long as it stays the same. It holds logins, so keep it to
 yourself. The API never sends a password back: the page shows which are set,
@@ -418,7 +439,8 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 | `KESTREL_GO2RTC_PORT`      | `1984`                           | go2rtc's port                                                      |
 | `KESTREL_GO2RTC_RTSP_PORT` | `1985`                           | go2rtc's RTSP port, on 127.0.0.1 only                              |
 | `KESTREL_GO2RTC`           | `go2rtc`                         | The go2rtc binary; the desktop app uses its own                    |
-| `KESTREL_FFMPEG`           | `ffmpeg`                         | The ffmpeg binary, for recording cameras                           |
+| `KESTREL_FFMPEG`           | `ffmpeg`                         | The ffmpeg binary, for recording cameras and web pages             |
+| `KESTREL_YT_DLP`           | `yt-dlp`                         | The yt-dlp binary, for web pages; the desktop app uses its own     |
 | `KESTREL_WEB`              | `packages/web/dist`              | The built web client; the desktop app uses its own                 |
 | `KESTREL_CONFIG`           | `~/.config/kestrel`              | Where `sources.json` is kept                                       |
 | `KESTREL_STATE`            | `~/.local/state/kestrel`         | Where paired devices, push subscriptions and recordings go         |

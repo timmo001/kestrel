@@ -20,6 +20,8 @@ stop working.
 - **The camera in a Bambu Lab P1 or A1 printer**, as a picture every few
   seconds. Not yet tried on real hardware
   ([#13](https://github.com/timmo001/kestrel/issues/13)).
+- **Live streams on web pages**, such as a Twitch channel or a YouTube live
+  stream, through [yt-dlp](https://github.com/yt-dlp/yt-dlp): live view only.
 
 On the way, behind the same pages: recording any of them itself
 ([#15](https://github.com/timmo001/kestrel/issues/15)).
@@ -73,6 +75,8 @@ the settings, the API and the protocol.
   protocol on port 9000, for replaying recorded files
 - [`packages/source-bambu`](packages/source-bambu): the camera in a Bambu Lab
   P1 or A1 printer, over its own picture feed
+- [`packages/source-web`](packages/source-web): live streams from web pages,
+  such as Twitch or YouTube, through yt-dlp, for live view
 - [`packages/format-mp4`](packages/format-mp4): recorded video as MP4,
   written for the browser and read back as frames
 - [`packages/nvr`](packages/nvr): records cameras' streams to disk with
