@@ -668,6 +668,20 @@ gw-table gw-sheet {
   --gw-popover-width: 22rem;
 }
 
+/* The picture settings, opened beside Move */
+.picture-panel {
+  --gw-popover-width: 20rem;
+}
+
+.picture-note {
+  margin: 0;
+  color: var(--gw-color-text-secondary);
+}
+
+.picture-note:empty {
+  display: none;
+}
+
 .recording-filters {
   flex-wrap: wrap;
   align-items: end;
@@ -925,6 +939,11 @@ gw-table gw-sheet {
 
   .live-view {
     grid-area: 1 / 6;
+  }
+
+  /* Picture settings, where a camera has them, beside the sound */
+  .live-picture {
+    grid-area: 1 / 2;
   }
 
   .live-fullscreen,

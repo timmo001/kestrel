@@ -7,7 +7,9 @@
  * to the window so they fill as much of it as they can; the View menu swaps
  * it for each count's fixed layout. The arrow keys move the pick,
  * on to the next page past the edge. A camera that moves is steered in Move
- * mode, and one with a second view, such as a telephoto lens, plays both,
+ * mode, and one with picture settings has its hue, brightness and the rest
+ * on sliders in the Picture panel. One with a second view, such as a
+ * telephoto lens, plays both,
  * the other small in a corner, and swaps them without reloading either. The
  * picked camera's sound plays where it has a microphone and its sound is on,
  * each camera with its own volume. The layout, tiling, page, picked camera, each
@@ -36,11 +38,13 @@ import {
   phPause,
   phPlay,
   phQuestion,
+  phSlidersHorizontal,
   phSpeakerHigh,
   phSpeakerLow,
   phSpeakerSlash,
   phSquaresFour,
 } from "./icons.ts";
+import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
   controlKey,
@@ -348,6 +352,7 @@ export const livePage = (): LivePage => {
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const moveButton = find("gw-button", "live-move");
+  const pictureButton = find("gw-button", "live-picture");
   const soundButton = find("gw-button", "live-sound");
   const soundDivider = find("span", "live-sound-divider");
   const volumeRange = find("gw-range", "live-volume");
@@ -569,6 +574,7 @@ export const livePage = (): LivePage => {
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
   setIcon(moveButton, phJoystick, "Move the camera (M)");
+  setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
   setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
@@ -580,6 +586,8 @@ export const livePage = (): LivePage => {
   captureButton?.setAttribute("aria-keyshortcuts", "s");
   moveButton?.setAttribute("aria-keyshortcuts", "m");
   moveButton?.toggleAttribute("toggle", true);
+  pictureButton?.setAttribute("aria-keyshortcuts", "p");
+  pictureButton?.toggleAttribute("toggle", true);
   soundButton?.setAttribute("aria-keyshortcuts", "u");
   helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
@@ -610,6 +618,27 @@ export const livePage = (): LivePage => {
     moveButton.hidden = !streams.some((stream) => stream.controls.ptz !== null);
     moveButton.disabled = steerTile() === undefined;
     moveButton.pressed = steer.on();
+  };
+
+  /** The picked camera, for one with picture settings. */
+  const pictureTile = (): PictureTile | undefined => {
+    const tile = tiles.find((shownTile) => shownTile.stream.id === picked);
+    const controls = tile?.stream.controls.picture ?? null;
+
+    return tile === undefined || controls === null
+      ? undefined
+      : { id: tile.stream.id, controls };
+  };
+
+  /** Picture settings, shown where any camera has them and pressed while open. */
+  const showPicture = () => {
+    if (pictureButton === null) return;
+
+    pictureButton.hidden = !streams.some(
+      (stream) => stream.controls.picture !== null,
+    );
+    pictureButton.disabled = pictureTile() === undefined;
+    pictureButton.pressed = picture.open();
   };
 
   /** The picked camera's tile, for a camera with sound. */
@@ -723,6 +752,13 @@ export const livePage = (): LivePage => {
   };
 
   moveButton?.addEventListener("click", toggleMove);
+
+  const picture = pictureSettings({
+    button: pictureButton,
+    picked: pictureTile,
+    onChange: showPicture,
+  });
+
   soundButton?.addEventListener("click", toggleSound);
 
   // Turning it up plays the sound, as it would on a speaker
@@ -814,6 +850,8 @@ export const livePage = (): LivePage => {
     // Move mode follows the camera, and ends once another's picked
     steer.show();
     showMove();
+    picture.show();
+    showPicture();
     showZoom();
     showSound();
   };
@@ -1522,6 +1560,7 @@ export const livePage = (): LivePage => {
     ["0", zoom.whole],
     ["s", capture],
     ["m", toggleMove],
+    ["p", () => picture.toggle()],
     ["u", toggleSound],
     ["l", nextLens],
     ["z", zoom.toggleFill],
@@ -1642,6 +1681,7 @@ export const livePage = (): LivePage => {
     },
     stop: () => {
       steer.leave();
+      picture.close();
       tiles = [];
       // Back to placeholders, so the page comes back without a jump
       placeholders();

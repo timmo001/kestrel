@@ -44,6 +44,7 @@ const names = [
   "scissors",
   "skip-back",
   "skip-forward",
+  "sliders-horizontal",
   "speaker-high",
   "speaker-low",
   "speaker-slash",
