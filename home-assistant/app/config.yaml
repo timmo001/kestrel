@@ -20,6 +20,8 @@ ingress_port: 8099
 panel_icon: mdi:cctv
 panel_title: Kestrel
 watchdog: http://[HOST]:7380/api/health
+# Seconds to stop in, so each camera's recording finishes its file
+timeout: 30
 # Recordings go in Home Assistant's media folder, so they show in its media
 # browser and stay out of the app's backups
 map:
