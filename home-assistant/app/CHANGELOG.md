@@ -1,28 +1,20 @@
-Kestrel now keeps to limits when it works in the background, so it can share a small machine, such as a Home Assistant Green, with everything else on it. An Activity page shows what it's doing and how much it uses.
+On a Home Assistant Green, 0.4.0 still ran out of memory once it reached the Reolink hub's recordings. Converting them has its own limits now, and new motion clips no longer wait behind a long copy.
 
-## Limits on background work
+## Converting recordings
 
-On a Home Assistant Green, 0.3.0 copied every recorder recording at full speed. It grew to 700 MB and pushed the box into swap. Now copying recordings from sources, and clearing out old ones, wait while:
+The Reolink hub records in 4K H.265, which Kestrel converts to H.264 as it copies. In 0.4.0, ffmpeg used every core with x264's full lookahead and held dozens of 4K frames at once: 2.5 GB on an 8-core laptop, and about 1 GB on the Green, before the limits could step in. The whole replay was also held in memory before conversion started.
 
-- under 15% of the machine's memory is free,
-- the server, go2rtc and ffmpeg use over 512 MB together,
-- they use over half the machine's CPU over half a minute,
-- or the machine is short of memory (swapping) or its disks are busy, from Linux's pressure figures.
+- Replays go to disk as they arrive, at the copy rate, and wait on the same limits as any other copy.
+- Background conversions run ffmpeg on one thread with a short lookahead, and wait for room before they start. A 4K hub clip now converts in about 400 MB, where 0.4.0 took 2.5 GB.
+- Playing a clip that isn't copied yet converts on up to four threads, so it still starts quickly.
+- Bambu Lab footage converts the same way.
 
-Copies also read no faster than 2 MB a second. Change the limits in Settings, Recording, Background work. Live view and the server's own recording never wait. Clearing out waits at most 10 minutes, then runs anyway, as it frees the disk.
+Hub clips convert slowly on a Green, several minutes each, but they no longer take it down.
 
-## Activity
+## Recent clips first
 
-- A new **Activity** page lists each job: the copy from sources, each camera's recording and the clear-out. For each one it shows what it's doing, how far through it is, its last run and its last error, plus the recordings copied lately.
-- The page also shows the server's memory and CPU against the limits, the machine's memory and load with the last hour of each, and what each camera's recordings take on disk. It says why background work is waiting when it is.
-- `kestrel jobs` and `kestrel usage` print the same, with `--json`, and they're MCP tools too. The API has them at `/api/activity/jobs` and `/api/activity/usage`.
+Motion clips were already copied newest first, but each pass worked through the whole list it started with. On a first run that can be thousands of files, so new motion waited hours. A copy now looks again every 10 minutes, so new clips go ahead of older ones still waiting.
 
-## Packages
+## Docs
 
-- The systemd services run at a lower CPU and disk priority.
-- The Home Assistant app gets 30 seconds to stop, so each camera's recording finishes its file.
-
-## Fixes
-
-- A new server no longer warns every hour that old recordings couldn't be cleared out before anything has been recorded.
-- The `kestrel` command no longer reads a `.env` file or `bunfig.toml` from the folder it's run in. A project's settings there can't change what it sends to a server, such as `kestrel config copy` picking up another login.
+- The install docs are in one place, with a tab for each platform.
