@@ -5,6 +5,7 @@
  * @module
  */
 import { Schema } from "effect";
+import { CameraControls } from "./Controls.ts";
 import { CameraId, SourceId } from "./Ids.ts";
 
 /** A camera's live streams, by their go2rtc names: the full one and the small sub stream. */
@@ -16,6 +17,19 @@ export const LiveStreams = Schema.Struct({
 });
 
 export interface LiveStreams extends Schema.Schema.Type<typeof LiveStreams> {}
+
+/** One of a camera's pictures, for a camera with more than one, such as a second lens. */
+export const CameraView = Schema.Struct({
+  /** Its key, such as `telephoto`; the first view's is `main`. */
+  key: Schema.String,
+  /** Its name, such as `Telephoto`. */
+  name: Schema.String,
+  live: LiveStreams,
+  /** Whether the camera's lens zoom changes this picture. */
+  zoom: Schema.Boolean,
+});
+
+export interface CameraView extends Schema.Schema.Type<typeof CameraView> {}
 
 export const Camera = Schema.Struct({
   id: CameraId,
@@ -29,6 +43,9 @@ export const Camera = Schema.Struct({
   /** Whether it has a picture now; `null` when its source can't tell. */
   signal: Schema.NullOr(Schema.Boolean),
   live: Schema.NullOr(LiveStreams),
+  /** Its pictures, the main one first, for a camera with more than one; else empty. */
+  views: Schema.Array(CameraView),
+  controls: CameraControls,
   /** Whether it has a still picture, at `/api/cameras/:source/:camera/still`, for a camera with no video. */
   still: Schema.Boolean,
   recordings: Schema.Boolean,

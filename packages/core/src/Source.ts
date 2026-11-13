@@ -2,15 +2,18 @@
  * What a source kind implements, such as the Raysharp recorder: its
  * connection and what needs you about it, its cameras and where go2rtc
  * reads their live streams, and the capabilities only some sources have,
- * each optional: recordings, events, still pictures and details. Cameras are named by their
+ * each optional: recordings, events, still pictures, moving and zooming,
+ * and details. Cameras are named by their
  * full id, such as `swann/3`.
  *
  * @module
  */
 import type { Effect, Redacted, Stream } from "effect";
+import type { PtzCommand, PtzControls, PtzState } from "./Controls.ts";
 import type { Attention, Details } from "./Details.ts";
 import type {
   NoRecordings,
+  NotSupported,
   SourceUnavailable,
   UnknownCamera,
 } from "./Errors.ts";
@@ -50,6 +53,8 @@ export interface CameraInfo {
   readonly still: boolean;
   readonly recordings: boolean;
   readonly events: boolean;
+  /** How it moves and zooms, for a camera that does; left out for one that doesn't. */
+  readonly ptz?: PtzControls;
 }
 
 /** A camera's still picture, as its source sent it. */
@@ -82,6 +87,43 @@ export interface LiveFeed {
    * picture in 352×288. Left out, it's drawn at its own shape.
    */
   readonly subRatio?: number;
+  /**
+   * For a camera with other pictures, such as a second lens: the main
+   * picture's name and whether the lens zoom changes it.
+   */
+  readonly view?: { readonly name: string; readonly zoom: boolean };
+  /** Its other pictures, where it has them. */
+  readonly others?: ReadonlyArray<LiveView>;
+}
+
+/** Another of a camera's pictures, such as its telephoto lens. */
+export interface LiveView {
+  /** Its key, such as `telephoto`, which names its go2rtc streams. */
+  readonly key: string;
+  readonly name: string;
+  readonly main: Redacted.Redacted;
+  readonly sub: Redacted.Redacted | null;
+  /** Whether the camera's lens zoom changes this picture. */
+  readonly zoom: boolean;
+}
+
+/** Moving and zooming, for a source with cameras that do; a camera that doesn't is `NotSupported`. */
+export interface SourcePtz {
+  /** Where a camera's lens is zoomed and its presets. */
+  readonly state: (
+    camera: CameraId,
+  ) => Effect.Effect<
+    PtzState,
+    SourceUnavailable | UnknownCamera | NotSupported
+  >;
+  /**
+   * Tells a camera to move, stop, zoom or go to a preset. A camera told to
+   * move stops by itself unless told again within a second or so.
+   */
+  readonly send: (
+    camera: CameraId,
+    command: PtzCommand,
+  ) => Effect.Effect<void, SourceUnavailable | UnknownCamera | NotSupported>;
 }
 
 /** Recordings, for a source that keeps them. */
@@ -136,6 +178,7 @@ export interface Source {
   readonly recordings?: SourceRecordings;
   readonly events?: SourceEvents;
   readonly stills?: SourceStills;
+  readonly ptz?: SourcePtz;
   /** What it shows about itself, such as a recorder's device, disks and channels. */
   readonly details?: Effect.Effect<Details, SourceUnavailable>;
 }

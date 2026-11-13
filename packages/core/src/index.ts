@@ -7,6 +7,8 @@
  */
 export * from "./Cameras.ts";
 
+export * from "./Controls.ts";
+
 export * from "./Details.ts";
 
 export * from "./Errors.ts";
@@ -26,9 +28,11 @@ export * from "./Times.ts";
 export type {
   CameraInfo,
   LiveFeed,
+  LiveView,
   RecordedFrame,
   Source,
   SourceEvents,
+  SourcePtz,
   SourceRecordings,
   SourceStills,
   StillPicture,
