@@ -94,7 +94,14 @@ export const layer = (options: ServeOptions) =>
     Layer.mergeAll(routes, go2rtc, push, webClient(options.web)),
   ).pipe(
     Layer.provide(
-      BunHttpServer.layer({ hostname: options.hostname, port: options.port }),
+      BunHttpServer.layer({
+        hostname: options.hostname,
+        port: options.port,
+        // The page's live events and go2rtc's sockets never finish, so the
+        // default 20 seconds for open requests held up every stop with a
+        // page open
+        gracefulShutdownTimeout: "2 seconds",
+      }),
     ),
     Layer.merge(Recording.layer),
     Layer.merge(Sync.layer),
