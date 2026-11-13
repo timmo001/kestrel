@@ -11,7 +11,7 @@ bun = "1.4.4"
 # starts it.
 "github:AlexxIT/go2rtc" = "1.9.15"
 # The linters the shared hk pre-push hook runs.
-uv = "0.13.7"
+uv = "0.13.8"
 # yamllint's PyYAML has no wheels for Python 3.15 yet, which mise lock needs.
 python = "3.14.10"
 "pipx:yamllint" = "1.38.0"
