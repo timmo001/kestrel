@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 /**
  * The `kestrel` CLI: the cameras' status, recordings and events from the
- * server, with `--json` for scripts and agents, `agent tools --json` for
- * Code Mode and `mcp` to serve the same operations over MCP. `pair` pairs
+ * server, with `--json` for scripts and agents, `agent tools --json` and
+ * `agent call` for Code Mode and `mcp` to serve the same operations over
+ * MCP. `pair` pairs
  * it with a server, or shows a code for another device, `devices`
  * lists or removes the paired ones, and `jobs` and `usage` say what the
  * server does by itself and how much of the machine it uses.
@@ -42,11 +43,13 @@ import {
   Layer,
   Option,
   Schema,
+  Stdio,
   Stream,
 } from "effect";
 import { Argument, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import { renderUnicodeCompact } from "uqr";
+import { callArgs, manifest, type Manifest } from "./agent.ts";
 import {
   connection,
   connectionTo,
@@ -60,11 +63,9 @@ import {
   ClientError,
   clientFor,
   matchVersion,
-  operations,
   resolveCamera,
   resolveSource,
   ServerClient,
-  type Operation,
 } from "./operations.ts";
 
 const json = Flag.Boolean("json").pipe(
@@ -117,15 +118,7 @@ type Output =
       readonly begin: string;
       readonly end: string;
     }
-  | {
-      readonly tool: string;
-      readonly operations: ReadonlyArray<
-        Operation & {
-          readonly command: ReadonlyArray<string>;
-          readonly json: boolean;
-        }
-      >;
-    };
+  | Manifest;
 
 const printJson = (value: Output) =>
   Console.log(JSON.stringify(value, null, 2));
@@ -956,27 +949,61 @@ const config = Command.make("config").pipe(
   Command.withSubcommands([configCopy]),
 );
 
-/** The Code Mode manifest: every operation with how an agent may use it. */
+/** The Code Mode manifest: every tool, its input and how an agent may use it. */
 const agentTools = Command.make(
   "tools",
   { json },
   Effect.fn("agentTools")(function* () {
-    yield* printJson({
-      tool: "kestrel",
-      operations: operations.map((operation) => ({
-        name: operation.name,
-        description: operation.description,
-        access: operation.access,
-        command: ["kestrel", ...operation.name.split(" ")],
-        json: true,
-      })),
-    });
+    yield* printJson(manifest);
   }),
 ).pipe(Command.withDescription("Print the Code Mode manifest as JSON"));
 
+/** The commands an agent's call runs, behind `agent call`. */
+const callable = Command.make("kestrel").pipe(
+  Command.withSubcommands([
+    status,
+    details,
+    sources,
+    cameras,
+    recordings,
+    download,
+    days,
+    events,
+    devices,
+    jobs,
+    usage,
+    pair,
+    servers,
+    config,
+  ]),
+);
+
+const agentCall = Command.make(
+  "call",
+  {
+    tool: Argument.String("tool").pipe(
+      Argument.withDescription("The tool, as `agent tools` names it"),
+    ),
+  },
+  Effect.fn("agentCall")(function* ({ tool }) {
+    const input = yield* (yield* Stdio.Stdio).stdin.pipe(
+      Stream.decodeText(),
+      Stream.mkString,
+    );
+
+    const args = yield* callArgs(tool, input);
+
+    yield* Command.runWith(callable, { version })(args);
+  }),
+).pipe(
+  Command.withDescription(
+    "Run one Code Mode tool with its input as JSON on stdin, printing JSON",
+  ),
+);
+
 const agent = Command.make("agent").pipe(
   Command.withDescription("Agent surfaces"),
-  Command.withSubcommands([agentTools]),
+  Command.withSubcommands([agentTools, agentCall]),
 );
 
 const mcp = Command.make("mcp", {}, () => serveMcp).pipe(

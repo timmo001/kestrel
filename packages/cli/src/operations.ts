@@ -1,10 +1,7 @@
 /**
- * The operations the CLI and MCP server share, and the `ServerClient` they
- * run through: the server's API, at the server and with the token
- * `connection.ts` finds. Every operation only reads from the sources;
- * `download` writes a file on this machine and `pair` saves a token, so
- * they're marked as writes and are CLI-only. Cameras are named by id, such
- * as `swann/3`.
+ * The `ServerClient` the CLI and MCP server run their operations through:
+ * the server's API, at the server and with the token `connection.ts`
+ * finds. Cameras are named by id, such as `swann/3`.
  *
  * @module
  */
@@ -49,98 +46,6 @@ export class ServerUnreachable extends Schema.TaggedError<ServerUnreachable>()(
   "ServerUnreachable",
   { message: Schema.String },
 ) {}
-
-/** How an agent may use an operation: `write` saves a file on this machine. */
-export type Access = "read" | "write";
-
-export interface Operation {
-  readonly name: string;
-  readonly description: string;
-  readonly access: Access;
-}
-
-export const operations: ReadonlyArray<Operation> = [
-  {
-    name: "status",
-    description:
-      "What needs you, and each source's connection, clock, storage and cameras",
-    access: "read",
-  },
-  {
-    name: "details",
-    description:
-      "A source's details: its facts, clock, storage and each camera's state",
-    access: "read",
-  },
-  {
-    name: "sources",
-    description:
-      "Every source's settings and the names given to cameras, as the Settings page shows them, with no secrets",
-    access: "read",
-  },
-  {
-    name: "cameras",
-    description:
-      "Every camera's id, name and what it can do, with its live stream names",
-    access: "read",
-  },
-  {
-    name: "recordings",
-    description: "A camera's recordings on one day, with why each was made",
-    access: "read",
-  },
-  {
-    name: "download",
-    description:
-      "Save what a camera recorded between two times as an MP4 file, across recordings",
-    access: "write",
-  },
-  {
-    name: "days",
-    description: "The days in a month that have recordings on any camera",
-    access: "read",
-  },
-  {
-    name: "events",
-    description: "The newest events, such as motion and PIR, from every source",
-    access: "read",
-  },
-  {
-    name: "devices",
-    description:
-      "The devices paired with the server, such as browsers, phones and this CLI",
-    access: "read",
-  },
-  {
-    name: "jobs",
-    description:
-      "What the server does by itself, such as copying recordings from sources, recording each camera and clearing out old recordings: each job's state, progress, last run and last error, with the recordings copied lately",
-    access: "read",
-  },
-  {
-    name: "usage",
-    description:
-      "The server's memory and CPU, with go2rtc and ffmpeg, against the limits background work keeps to, the machine's memory and load, the recordings' disk use by camera, and whether background work is waiting and why",
-    access: "read",
-  },
-  {
-    name: "servers",
-    description: "The Kestrel servers on this network, found over mDNS",
-    access: "read",
-  },
-  {
-    name: "config copy",
-    description:
-      "Copy this machine's sources, logins and camera names to another paired server, replacing its own",
-    access: "write",
-  },
-  {
-    name: "pair",
-    description:
-      "Pair this CLI with a server by a code, or with no code, show a code and QR code for another device; saves the token on this machine",
-    access: "write",
-  },
-];
 
 /**
  * A client for `server`, saying this CLI's version and signing every
