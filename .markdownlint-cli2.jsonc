@@ -12,5 +12,7 @@
     "packages/desktop/build/**",
     // Flathub's shared modules, a submodule
     ".scripts/linux/flatpak/shared-modules/**",
+    // Copied from the release notes, which have no heading
+    "home-assistant/app/CHANGELOG.md",
   ],
 }
