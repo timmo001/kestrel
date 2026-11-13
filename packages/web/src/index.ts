@@ -1,7 +1,7 @@
 /**
  * The page script, the app's shell: the fonts, the theme and the
  * components, the connection banner and what needs you, then the app bar's
- * pages (Live, Recordings, Events and Sources), one shown at a time from the
+ * pages (Live, Recordings, Events, Sources and Activity), one shown at a time from the
  * address, each from a module of its own. The service worker keeps the
  * shell so the app starts offline.
  */
@@ -43,6 +43,7 @@ import {
   phBookOpen,
   phDotsThreeVertical,
   phFilmStrip,
+  phGauge,
   phGear,
   phHardDrives,
   phVideoCamera,
@@ -53,6 +54,7 @@ import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import { find } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
+import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
 import {
   pickerOptions,
@@ -184,6 +186,8 @@ const events = eventsPage({
 
 const sources = sourcesPage();
 
+const activity = activityPage();
+
 /** Shows the cameras again after a save, with their new names, and any new ones. */
 const reloadCameras = async () => {
   const known = await loadCameras().catch(() => cameras ?? []);
@@ -268,6 +272,7 @@ const isPage = Schema.is(
     "recordings",
     "events",
     "sources",
+    "activity",
     "settings",
     "pair",
     "notFound",
@@ -279,6 +284,7 @@ const pageTitles: Record<Page, string> = {
   recordings: "Recordings",
   events: "Events",
   sources: "Sources",
+  activity: "Activity",
   settings: "Settings",
   pair: "Pair this browser",
   notFound: "Page not found",
@@ -294,6 +300,7 @@ const pageIcons: Record<Page, string> = {
   recordings: phFilmStrip,
   events: phBellRinging,
   sources: phHardDrives,
+  activity: phGauge,
   settings: phGear,
   pair: phGear,
   notFound: phVideoCamera,
@@ -336,6 +343,10 @@ const showPage = (location: Location) => {
   if (left === "live") live.stop();
 
   if (left === "recordings") recordings.pause();
+
+  if (left === "activity") activity.stop();
+
+  if (page === "activity") activity.start();
 
   // Arriving at a player, the keyboard controls work straight away
   if (page === "recordings") requestAnimationFrame(recordings.focus);

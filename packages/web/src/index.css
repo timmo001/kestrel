@@ -831,6 +831,25 @@ gw-page {
   color: var(--gw-color-text-secondary);
 }
 
+/* The Activity page: each usage meter with the last hour's line under it */
+.usage-meter {
+  display: grid;
+  gap: var(--gw-space-2);
+  margin-block-end: var(--gw-space-3);
+}
+
+.usage-graph {
+  inline-size: 100%;
+  block-size: 3rem;
+}
+
+.usage-graph polyline {
+  fill: none;
+  stroke: var(--gw-color-accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

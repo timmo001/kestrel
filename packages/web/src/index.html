@@ -45,6 +45,9 @@
       <a class="nav-link" href="sources" data-page="sources"
         ><span>Sources</span></a
       >
+      <a class="nav-link" href="activity" data-page="activity"
+        ><span>Activity</span></a
+      >
       <a class="nav-link" href="settings" data-page="settings"
         ><span>Settings</span></a
       >
@@ -501,6 +504,25 @@
           <gw-page-header heading="Sources" level="2"></gw-page-header>
           <gw-stack class="source-list">
             <gw-card heading="Sources" loading lines="4"></gw-card>
+          </gw-stack>
+        </section>
+
+        <!-- Activity: what the server does by itself, such as copying from
+             sources, and how much of the machine it uses -->
+        <section class="page" data-page="activity" hidden>
+          <gw-page-header
+            heading="Activity"
+            description="What the server does by itself, and how much of the machine it uses."
+            level="2"
+          ></gw-page-header>
+          <gw-alert class="activity-notice" hidden></gw-alert>
+          <gw-grid class="activity-usage">
+            <gw-card heading="Server" loading lines="4"></gw-card>
+            <gw-card heading="Machine" loading lines="4"></gw-card>
+            <gw-card heading="Recordings" loading lines="4"></gw-card>
+          </gw-grid>
+          <gw-stack class="activity-jobs">
+            <gw-card heading="Jobs" loading lines="4"></gw-card>
           </gw-stack>
         </section>
 

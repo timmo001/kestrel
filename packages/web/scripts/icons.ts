@@ -30,6 +30,7 @@ const names = [
   "dots-three-vertical",
   "download-simple",
   "floppy-disk",
+  "gauge",
   "gear",
   "house",
   "plus",

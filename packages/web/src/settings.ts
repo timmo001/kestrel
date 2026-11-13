@@ -11,7 +11,9 @@ import {
   defaultClipHours,
   defaultContinuousHours,
   defaultDiskShare,
+  defaultLimits,
   hoursText,
+  limitRanges,
   SourceId,
   type Camera,
   type KindInfo,
@@ -37,6 +39,7 @@ const defaultRecording = (): Mutable<RecordingSettings> => ({
   continuousHours: defaultContinuousHours,
   clipHours: defaultClipHours,
   diskShare: defaultDiskShare,
+  limits: defaultLimits,
 });
 
 /** A whole-number field, writing what's typed through `set`; the page checks its range before a save. */
@@ -68,6 +71,13 @@ const hoursHint = (value: number) =>
   Number.isInteger(value) && value >= 1
     ? hoursText(value)
     : "A whole number of hours, 1 or more";
+
+const limitKeys = [
+  "copyRate",
+  "memoryFree",
+  "memoryLimit",
+  "cpuShare",
+] as const;
 
 /** A source as the page edits it. */
 interface Draft {
@@ -251,6 +261,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       continuousHours: settings.recording.continuousHours,
       clipHours: settings.recording.clipHours,
       diskShare: settings.recording.diskShare,
+      limits: { ...settings.recording.limits },
     };
     revision = settings.revision ?? "";
     // The panel open before a save stays open after it
@@ -484,6 +495,26 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       },
     );
 
+    const limitInput = (
+      key: keyof typeof limitRanges,
+      label: string,
+      hint: (value: number) => string,
+    ) => {
+      const range = limitRanges[key];
+
+      return numberInput(
+        label,
+        (value) =>
+          value >= range.minimum && value <= range.maximum
+            ? hint(value)
+            : `From ${range.minimum} to ${range.maximum}`,
+        recording.limits[key],
+        (value) => {
+          recording.limits = { ...recording.limits, [key]: value };
+        },
+      );
+    };
+
     recordingPanel.replaceChildren(
       group(
         "Cameras to record",
@@ -514,6 +545,34 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
           ),
           share,
           folder,
+        ]),
+      ),
+      group(
+        "Background work",
+        "Copying recordings from sources and clearing out old ones wait while the machine or the server is past any of these. Live view and recording never wait. Activity shows how they're getting on.",
+        fieldGrid([
+          limitInput(
+            "copyRate",
+            "Copy rate, MB a second",
+            (value) => `Copies read up to ${value} MB a second`,
+          ),
+          limitInput(
+            "memoryFree",
+            "Memory kept free, %",
+            (value) =>
+              `Waits while under ${value}% of the machine's memory is free`,
+          ),
+          limitInput(
+            "memoryLimit",
+            "Server memory, MB",
+            (value) =>
+              `Waits while the server, go2rtc and ffmpeg use over ${value} MB`,
+          ),
+          limitInput(
+            "cpuShare",
+            "Server CPU, %",
+            (value) => `Waits while the server uses over ${value}% of the CPU`,
+          ),
         ]),
       ),
     );
@@ -595,6 +654,13 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     ...(recording.diskShare >= 1 && recording.diskShare <= 90
       ? []
       : ["The disk share needs to be from 1 to 90"]),
+    ...(limitKeys.every(
+      (key) =>
+        recording.limits[key] >= limitRanges[key].minimum &&
+        recording.limits[key] <= limitRanges[key].maximum,
+    )
+      ? []
+      : ["Each background work limit needs to be in its range"]),
   ];
 
   const payload = (): Settings => ({

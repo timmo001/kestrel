@@ -69,6 +69,7 @@ export const routes = {
   recordings: route("/recordings", NoParams, RecordingsSearch),
   events: route("/events", NoParams, NoSearch),
   sources: route("/sources", NoParams, NoSearch),
+  activity: route("/activity", NoParams, NoSearch),
   settings: route("/settings", NoParams, NoSearch),
   /** Pairs this browser with the server, from a code typed in or in the address's `#code=`. */
   pair: route("/pair", NoParams, NoSearch),
