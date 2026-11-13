@@ -18,6 +18,7 @@ import {
   Settings,
   SourceId,
   SourceInfo,
+  version,
 } from "@timmo001/kestrel-core";
 import { Device } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Option, Schema } from "effect";
@@ -201,7 +202,7 @@ export const serveMcp = McpServer.toolkit(Tools).pipe(
   Layer.provide(
     McpServer.layerStdio({
       name: "kestrel",
-      version: "0.0.0",
+      version,
       protocols: [McpProtocol.v2026_07_28, McpProtocol.v2025_11_25],
     }),
   ),

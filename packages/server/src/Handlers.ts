@@ -12,6 +12,7 @@ import {
   type LiveFeed,
   type Source,
   type SourceInfo,
+  version,
 } from "@timmo001/kestrel-core";
 import { toMp4 } from "@timmo001/kestrel-format-mp4";
 import { Effect, Layer, Option, Stream } from "effect";
@@ -299,7 +300,7 @@ const DevicesHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const devices = yield* Devices;
     const identity = yield* Identity;
-    const server = { id: identity.id, name: identity.name };
+    const server = { id: identity.id, name: identity.name, version };
 
     return handlers
       .handle("server", () => Effect.succeed(server))

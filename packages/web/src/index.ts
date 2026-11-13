@@ -16,7 +16,12 @@ import "@fontsource-variable/jetbrains-mono";
 import "@timmo001/groundwork-tokens/themes.css";
 import "./index.css";
 import "@timmo001/groundwork-ui";
-import type { Attention, Camera, SourceInfo } from "@timmo001/kestrel-core";
+import {
+  version,
+  type Attention,
+  type Camera,
+  type SourceInfo,
+} from "@timmo001/kestrel-core";
 import {
   connectPwa,
   pushState,
@@ -28,7 +33,7 @@ import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
-import { call, onUnpaired } from "./api.ts";
+import { call, onMismatched, onUnpaired } from "./api.ts";
 import { loadCameras } from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
@@ -208,6 +213,28 @@ void devices.start();
 // Pairing: once paired, the app starts again with the server's cookie, so
 // every page loads as a paired browser
 const pair = pairPage({ onPaired: () => location.assign(href("live")) });
+
+// Another version: the server was updated since the browser kept this page.
+// It reloads once by itself, and says so where the reload didn't help
+const versionBanner = find("gw-banner", "version");
+const reloadedKey = "kestrel:reloaded-for-version";
+
+find("gw-button", "version-reload")?.addEventListener("click", () =>
+  location.reload(),
+);
+
+onMismatched(() => {
+  if (versionBanner === null || versionBanner.open) return;
+
+  if (sessionStorage.getItem(reloadedKey) !== version) {
+    sessionStorage.setItem(reloadedKey, version);
+    location.reload();
+
+    return;
+  }
+
+  versionBanner.open = true;
+});
 
 onUnpaired(() => {
   unpaired = true;

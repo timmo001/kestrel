@@ -9,7 +9,17 @@
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { connectPath, sessionCookie, Unpaired } from "./Api.ts";
+import {
+  mismatchMessage,
+  version,
+  versionHeader,
+} from "@timmo001/kestrel-core";
+import {
+  connectPath,
+  sessionCookie,
+  Unpaired,
+  VersionMismatch,
+} from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Go2rtc } from "./go2rtc/Go2rtc.ts";
@@ -106,10 +116,31 @@ const unpaired = HttpServerResponse.jsonUnsafe(
   { status: 401 },
 );
 
+/** The paths open to any version, so a client can always learn the server's. */
+const anyVersion = new Set(["/api/health", "/api/devices/server"]);
+
+const mismatched = (client: string) =>
+  HttpServerResponse.jsonUnsafe(
+    Schema.encodeSync(VersionMismatch)(
+      new VersionMismatch({
+        message: mismatchMessage({
+          client,
+          server: version,
+          what: "This client",
+          where: "this address",
+        }),
+        server: version,
+        client,
+      }),
+    ),
+    { status: 426 },
+  );
+
 /**
  * Lets a request through to the API, go2rtc or push only from a paired
- * device, by its bearer token or its window's cookie. The page's own files
- * stay open, so a browser that isn't paired can load the pairing page.
+ * device, by its bearer token or its window's cookie, and only from a client
+ * of the server's own version where it says its version. The page's own
+ * files stay open, so a browser that isn't paired can load the pairing page.
  *
  * With `trustLoopback`, set only while the server listens on this machine
  * alone, a request from this machine needs nothing. Once it listens on the
@@ -124,6 +155,19 @@ const signIn =
     Effect.gen(function* () {
       const request = yield* HttpServerRequest.HttpServerRequest;
       const path = new URL(request.url, "http://kestrel").pathname;
+
+      // A video, events stream or socket can't send a header, so only a
+      // client that says its version is held to it
+      const client = request.headers[versionHeader];
+
+      if (
+        client !== undefined &&
+        client !== version &&
+        guarded(path) &&
+        !anyVersion.has(path)
+      ) {
+        return mismatched(client);
+      }
 
       if (
         !guarded(path) ||

@@ -1,7 +1,8 @@
 /**
  * What every source shares: how sources and cameras are named and set up,
  * what they report (cameras, recordings, events and details), their errors,
- * and the `Source` interface each kind implements and the server serves.
+ * and the `Source` interface each kind implements and the server serves,
+ * and the version the server and its clients share.
  *
  * @module
  */
@@ -24,6 +25,8 @@ export * from "./Settings.ts";
 export * from "./Sources.ts";
 
 export * from "./Times.ts";
+
+export * from "./Version.ts";
 
 export type {
   CameraInfo,

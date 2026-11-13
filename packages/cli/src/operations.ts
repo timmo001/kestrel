@@ -8,7 +8,14 @@
  *
  * @module
  */
-import { CameraId, cameraId, type SourceInfo } from "@timmo001/kestrel-core";
+import {
+  CameraId,
+  cameraId,
+  mismatchMessage,
+  version,
+  versionHeader,
+  type SourceInfo,
+} from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
 import { Context, Effect, Layer, Option, Redacted, Schema } from "effect";
 import {
@@ -101,7 +108,10 @@ export const operations: ReadonlyArray<Operation> = [
   },
 ];
 
-/** A client for `server`, signing every request in with `token` where there's one. */
+/**
+ * A client for `server`, saying this CLI's version and signing every
+ * request in with `token` where there's one.
+ */
 export const clientFor = (
   server: string,
   token: Option.Option<Redacted.Redacted>,
@@ -113,7 +123,11 @@ export const clientFor = (
         onNone: () => client,
         onSome: (bearer) =>
           HttpClient.mapRequest(client, HttpClientRequest.bearerToken(bearer)),
-      }),
+      }).pipe(
+        HttpClient.mapRequest(
+          HttpClientRequest.setHeader(versionHeader, version),
+        ),
+      ),
   });
 
 type Client = Effect.Success<ReturnType<typeof clientFor>>;
@@ -121,12 +135,40 @@ type Client = Effect.Success<ReturnType<typeof clientFor>>;
 /** A failed call to `server` as a `ClientError`, saying how to pair where it refused this CLI. */
 export const asClientError = (server: string) => (error: Error) =>
   new ClientError({
-    // The server refuses a CLI it doesn't know
     message:
       HttpClientError.isHttpClientError(error) && error.response?.status === 401
         ? `The server at ${server} needs this CLI paired: get a code from Settings, Devices on a paired browser, then run \`kestrel pair <code> --server ${server}\``
-        : error.message,
+        : HttpClientError.isHttpClientError(error) &&
+            error.response?.status === 426
+          ? `The server at ${server} runs another version of Kestrel than this CLI (${version}), and they must match`
+          : error.message,
   });
+
+/**
+ * Fails where the server at `server` runs another version than this CLI,
+ * saying which to update and how. The server's info answers any version.
+ */
+export const matchVersion = Effect.fn("matchVersion")(function* (
+  client: Client,
+  server: string,
+) {
+  const info = yield* client.devices
+    .server()
+    .pipe(Effect.mapError(asClientError(server)));
+
+  if (info.version !== version) {
+    return yield* new ClientError({
+      message: mismatchMessage({
+        client: version,
+        server: info.version,
+        what: "This CLI",
+        where: server,
+      }),
+    });
+  }
+
+  return info;
+});
 
 /** The Kestrel server's API, as the CLI and MCP server call it. */
 export class ServerClient extends Context.Service<
@@ -144,8 +186,17 @@ export class ServerClient extends Context.Service<
       const { server, token } = yield* connection;
       const client = yield* clientFor(server, token);
 
+      // Once, before the first call, so commands that don't call the server
+      // don't need it
+      const matched = yield* Effect.cached(matchVersion(client, server));
+
       return ServerClient.of({
-        call: (use) => use(client).pipe(Effect.mapError(asClientError(server))),
+        call: (use) =>
+          matched.pipe(
+            Effect.andThen(
+              use(client).pipe(Effect.mapError(asClientError(server))),
+            ),
+          ),
       });
     }),
   ).pipe(Layer.provide(FetchHttpClient.layer));

@@ -23,6 +23,7 @@ import {
   type Settings,
   type SourceId,
   type SourceInfo,
+  version,
 } from "@timmo001/kestrel-core";
 import type {
   Device,
@@ -54,6 +55,7 @@ import {
   asClientError,
   ClientError,
   clientFor,
+  matchVersion,
   operations,
   resolveCamera,
   resolveSource,
@@ -569,13 +571,17 @@ const pair = Command.make(
 
     const paired = yield* clientFor(target, Option.none()).pipe(
       Effect.flatMap((client) =>
-        client.devices.pair({
-          payload: {
-            code: code.value,
-            name: `Command line on ${hostname()}`,
-            kind: "cli",
-          },
-        }),
+        matchVersion(client, target).pipe(
+          Effect.andThen(
+            client.devices.pair({
+              payload: {
+                code: code.value,
+                name: `Command line on ${hostname()}`,
+                kind: "cli",
+              },
+            }),
+          ),
+        ),
       ),
       Effect.provide(FetchHttpClient.layer),
       Effect.catchTag("PairingRefused", () =>
@@ -707,6 +713,8 @@ const configCopy = Command.make(
       use: (api: typeof client) => Effect.Effect<A, E>,
     ) => use(client).pipe(Effect.mapError(asClientError(target.server)));
 
+    yield* matchVersion(client, target.server);
+
     const kinds = yield* call((api) => api.sources.kinds());
     const theirs = yield* call((api) => api.sources.settings());
     const ours = yield* localSettings(kinds);
@@ -808,7 +816,7 @@ const cli = Command.make("kestrel").pipe(
 );
 
 cli.pipe(
-  Command.run({ version: "0.0.0" }),
+  Command.run({ version }),
   Effect.provide(
     ServerClient.layer.pipe(Layer.provideMerge(BunServices.layer)),
   ),

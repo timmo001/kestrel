@@ -48,14 +48,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Check the app's version matches the release
+      # The one version the server and every client share, in packages/core
+      - name: Check Kestrel's version matches the release
         if: github.event_name == 'release' && runner.os == 'Linux'
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
-          version="$(sed -n 's/^ *version: "\(.*\)",$/\1/p' packages/desktop/electrobun.config.ts)"
+          version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
           if [ "$version" != "$TAG" ]; then
-            echo "::error::The app's version is $version, but the release is $TAG"
+            echo "::error::Kestrel's version is $version, but the release is $TAG"
             exit 1
           fi
 

@@ -4,6 +4,7 @@
  * built docs site and go2rtc. It uses the system's webview, not CEF.
  */
 import type { ElectrobunConfig } from "electrobun";
+import { version } from "../core/src/Version.ts";
 
 const go2rtc = process.platform === "win32" ? "go2rtc.exe" : "go2rtc";
 
@@ -11,7 +12,8 @@ export default {
   app: {
     name: "Kestrel",
     identifier: "dev.timmo.kestrel",
-    version: "0.2.0",
+    // The one version the server and every client share
+    version,
   },
   runtime: {
     // It keeps running in the tray

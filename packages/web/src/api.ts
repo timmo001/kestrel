@@ -1,19 +1,28 @@
 /**
  * The server's API from the page: a typed client over the same origin, and
- * the live events as server-sent events. A call the server refuses because
- * this browser isn't paired tells `onUnpaired`.
+ * the live events as server-sent events. Each call says the page's version,
+ * which the server must share. A call the server refuses because this
+ * browser isn't paired tells `onUnpaired`, and one it refuses because the
+ * page is from another version, such as a cached one, tells `onMismatched`.
  */
-import { CameraEvent } from "@timmo001/kestrel-core";
+import { CameraEvent, version, versionHeader } from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
 import { Effect, Schema } from "effect";
-import { FetchHttpClient, HttpClient } from "effect/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
 let whenUnpaired = () => {};
 
+let whenMismatched = () => {};
+
 /** Runs `listener` when the server says this browser isn't paired, such as after it's removed. */
 export const onUnpaired = (listener: () => void) => {
   whenUnpaired = listener;
+};
+
+/** Runs `listener` when the server runs another version than this page. */
+export const onMismatched = (listener: () => void) => {
+  whenMismatched = listener;
 };
 
 /**
@@ -28,11 +37,19 @@ export const serverUrl = (path: string) => new URL(path, document.baseURI);
 const client = Effect.suspend(() =>
   HttpApiClient.make(Api, {
     baseUrl: serverUrl("./"),
-    transformClient: HttpClient.tap((response) =>
-      Effect.sync(() => {
-        if (response.status === 401) whenUnpaired();
-      }),
-    ),
+    transformClient: (http) =>
+      http.pipe(
+        HttpClient.mapRequest(
+          HttpClientRequest.setHeader(versionHeader, version),
+        ),
+        HttpClient.tap((response) =>
+          Effect.sync(() => {
+            if (response.status === 401) whenUnpaired();
+
+            if (response.status === 426) whenMismatched();
+          }),
+        ),
+      ),
   }),
 ).pipe(Effect.provide(FetchHttpClient.layer));
 

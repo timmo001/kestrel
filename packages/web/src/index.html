@@ -17,6 +17,16 @@
     <gw-banner class="offline" tone="danger" urgent>
       <p class="offline-message">Can't reach the recorder. Trying again…</p>
     </gw-banner>
+    <!-- A page from another version than the server's, such as one the
+         browser kept from before the server was updated -->
+    <gw-banner class="version" tone="warning" urgent>
+      <p class="version-message">
+        Kestrel was updated on the server. Reload to use the new version.
+      </p>
+      <gw-button slot="actions" class="version-reload" size="small"
+        >Reload</gw-button
+      >
+    </gw-banner>
     <gw-app-bar size="wide">
       <a slot="brand" class="brand" href="./">
         <img src="icons/icon-192.png" alt="" width="24" height="24" />

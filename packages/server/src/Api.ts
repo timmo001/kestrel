@@ -238,10 +238,14 @@ export const Device = Schema.Struct({
 
 export interface Device extends Schema.Schema.Type<typeof Device> {}
 
-/** The server, as a device sees it: an id that stays the same when its address changes, and its name. */
+/**
+ * The server, as a device sees it: an id that stays the same when its
+ * address changes, its name, and its version, which a client must match.
+ */
 export const ServerInfo = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
+  version: Schema.String,
 });
 
 export interface ServerInfo extends Schema.Schema.Type<typeof ServerInfo> {}
@@ -295,6 +299,16 @@ export class Unpaired extends Schema.TaggedError<Unpaired>()(
   "Unpaired",
   { message: Schema.String },
   { httpApiStatus: 401 },
+) {}
+
+/**
+ * The client runs another version of Kestrel than the server, which every
+ * route but the server's health and info answers with.
+ */
+export class VersionMismatch extends Schema.TaggedError<VersionMismatch>()(
+  "VersionMismatch",
+  { message: Schema.String, server: Schema.String, client: Schema.String },
+  { httpApiStatus: 426 },
 ) {}
 
 /** No paired device has that id. */

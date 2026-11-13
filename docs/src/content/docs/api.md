@@ -114,6 +114,17 @@ read that folder owns the server. `POST /api/devices/link` returns a path,
 such as the desktop app's window: opening it sets the cookie and goes to the
 page.
 
+## Versions
+
+A client only works with a server of its own version, so the two never
+disagree on the API. A client says its version in `X-Kestrel-Version`, and
+a server of another version answers 426 with `VersionMismatch`, giving both
+versions and how to update whichever is behind.
+`GET /api/devices/server` and `/api/health` answer any version, so a client
+can always learn the server's. Only released versions are packaged, so each
+release's server and clients match. The page reloads once when it finds
+the server was updated, and otherwise asks you to.
+
 ## Errors
 
 Every endpoint that needs a source returns 503 with a `SourceUnavailable`
