@@ -136,6 +136,7 @@ gw-table gw-sheet {
    first paint */
 .live-stage {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   height: calc(100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5));
   min-height: 20rem;
@@ -676,6 +677,7 @@ gw-table gw-sheet {
 .player-stage {
   display: grid;
   flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 12rem;
   overflow: hidden;
@@ -832,6 +834,62 @@ gw-table gw-sheet {
   }
 }
 
+/* On a phone, each part takes its own row, centred: the transport, then the
+   speed or layout, then the rest. A segmented control wider than the screen,
+   such as the speeds, scrolls across in place */
+@media (width < 40rem) {
+  .player-controls {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--gw-space-2);
+  }
+
+  .controls-start,
+  .controls-end {
+    justify-content: center;
+  }
+
+  .player-controls gw-segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  /* The speeds take a row of their own, with the frame step and any other
+     speed under them */
+  .control-speed {
+    flex-basis: 100%;
+    order: -1;
+    text-align: center;
+  }
+
+  /* The video at its own shape, with the timeline straight under it, rather
+     than stretched to fill the window */
+  .playback-view {
+    height: auto;
+    min-height: 0;
+  }
+
+  .player-stage {
+    flex: none;
+  }
+
+  .player-screen {
+    aspect-ratio: 16 / 9;
+  }
+
+  .player-stage:fullscreen .player-screen {
+    aspect-ratio: auto;
+  }
+}
+
+/* A touch screen has no keyboard to show the keys for */
+@media (hover: none) and (pointer: coarse) {
+  .live-help,
+  .control-help {
+    display: none;
+  }
+}
+
 /* The day's chips and the day and channel, in one row */
 .playback-bar {
   display: flex;
@@ -862,11 +920,34 @@ gw-table gw-sheet {
   color: var(--gw-color-text-secondary);
 }
 
-/* The Activity page: each usage meter with the last hour's line under it */
+/* The Activity page: each usage meter with the last hour's line under it,
+   kept to its card: the value wraps under the label and the caption wraps,
+   rather than running the card on */
 .usage-meter {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gw-space-2);
   margin-block-end: var(--gw-space-3);
+}
+
+.page[data-page="activity"] gw-meter::part(top) {
+  flex-wrap: wrap;
+}
+
+.page[data-page="activity"] gw-meter::part(caption) {
+  white-space: normal;
+}
+
+/* On a phone, long text cells keep a readable width, and the tables scroll
+   across */
+@media (width < 40rem) {
+  .page[data-page="activity"] gw-table {
+    --activity-text-width: 14rem;
+  }
+
+  .page[data-page="activity"] gw-table::part(cell) {
+    white-space: nowrap;
+  }
 }
 
 .usage-graph {

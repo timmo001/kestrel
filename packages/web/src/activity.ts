@@ -55,6 +55,21 @@ const when = (iso: string | undefined) =>
   iso === undefined || iso === "" ? "" : dateTimeFormat.format(new Date(iso));
 
 /**
+ * A long text cell. On a phone, `--activity-text-width` keeps it wide enough
+ * to read, and the table scrolls across, rather than it wrapping a word to a
+ * line.
+ */
+const longText = (text: string) => {
+  const span = element("span", text);
+
+  span.style.display = "block";
+  span.style.minInlineSize = "var(--activity-text-width, 0)";
+  span.style.whiteSpace = "normal";
+
+  return span;
+};
+
+/**
  * A small line graph of the last hour, as an SVG drawn in the accent
  * colour, scaled from 0 to `top`, or the highest value where that's higher,
  * with a dashed line at `limit` when there is one.
@@ -351,11 +366,26 @@ const jobsTable = () =>
           return chip;
         },
       },
-      { id: "detail", header: "Doing", wide: true },
+      {
+        id: "detail",
+        header: "Doing",
+        wide: true,
+        cell: (row) => longText(String(row.detail ?? "")),
+      },
       { id: "since", header: "Since" },
       { id: "progress", header: "This pass" },
-      { id: "lastRun", header: "Last run", wide: true },
-      { id: "lastError", header: "Last error", wide: true },
+      {
+        id: "lastRun",
+        header: "Last run",
+        wide: true,
+        cell: (row) => longText(String(row.lastRun ?? "")),
+      },
+      {
+        id: "lastError",
+        header: "Last error",
+        wide: true,
+        cell: (row) => longText(String(row.lastError ?? "")),
+      },
     ],
     filters: [
       {
@@ -451,7 +481,12 @@ const errorsTable = () =>
     columns: [
       { id: "at", header: "When", cell: (row) => when(String(row.at)) },
       { id: "name", header: "Job" },
-      { id: "message", header: "Error", wide: true },
+      {
+        id: "message",
+        header: "Error",
+        wide: true,
+        cell: (row) => longText(String(row.message ?? "")),
+      },
     ],
     filters: [
       {

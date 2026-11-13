@@ -62,11 +62,18 @@ export const clockOf = (second: number) =>
     .map((part) => String(Math.floor(part)).padStart(2, "0"))
     .join(":");
 
-/** The gap between labels for a span, so about eight fit across. */
-const tickStep = (span: number) =>
-  [60, 120, 300, 600, 900, 1800, 3600, 7200, 10_800].find(
-    (step) => span / step <= 8,
-  ) ?? 10_800;
+/** About how wide each label needs, with room either side. */
+const tickWidth = 56;
+
+/** The gap between labels for a span, so `fit` labels or fewer fit across. */
+const tickStep = (span: number, fit: number) =>
+  [60, 120, 300, 600, 900, 1800, 3600, 7200, 10_800, 21_600].find(
+    (step) => span / step <= fit,
+  ) ?? 21_600;
+
+/** How many labels fit across `width` pixels, up to eight. */
+const labelsAcross = (width: number) =>
+  Math.min(8, Math.max(2, Math.floor(width / tickWidth)));
 
 /** A timeline over `elements`; `onPick` hears the second of the day clicked. */
 export const timelineFor = (
@@ -78,6 +85,7 @@ export const timelineFor = (
   let start = 0;
   let head: number | undefined;
   let marked: readonly [number, number] | undefined;
+  let fit = 8;
 
   const clamp = (value: number) =>
     Math.min(Math.max(value, 0), daySeconds - span);
@@ -135,7 +143,7 @@ export const timelineFor = (
       }),
     );
 
-    const step = tickStep(span);
+    const step = tickStep(span, fit);
     const ticks: Array<HTMLElement> = [];
 
     for (
@@ -256,6 +264,17 @@ export const timelineFor = (
   elements.track.addEventListener("pointerleave", () => {
     elements.hover.hidden = true;
   });
+
+  // Fewer labels on a narrow bar, such as a phone's, so they don't run
+  // together
+  new ResizeObserver(() => {
+    const across = labelsAcross(elements.ticks.clientWidth);
+
+    if (across === fit) return;
+
+    fit = across;
+    draw();
+  }).observe(elements.ticks);
 
   return {
     show: (next) => {
