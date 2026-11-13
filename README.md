@@ -39,8 +39,13 @@ the pages are built on [Groundwork](https://github.com/timmo001/groundwork).
 
 ## Running it
 
-You need [mise](https://mise.jdx.dev). Copy `.env.example` to `.env.local` and
-fill in your recorder's address and login, then:
+Kestrel comes for Arch, Debian, Ubuntu, Fedora and Windows, as a Home
+Assistant app and as a container image. See
+[Install](https://kestrel.timmo.dev/install) for each, and
+[Running it](https://kestrel.timmo.dev/running) to set up a server and pair
+your devices with it.
+
+To run it from a checkout, you need [mise](https://mise.jdx.dev):
 
 ```sh
 mise install
@@ -50,17 +55,6 @@ mise run serve:server
 
 Open <https://server.kestrel.localhost>. The docs in [`docs/`](docs) cover
 the settings, the API and the protocol.
-
-To keep it running without a terminal, install the desktop app, which runs
-the server itself and stays in the tray: download it for Linux or Windows
-from the [releases](https://github.com/timmo001/kestrel/releases), install
-it with `mise use -g github:timmo001/kestrel`, or build and install it here
-with `mise run desktop:install`.
-
-The server has no login and listens on `127.0.0.1` by default, so only open it
-up to a network where everyone who can reach it should see your cameras. A
-login is planned for when remote access arrives, in
-[timmo001/kestrel#19](https://github.com/timmo001/kestrel/issues/19).
 
 ## Parts
 
