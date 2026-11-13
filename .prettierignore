@@ -18,3 +18,5 @@ packages/desktop/.cottontail-tmp/
 packages/desktop/build/
 packages/desktop/artifacts/
 packages/desktop/vendor/
+# Flathub's shared modules, a submodule
+.scripts/linux/flatpak/shared-modules/
