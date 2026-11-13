@@ -10,7 +10,7 @@ export default defineConfig(
     site: "kestrel.timmo.dev",
     github: { owner: "timmo001", repo: "kestrel" },
     navigation: {
-      sidebar: ["/", "/running", "/api", "/agents", "/protocol"],
+      sidebar: ["/", "/install", "/running", "/api", "/agents", "/protocol"],
     },
   }),
 );

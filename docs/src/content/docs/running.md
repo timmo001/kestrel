@@ -1,7 +1,92 @@
 ---
 title: Running it
-description: Set up the server and web client against your recorder.
+description: Run a Kestrel server, pair your devices with it, and set up its sources.
 ---
+
+One Kestrel server keeps your sources, recordings and events, and every
+other device uses it: the desktop app, a browser, a phone or the `kestrel`
+command. Run it somewhere that stays on, such as Home Assistant or a box on
+your network, and pair each device with it once. [Install](/install) has
+every package.
+
+## Ways to run a server
+
+### Home Assistant
+
+The [Home Assistant app](/install#home-assistant) runs the server on Home
+Assistant OS. Open **Kestrel** from the sidebar: Home Assistant has already
+signed you in, so it needs no pairing. Other devices pair with it at
+`http://homeassistant.local:7380`. The app shares the host's network, so it
+announces itself where devices can find it, and runs go2rtc on port 11984,
+out of the way of another go2rtc, such as Frigate's. Recordings go in Home
+Assistant's media folder, under `kestrel`, and settings and paired devices
+in the app's own data.
+
+### Docker
+
+```sh
+docker run -d --name kestrel --network host --restart unless-stopped \
+  -e KESTREL_NAME="Kestrel" -v kestrel:/data ghcr.io/timmo001/kestrel
+docker exec kestrel kestrel pair
+```
+
+The image runs as its own `kestrel` user and keeps its config, state and
+recordings in `/data`, with `ffmpeg` built in. On the host's network it
+announces itself so devices find it; with `-p 7380:7380` instead, pair them
+by its address. `docker exec kestrel kestrel pair` shows a code for the first
+device. To update, pull the new image and start the container again.
+
+### Linux services
+
+The `.deb`, `.rpm` and Arch packages have two services, both off until you
+turn one on:
+
+```sh
+# As you, with your own folders, while you're logged in
+systemctl --user enable --now kestrel-nvr
+
+# As its own kestrel user, with nobody logged in
+sudo systemctl enable --now kestrel-nvr
+sudo -u kestrel -H kestrel pair
+```
+
+The system service keeps everything in `/var/lib/kestrel-nvr`. For the user
+service to run while you're logged out, run `loginctl enable-linger`.
+
+### By hand
+
+`kestrel serve` runs the server with no window. It listens on every address
+on port 7380, so pair each device with it.
+
+### The desktop app
+
+The [desktop app](#desktop-app) runs this computer's own server, or uses
+another one.
+
+## Pairing a device
+
+A server answers only devices paired with it, apart from its page and what
+pairing needs. A device pairs once with a one-time code, good for five
+minutes. Get one from Settings, Devices on a paired browser, which shows a
+QR code for a phone too, or with `kestrel pair` on the server's own machine,
+as the user the server runs as. Then:
+
+- In a browser, open the server's address and type the code, or scan the QR
+  code with a phone.
+- In the desktop app, choose **Use another server…** in the tray.
+- With the CLI, run `kestrel pair <code>`.
+
+Servers announce themselves on the network over mDNS, as `_kestrel._tcp`, so
+the desktop app and `kestrel servers` list them, and find a paired one again
+when its address changes. Remove a device in Settings, Devices, or with
+`kestrel devices remove <id>`, and it's signed out at once. A server that
+listens on `127.0.0.1` alone trusts this computer, so it needs no pairing
+from it.
+
+Everything travels over plain HTTP, so keep the server on your own network.
+To reach it from outside, put it behind a reverse proxy with HTTPS.
+
+## From source
 
 You need [mise](https://mise.jdx.dev), which installs Bun, go2rtc and the
 other tools at the versions the repository pins.
@@ -172,57 +257,61 @@ longer each time, whenever the connection drops. A source that can't start,
 such as one with no address, shows as not connected with the reason. `mise
 run serve:server:logs` follows its log.
 
-The server listens on `127.0.0.1:7380`. go2rtc only listens on
-`127.0.0.1:1984`, and the server passes it through under `/go2rtc/`; it
-starts go2rtc again whenever the cameras' streams change. go2rtc's RTSP
-server stays on `127.0.0.1:1985`, since its ffmpeg sources hand their output
-back through it. Set `KESTREL_HOST`
-to listen on another address, such as your machine's address on your network
-to use it from a phone, and `KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and
-`KESTREL_GO2RTC_RTSP_PORT` for other ports. The server doesn't ask for a
-login, so only listen where everyone
-who can reach it should see the cameras and change its sources.
+`serve:server` listens on `127.0.0.1:7380`, so it trusts this machine and
+needs no pairing. go2rtc only listens on `127.0.0.1:1984`, and the server
+passes it through under `/go2rtc/`; it starts go2rtc again whenever the
+cameras' streams change. go2rtc's RTSP server stays on `127.0.0.1:1985`,
+since its ffmpeg sources hand their output back through it. Set
+`KESTREL_HOST` to listen on another address, such as `::` to use it from a
+phone, where every device [pairs](#pairing-a-device) first, and
+`KESTREL_PORT`, `KESTREL_GO2RTC_PORT` and `KESTREL_GO2RTC_RTSP_PORT` for
+other ports.
 
 ## Desktop app
 
-The desktop app runs the server itself and opens the web client in a
-window, so Kestrel keeps running without Pitchfork or a terminal. It
-listens on `127.0.0.1:7380` like `serve:server`, with go2rtc built in, and
-takes its sources from `sources.json`. For a recorder that leaves its
-address and login out there, it reads the file `mise run auth:save` keeps;
-it doesn't read `.env.local`, since that needs 1Password.
+The desktop app opens the web client in a window and keeps running in the
+tray. It either runs this computer's own server or uses another one, never
+both, so there's one copy of the footage and nothing records a camera
+twice. [Install](/install) has it for Linux and Windows.
 
-Each [release](https://github.com/timmo001/kestrel/releases) has it for
-Linux and Windows (x64): unpack the Setup file and run the installer in it,
-or install it with mise and start it with `kestrel`:
+Its own server listens on `127.0.0.1:7380` like `serve:server`, with go2rtc
+built in, and takes its sources from `sources.json`. For a recorder that
+leaves its address and login out there, it reads the file `mise run
+auth:save` keeps; it doesn't read `.env.local`, since that needs 1Password.
+Recording needs `ffmpeg` on the path, or `KESTREL_FFMPEG`. Tick **Share with
+other devices** in the tray to have it listen on the network too, so other
+devices can pair with it; the window then signs in as the server's owner.
 
-```sh
-mise use -g github:timmo001/kestrel
-```
+To use another server, such as the Home Assistant app, choose **Use another
+server…** in the tray. It lists the servers on the network, or takes an
+address, and pairs with a code from that server's Settings, Devices. The
+app's own server stops, and the window opens the other server's page,
+signed in as this computer. **Use this computer's server** goes back. The
+choice is kept in `desktop.json` in the config folder. When the other
+server moves to a new address, the app finds it again by its id.
 
-Neither is signed, so Windows asks before running it, but each release's
-files have a GitHub attestation, which mise checks, or check one yourself
-with `gh attestation verify <file> -R timmo001/kestrel`. Recording needs
-`ffmpeg` on the path, or `KESTREL_FFMPEG`; the app doesn't bring its own.
-The Windows build hasn't been tried on a real machine yet, and Start at
-login is Linux only. With mise, Start at login points at that version, so
-tick it again after upgrading.
+The app and its server must run the same version. When they don't, the
+tray and window say which is older and how to update it. On Windows, where
+the app installs itself, **Update Kestrel** downloads that version's Setup,
+checks it against the release's `SHA256SUMS` and runs it; elsewhere it opens
+the release and your package manager updates it.
 
 Closing the window leaves it running in the tray. The tray menu opens the
-window again, shows whether the server is running, how many sources are
-connected and how many cameras it records, opens these docs and quits. The
-docs are built into the app, so they open in your browser without a
-connection, from the tray or the page's More menu. If the server stops, the
-app starts it again, waiting longer each time up to 30 seconds.
-Opening the app again while it runs brings its window to the front.
+window again, shows how the server is doing, chooses the server, opens these
+docs and quits. The docs are built into the app, so they open in your
+browser without a connection, from the tray or the page's More menu. If its
+own server stops, the app starts it again, waiting longer each time up to
+30 seconds. Opening the app again while it runs brings its window to the
+front. The Windows build hasn't been tried on a real machine yet.
 
 Tick Start at login in the tray to start it in the tray when you log in. It
 adds `~/.config/autostart/dev.timmo.kestrel.desktop`; untick it to remove
-that again.
+that again. It's Linux only, and left out of the Flatpak. With mise, Start
+at login points at that version, so tick it again after upgrading.
 
-The app is the always-on server, so stop the background one with `mise run
-serve:server:stop` while the app runs: both use ports 7380 and 1984 and the
-same recordings folder.
+While the app runs its own server, stop the background one with `mise run
+serve:server:stop`: both use ports 7380 and 1984 and the same recordings
+folder.
 
 | Task                       | What it does                                                                      |
 | -------------------------- | --------------------------------------------------------------------------------- |
@@ -292,14 +381,18 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable                   | Default                  | What it sets                                       |
-| -------------------------- | ------------------------ | -------------------------------------------------- |
-| `KESTREL_HOST`             | `127.0.0.1`              | The address the server listens on                  |
-| `KESTREL_PORT`             | `7380`                   | The server's port (`PORT` too, for Pitchfork)      |
-| `KESTREL_GO2RTC_PORT`      | `1984`                   | go2rtc's port                                      |
-| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                   | go2rtc's RTSP port, on 127.0.0.1 only              |
-| `KESTREL_GO2RTC`           | `go2rtc`                 | The go2rtc binary; the desktop app uses its own    |
-| `KESTREL_FFMPEG`           | `ffmpeg`                 | The ffmpeg binary, for recording cameras           |
-| `KESTREL_WEB`              | `packages/web/dist`      | The built web client; the desktop app uses its own |
-| `KESTREL_CONFIG`           | `~/.config/kestrel`      | Where `sources.json` is kept                       |
-| `KESTREL_STATE`            | `~/.local/state/kestrel` | Where push subscriptions and recordings go         |
+| Variable                   | Default                          | What it sets                                                       |
+| -------------------------- | -------------------------------- | ------------------------------------------------------------------ |
+| `KESTREL_HOST`             | `::`                             | The address the server listens on; `serve:server` sets `127.0.0.1` |
+| `KESTREL_PORT`             | `7380`                           | The server's port (`PORT` too, for Pitchfork)                      |
+| `KESTREL_GO2RTC_PORT`      | `1984`                           | go2rtc's port                                                      |
+| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                           | go2rtc's RTSP port, on 127.0.0.1 only                              |
+| `KESTREL_GO2RTC`           | `go2rtc`                         | The go2rtc binary; the desktop app uses its own                    |
+| `KESTREL_FFMPEG`           | `ffmpeg`                         | The ffmpeg binary, for recording cameras                           |
+| `KESTREL_WEB`              | `packages/web/dist`              | The built web client; the desktop app uses its own                 |
+| `KESTREL_CONFIG`           | `~/.config/kestrel`              | Where `sources.json` is kept                                       |
+| `KESTREL_STATE`            | `~/.local/state/kestrel`         | Where paired devices, push subscriptions and recordings go         |
+| `KESTREL_RECORDINGS`       | `recordings` in the state folder | Where the server's own recordings go                               |
+| `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                 |
+| `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links           |
+| `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets            |
