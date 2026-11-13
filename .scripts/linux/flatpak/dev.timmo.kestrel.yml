@@ -1,0 +1,75 @@
+---
+# The Flatpak, from a release's kestrel-nvr archive (build.sh puts it beside
+# this file as kestrel-nvr.tar.gz). GNOME's runtime brings WebKitGTK 4.1 and
+# GTK 3; the tray library and ffmpeg, which recording runs, are built here,
+# the tray's from Flathub's shared modules.
+app-id: dev.timmo.kestrel
+runtime: org.gnome.Platform
+runtime-version: "51"
+sdk: org.gnome.Sdk
+command: kestrel
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=x11
+  - --device=dri
+  # The tray, and notifications
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+modules:
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: x264
+    config-opts:
+      - --enable-shared
+      - --enable-pic
+      - --disable-cli
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    sources:
+      - type: git
+        url: https://code.videolan.org/videolan/x264.git
+        # The stable branch
+        commit: b35605ace3ddf7c1a5d67a2eb553f034aef41d55
+
+  - name: ffmpeg
+    config-opts:
+      - --enable-gpl
+      - --enable-libx264
+      - --enable-shared
+      - --disable-static
+      - --disable-doc
+      - --disable-ffplay
+      - --disable-debug
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/ffmpeg/examples
+    sources:
+      - type: archive
+        url: https://ffmpeg.org/releases/ffmpeg-8.1.3.tar.xz
+        sha256: 7138d28c96d9d3e3af4ee3d8cad72741f8ffb40da90c1112235dea3ecd3178a3
+
+  - name: kestrel
+    buildsystem: simple
+    build-commands:
+      # The desktop app loads WebKitGTK 4.1 from the runtime
+      - ldconfig -p | grep -q libwebkit2gtk-4.1.so.0
+      - mkdir -p /app/kestrel-nvr /app/bin
+      - cp -a lib/kestrel-nvr/. /app/kestrel-nvr/
+      - ln -s /app/kestrel-nvr/Resources/app/kestrel /app/bin/kestrel
+      - install -Dm644 kestrel-nvr.desktop /app/share/applications/dev.timmo.kestrel.desktop
+      - desktop-file-edit --set-key=Exec --set-value=kestrel --set-icon=dev.timmo.kestrel /app/share/applications/dev.timmo.kestrel.desktop
+      - install -Dm644 logo.svg /app/share/icons/hicolor/scalable/apps/dev.timmo.kestrel.svg
+      - install -Dm644 dev.timmo.kestrel.metainfo.xml /app/share/metainfo/dev.timmo.kestrel.metainfo.xml
+    sources:
+      - type: archive
+        path: kestrel-nvr.tar.gz
+      - type: file
+        path: ../kestrel-nvr.desktop
+      - type: file
+        path: ../../../packages/web/src/logo.svg
+      - type: file
+        path: dev.timmo.kestrel.metainfo.xml

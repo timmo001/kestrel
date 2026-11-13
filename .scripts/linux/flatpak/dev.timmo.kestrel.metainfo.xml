@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.timmo.kestrel</id>
+  <name>Kestrel</name>
+  <summary>Your cameras, recordings and events in one place</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="dev.timmo">
+    <name>Aidan Timson</name>
+  </developer>
+  <description>
+    <p>
+      Kestrel brings your recorders and cameras together: live view,
+      recordings, motion and other events, and each recorder's health. It
+      runs its own server, or uses one elsewhere on your network.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.timmo.kestrel.desktop</launchable>
+  <url type="homepage">https://github.com/timmo001/kestrel</url>
+  <url type="help">https://kestrel.timmo.dev</url>
+  <content_rating type="oars-1.1" />
+</component>
