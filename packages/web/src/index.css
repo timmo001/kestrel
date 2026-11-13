@@ -182,7 +182,8 @@ gw-table gw-sheet {
 
 /* A layout's worth of cameras, on Live and Recordings, in the layout's own
    shape so each picture fills its 16:9 cell, as big as fits and centred on
-   black. Three is one large and two stacked beside it */
+   black. Three is one large and two stacked beside it. Live's smart tiling
+   sets its own size and tracks over these */
 .camera-grid {
   --live-ratio: calc(16 / 9);
 
@@ -263,34 +264,35 @@ gw-table gw-sheet {
   color: rgb(255 255 255 / 70%);
 }
 
-/* On a phone, the cameras one under another at their own shape */
+/* On a phone, with fixed layouts, the cameras one under another at their own
+   shape; smart tiling still fits them to the screen */
 @media (width < 40rem) {
-  .live-stage {
+  .live-stage[data-tiling="fixed"]:not(:fullscreen) {
     height: auto;
   }
 
-  .live-area {
+  [data-tiling="fixed"] .live-area {
     display: block;
     container-type: normal;
   }
 
-  .live-grid,
-  .live-grid[data-layout] {
+  [data-tiling="fixed"] .live-grid,
+  [data-tiling="fixed"] .live-grid[data-layout] {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
     width: auto;
     height: auto;
   }
 
-  .live-grid[data-layout="3"] > :first-child {
+  [data-tiling="fixed"] .live-grid[data-layout="3"] > :first-child {
     grid-row: auto;
   }
 
-  .live-grid[data-layout="5"] > * {
+  [data-tiling="fixed"] .live-grid[data-layout="5"] > * {
     grid-column: auto;
   }
 
-  .live-tile {
+  [data-tiling="fixed"] .live-tile {
     aspect-ratio: 16 / 9;
   }
 }
@@ -889,7 +891,8 @@ gw-table gw-sheet {
     position: absolute;
   }
 
-  /* The first row: the sound or the time, the transport, full screen */
+  /* The first row: the sound or the time, the transport, Live's View menu
+     and full screen */
   .live-sound {
     grid-area: 1 / 1;
   }
@@ -912,6 +915,10 @@ gw-table gw-sheet {
   .live-next,
   .control-next {
     grid-area: 1 / 5;
+  }
+
+  .live-view {
+    grid-area: 1 / 6;
   }
 
   .live-fullscreen,
@@ -1014,6 +1021,11 @@ gw-table gw-sheet {
   gap: var(--gw-space-2) var(--gw-space-4);
   align-items: center;
   justify-content: space-between;
+}
+
+/* The Sources heading on the Settings page, set apart from the panels above */
+.settings-sources {
+  margin-block-start: var(--gw-space-4);
 }
 
 /* A part of a source's card on the Settings page, such as its cameras */

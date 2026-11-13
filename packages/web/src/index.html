@@ -92,7 +92,7 @@
              their controls under them, which go full screen together -->
         <section class="page" data-page="live">
           <!-- Focusable, so the keyboard controls reach it after a click -->
-          <div class="live-stage" tabindex="-1">
+          <div class="live-stage" tabindex="-1" data-tiling="smart">
             <!-- The grid keeps its layout's shape, centred in the space -->
             <div class="live-area">
               <!-- Placeholders hold the grid's space until the cameras are known -->
@@ -114,6 +114,14 @@
                   label="Cameras at once"
                   value="all"
                 ></gw-segmented>
+                <!-- How the cameras tile: smart, sized to the window, or
+                     each count's fixed layout -->
+                <gw-menu-button
+                  class="live-view"
+                  label="View"
+                  labels="hide"
+                  appearance="plain"
+                ></gw-menu-button>
                 <!-- The picked camera's sound, where any camera has it: on
                      or off, and how loud -->
                 <span
@@ -197,6 +205,11 @@
                     <dd>Cameras at once</dd>
                     <dt><kbd>A</kbd></dt>
                     <dd>Every camera at once</dd>
+                    <dt><kbd>T</kbd></dt>
+                    <dd>
+                      Smart tiling, sized to the window, or fixed layouts, as
+                      the View menu picks
+                    </dd>
                     <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt>
                     <dd>Pick a camera, on to the next cameras past the edge</dd>
                     <dt><kbd>Page Up</kbd> <kbd>Page Down</kbd></dt>
@@ -556,28 +569,17 @@
           </gw-stack>
         </section>
 
-        <!-- Settings: each source's settings and cameras, and the names you
-             give cameras, saved to the server's sources file -->
+        <!-- Settings: camera order, recording, devices, and each source's
+             settings and cameras, saved to the server's sources file -->
         <section class="page" data-page="settings" hidden>
           <gw-page-header
             heading="Settings"
-            description="Where the cameras come from, and what they're called."
+            description="How cameras show and record, who can see them, and where they come from."
             level="2"
           >
-            <gw-menu-button
-              slot="actions"
-              class="settings-add"
-              label="Add source"
-              appearance="outlined"
-            ></gw-menu-button>
             <gw-button slot="actions" class="settings-save">Save</gw-button>
           </gw-page-header>
           <gw-alert class="settings-notice" hidden></gw-alert>
-          <!-- Placeholders the size of the folded panels until they load -->
-          <gw-stack class="settings-list">
-            <gw-card loading lines="1"></gw-card>
-            <gw-card loading lines="1"></gw-card>
-          </gw-stack>
           <!-- The order cameras show in, dragged or moved with the arrow keys -->
           <gw-expansion
             class="settings-order"
@@ -630,6 +632,22 @@
               >
             </gw-setting-row>
           </gw-card>
+          <!-- Each source's settings and cameras, below the rest -->
+          <gw-section-title class="settings-sources" level="3"
+            >Sources
+            <gw-menu-button
+              slot="actions"
+              class="settings-add"
+              label="Add source"
+              appearance="outlined"
+              size="small"
+            ></gw-menu-button>
+          </gw-section-title>
+          <!-- Placeholders the size of the folded panels until they load -->
+          <gw-stack class="settings-list">
+            <gw-card loading lines="1"></gw-card>
+            <gw-card loading lines="1"></gw-card>
+          </gw-stack>
         </section>
 
         <!-- Pairing: a browser the server doesn't know yet lands here, with a

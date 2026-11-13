@@ -52,7 +52,12 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   shown as the count and All) or any number fewer at a time (from the sub
   stream past four), paged with Previous and Next (Page Up and Page Down) or
   picked from the page list, which names each camera when there's one at a
-  time. All is the default. The arrow keys move the pick around the page and
+  time. All is the default. Smart tiling, the default, sizes the tiles to
+  the window and fills as much of it as they can, rows or columns with no
+  empty cells, the larger tiles first where the count doesn't split evenly;
+  the View menu (or T) swaps it for each count's fixed layout, and on a
+  phone the fixed layouts list the cameras one under another. The arrow
+  keys move the pick around the page and
   on to the next page past the edge. Each picture keeps its shape, fitted
   whole into its tile. The zoom controls act on the picked camera, and each
   camera keeps its own zoom, once in the tiles and once on its own (so one
@@ -64,7 +69,7 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   bigger than its tile. Pause closes
   the streams and holds the last frames; a double click or Enter shows the
   picked camera alone, and Esc or Backspace goes back. S saves a still of it,
-  and ? shows or hides the keys. The layout, the picked camera, each camera's zoom
+  and ? shows or hides the keys. The layout, the tiling, the picked camera, each camera's zoom
   and how many cameras there were are kept in the browser, so the loading
   placeholders already sit where the cameras will.
 

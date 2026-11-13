@@ -3,12 +3,14 @@
  * time (any count from one to one fewer than there are), paged with
  * Previous and Next or picked from the page list, under one set of controls:
  * pause, zoom (fit, fill or a step at a time, each camera its own), a still
- * of the picked camera, full screen and keys. The arrow keys move the pick,
+ * of the picked camera, full screen and keys. Smart tiling sizes the tiles
+ * to the window so they fill as much of it as they can; the View menu swaps
+ * it for each count's fixed layout. The arrow keys move the pick,
  * on to the next page past the edge. A camera that moves is steered in Move
  * mode, and one with a second view, such as a telephoto lens, plays both,
  * the other small in a corner, and swaps them without reloading either. The
  * picked camera's sound plays where it has a microphone and its sound is on,
- * each camera with its own volume. The layout, page, picked camera, each
+ * each camera with its own volume. The layout, tiling, page, picked camera, each
  * camera's view, zoom and sound and how many cameras there were are kept in
  * this browser, so the placeholders take the cameras' places before they're
  * known. A camera whose source can't be reached says why over its tile. The
@@ -37,6 +39,7 @@ import {
   phSpeakerHigh,
   phSpeakerLow,
   phSpeakerSlash,
+  phSquaresFour,
 } from "./icons.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
@@ -46,6 +49,7 @@ import {
   helpToggle,
   typingTargets,
 } from "./shared.ts";
+import { applyTiling, clearTiling, tilingFor } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 /** go2rtc's player element, as far as the page uses it. */
@@ -120,6 +124,29 @@ const keyedLayouts = 9;
 
 /** A layout: how many cameras at once, or all of them. */
 type Layout = number | "all";
+
+/**
+ * How a page's cameras are tiled: sized to the space they have, filling it,
+ * or in each count's own fixed shape.
+ */
+type Tiling = "smart" | "fixed";
+
+const tilings: ReadonlyArray<{
+  readonly value: Tiling;
+  readonly label: string;
+  readonly description: string;
+}> = [
+  {
+    value: "smart",
+    label: "Smart tiling",
+    description: "Tiles sized to the window, filling as much of it as they can",
+  },
+  {
+    value: "fixed",
+    label: "Fixed layouts",
+    description: "Each count of cameras in its own set shape",
+  },
+];
 
 /**
  * The layouts worth offering for this many cameras: every count from one up
@@ -241,8 +268,12 @@ const kept = () => {
   const keptLayout: Layout =
     Number.isInteger(layout) && layout >= 1 ? layout : "all";
 
+  /** Smart until fixed layouts are picked. */
+  const keptTiling: Tiling = values?.["tiling"] === "fixed" ? "fixed" : "smart";
+
   return {
     layout: keptLayout,
+    tiling: keptTiling,
     page: Number.isInteger(page) && page >= 0 ? page : 0,
     /** How many cameras there were last time, for the placeholders' shape. */
     count: Number.isInteger(count) && count > 0 ? count : 4,
@@ -306,6 +337,7 @@ export const livePage = (): LivePage => {
   const stage = find("div", "live-stage");
   const grid = find("div", "live-grid");
   const layoutToggle = find("gw-segmented", "live-layout");
+  const viewMenu = find("gw-menu-button", "live-view");
   const previousButton = find("gw-button", "live-previous");
   const playButton = find("gw-button", "live-play");
   const nextButton = find("gw-button", "live-next");
@@ -326,6 +358,7 @@ export const livePage = (): LivePage => {
 
   const saved = kept();
   let layout: Layout = saved.layout;
+  let tiling: Tiling = saved.tiling;
   let page = saved.page;
   // Several cameras start with none picked, so none is marked out
   let picked = saved.layout === 1 ? saved.picked : undefined;
@@ -429,25 +462,57 @@ export const livePage = (): LivePage => {
 
   const pages = () => Math.max(1, Math.ceil(count() / size()));
 
-  /** Lays the grid out for a page's worth of cameras. */
+  /**
+   * Lays the grid out for the cameras in it. Smart tiling sizes them to the
+   * space around the grid, every camera on the page filling as much of it
+   * as they can; fixed layouts keep the page's own shape, however many are
+   * on it.
+   */
   const arrangeGrid = (target: HTMLElement) => {
-    const arrangement = gridFor(size());
+    stage?.setAttribute("data-tiling", tiling);
 
-    target.dataset.layout = arrangement.layout;
+    const smart = tiling === "smart";
+    const arrangement = smart ? undefined : gridFor(size());
+
+    target.dataset.layout = arrangement?.layout ?? "smart";
+
+    const columns = arrangement?.columns ?? null;
+    const rows = arrangement?.rows ?? null;
 
     const ratio =
-      arrangement.columns === null || arrangement.rows === null
+      columns === null || rows === null
         ? null
-        : `calc(${arrangement.columns * 16} / ${arrangement.rows * 9})`;
+        : `calc(${columns * 16} / ${rows * 9})`;
 
     for (const [name, value] of [
-      ["--live-columns", arrangement.columns],
-      ["--live-rows", arrangement.rows],
+      ["--live-columns", columns],
+      ["--live-rows", rows],
       ["--live-ratio", ratio],
     ] as const) {
       if (value === null) target.style.removeProperty(name);
       else target.style.setProperty(name, String(value));
     }
+
+    if (!smart) {
+      clearTiling(target);
+
+      return;
+    }
+
+    const area = target.parentElement;
+
+    // Hidden, the space measures nothing, so the last tiling stays until
+    // it shows again
+    const tiled =
+      area === null
+        ? undefined
+        : tilingFor(
+            Math.max(target.childElementCount, 1),
+            area.clientWidth,
+            area.clientHeight,
+          );
+
+    if (tiled !== undefined) applyTiling(target, tiled);
   };
 
   /**
@@ -458,7 +523,6 @@ export const livePage = (): LivePage => {
     if (grid === null) return;
 
     page = Math.min(page, pages() - 1);
-    arrangeGrid(grid);
     grid.setAttribute("aria-busy", "true");
 
     const onPage = Math.max(1, Math.min(size(), count() - page * size()));
@@ -473,6 +537,8 @@ export const livePage = (): LivePage => {
         return tile;
       }),
     );
+
+    arrangeGrid(grid);
   };
 
   const setIcon = (
@@ -683,6 +749,14 @@ export const livePage = (): LivePage => {
         hint: layoutHint(each),
       }));
       layoutToggle.value = String(layout);
+    }
+
+    if (viewMenu !== null) {
+      viewMenu.items = tilings.map((each) => ({
+        ...each,
+        group: "Tiling",
+        checked: each.value === tiling,
+      }));
     }
 
     const single = pages() <= 1;
@@ -953,7 +1027,6 @@ export const livePage = (): LivePage => {
     if (grid === null || !shown()) return;
 
     page = Math.min(page, pages() - 1);
-    arrangeGrid(grid);
     grid.removeAttribute("aria-busy");
 
     tiles = streams
@@ -1051,6 +1124,8 @@ export const livePage = (): LivePage => {
       grid.replaceChildren(...tiles.map((tile) => tile.figure));
     }
 
+    arrangeGrid(grid);
+
     // On the page each player makes its video: the page's controls stand in
     // for the video's own, and it starts quiet until its sound is picked
     for (const tile of tiles) {
@@ -1099,6 +1174,19 @@ export const livePage = (): LivePage => {
     solo = undefined;
     keepPlace();
     render();
+  };
+
+  /** Smart tiling or fixed layouts, kept in this browser. */
+  const setTiling = (next: Tiling) => {
+    if (next === tiling) return;
+
+    tiling = next;
+    keep(storageKey, { tiling });
+
+    if (grid !== null) arrangeGrid(grid);
+
+    showZoom();
+    showControls();
   };
 
   /** Shows a page, by its number from the first. */
@@ -1301,6 +1389,28 @@ export const livePage = (): LivePage => {
     );
   }
 
+  if (viewMenu !== null) {
+    viewMenu.setAttribute("icon", phSquaresFour);
+    on(viewMenu, "select", (event) => {
+      const chosen = tilings.find((each) => each.value === event.detail.value);
+
+      if (chosen !== undefined) setTiling(chosen.value);
+    });
+  }
+
+  // Smart tiling follows the space the cameras have, as the window's size
+  // changes or they go full screen
+  const area = grid?.parentElement ?? null;
+
+  if (grid !== null && area !== null) {
+    new ResizeObserver(() => {
+      if (tiling !== "smart") return;
+
+      arrangeGrid(grid);
+      showZoom();
+    }).observe(area);
+  }
+
   previousButton?.addEventListener("click", () => step(-1));
   nextButton?.addEventListener("click", () => step(1));
   playButton?.addEventListener("click", togglePause);
@@ -1426,6 +1536,7 @@ export const livePage = (): LivePage => {
       ],
     ),
     ["a", () => setLayout("all")],
+    ["t", () => setTiling(tiling === "smart" ? "fixed" : "smart")],
   ]);
 
   /** The arrow keys, which steer the camera in Move mode while they're held. */
