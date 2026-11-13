@@ -9,6 +9,8 @@
     "build": "bun scripts/theme.ts && blume build --strict",
     "check": "bun scripts/theme.ts && blume check --strict --isolated",
     "validate": "blume validate --strict",
+    "deploy": "wrangler deploy --config dist/server/wrangler.json",
+    "deploy:preview": "wrangler versions upload --config dist/server/wrangler.json",
     "preview": "blume preview",
     "brand": "bun scripts/brand-images.ts",
     "theme": "bun scripts/theme.ts"
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "astro": "7.4.11",
-    "prettier": "3.10.1"
+    "prettier": "3.10.1",
+    "wrangler": "4.160.1"
   }
 }
