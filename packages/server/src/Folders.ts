@@ -31,11 +31,18 @@ export const configFolder = Effect.gen(function* () {
   );
 });
 
-/** The folder recordings go in when you haven't chosen one: `recordings` in the state folder. */
+/**
+ * The folder recordings go in when you haven't chosen one on the Settings
+ * page: `KESTREL_RECORDINGS`, such as a Home Assistant app's `/media`
+ * folder, else `recordings` in the state folder.
+ */
 export const ownRecordingsFolder = Effect.gen(function* () {
   const path = yield* Path.Path;
+  const state = yield* stateFolder;
 
-  return path.join(yield* stateFolder, "recordings");
+  return yield* Config.String("KESTREL_RECORDINGS").pipe(
+    Config.withDefault(path.join(state, "recordings")),
+  );
 });
 
 /**

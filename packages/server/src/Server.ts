@@ -7,7 +7,15 @@
  * @module
  */
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+import {
+  Config,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Path,
+  Schema,
+} from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import {
   mismatchMessage,
@@ -223,6 +231,33 @@ const connect = HttpRouter.add("GET", `/${connectPath}*`, (request) =>
     );
   }),
 );
+
+/**
+ * The server as `kestrel serve` and `mise run serve:server` run it, set from
+ * the environment: `KESTREL_HOST`, all addresses (`::`) by default, so other
+ * devices reach it once paired; `KESTREL_PORT` or `PORT`, 7380 by default;
+ * and `KESTREL_WEB`, the built web client, `packages/web/dist` beside this
+ * package by default.
+ */
+export const fromEnvironment = Effect.gen(function* () {
+  const path = yield* Path.Path;
+
+  const hostname = yield* Config.String("KESTREL_HOST").pipe(
+    Config.withDefault("::"),
+  );
+
+  // PORT is what Pitchfork hands its daemons
+  const port = yield* Config.Int("KESTREL_PORT").pipe(
+    Config.orElse(() => Config.Int("PORT")),
+    Config.withDefault(7380),
+  );
+
+  const web = yield* Config.String("KESTREL_WEB").pipe(
+    Config.withDefault(path.resolve(import.meta.dir, "../../web/dist")),
+  );
+
+  return layer({ hostname, port, web });
+});
 
 /**
  * Serves the API and the web client over plain HTTP, with the sources behind

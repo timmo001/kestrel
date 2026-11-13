@@ -702,6 +702,20 @@ const devices = devicesList.pipe(
   Command.withSubcommands([devicesRemove]),
 );
 
+// The server's code only loads for `serve`, so every other command starts
+// as quickly as before
+const serve = Command.make("serve", {}, () =>
+  Effect.promise(() => import("@timmo001/kestrel-server")).pipe(
+    Effect.flatMap(({ Server }) =>
+      Layer.launch(Layer.unwrap(Server.fromEnvironment)),
+    ),
+  ),
+).pipe(
+  Command.withDescription(
+    "Run the server with no window, on every address unless KESTREL_HOST says otherwise; pair devices with `kestrel pair`",
+  ),
+);
+
 const servers = Command.make(
   "servers",
   { json },
@@ -860,6 +874,7 @@ const cli = Command.make("kestrel").pipe(
     devices,
     pair,
     servers,
+    serve,
     config,
     agent,
     mcp,

@@ -9,6 +9,9 @@
 # running, so restart it with serve:server:restart after a change.
 [daemons.server]
 run = '''
+# Only this machine, unless KESTREL_HOST says otherwise: `kestrel serve`
+# listens on every address by default
+export KESTREL_HOST="${KESTREL_HOST:-127.0.0.1}"
 saved="${XDG_CONFIG_HOME:-$HOME/.config}/kestrel/recorder.env"
 if [ -f "$saved" ]; then
   exec bun --env-file="$saved" run packages/server/src/main.ts
