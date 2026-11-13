@@ -272,11 +272,19 @@ jobs:
       - name: Attest the release files
         uses: timmo001/workflows/.github/actions/attest-release-assets@ec70016a91999259142a156104978174490a0831 # 20261110.0
         with:
+          # One file each, as the action needs
           subject-patterns: |
-            release/kestrel-nvr-${{ github.event.release.tag_name }}-*
-            release/kestrel-nvr_*.deb
-            release/kestrel-nvr-*.rpm
-            release/Kestrel-Setup-${{ github.event.release.tag_name }}-*
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-aarch64.tar.gz
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-windows-x86_64.zip
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-x86_64.flatpak
+            release/kestrel-nvr_${{ github.event.release.tag_name }}-1_amd64.deb
+            release/kestrel-nvr_${{ github.event.release.tag_name }}-1_arm64.deb
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-1.x86_64.rpm
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-1.aarch64.rpm
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-linux-aarch64.tar.gz
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-windows-x86_64.zip
           bundle-path: release/kestrel-nvr-${{ github.event.release.tag_name }}.sigstore.json
 
       - name: Attach to the release
