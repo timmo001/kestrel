@@ -1,17 +1,21 @@
 /**
  * The HTTP server: the API's routes, go2rtc under `/go2rtc/`, the push
  * contract and the built web client, over plain HTTP, with the sources
- * behind them.
+ * behind them. Everything but the page's files and pairing needs a paired
+ * device.
  *
  * @module
  */
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, FileSystem, Layer, Path } from "effect";
-import { HttpRouter, HttpServerResponse } from "effect/http";
+import { Effect, FileSystem, Layer, Option, Path, Schema } from "effect";
+import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { connectPath, sessionCookie, Unpaired } from "./Api.ts";
 import { Attention } from "./Attention.ts";
+import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Go2rtc } from "./go2rtc/Go2rtc.ts";
 import * as Proxy from "./go2rtc/Proxy.ts";
 import { routes } from "./Handlers.ts";
+import { Identity, loopback } from "./Identity.ts";
 import { Library } from "./Library.ts";
 import { Push } from "./Push.ts";
 import * as Recording from "./Recording.ts";
@@ -84,6 +88,97 @@ const push = Layer.unwrap(
   }),
 );
 
+/** The paths that need a paired device: the API, go2rtc and push. */
+const guarded = (path: string) =>
+  ["/api/", "/go2rtc/", "/push/"].some((start) => path.startsWith(start));
+
+/** The paths open to anyone, so a device can find the server and pair. */
+const open = new Set([
+  "/api/health",
+  "/api/devices/server",
+  "/api/devices/pair",
+]);
+
+const unpaired = HttpServerResponse.jsonUnsafe(
+  Schema.encodeSync(Unpaired)(
+    new Unpaired({ message: "Pair this device with the server first" }),
+  ),
+  { status: 401 },
+);
+
+/**
+ * Lets a request through to the API, go2rtc or push only from a paired
+ * device, by its bearer token or its window's cookie. The page's own files
+ * stay open, so a browser that isn't paired can load the pairing page.
+ *
+ * With `trustLoopback`, set only while the server listens on this machine
+ * alone, a request from this machine needs nothing. Once it listens on the
+ * network, a request from this machine needs a token too, since other
+ * users, or apps sharing the host's network, would reach it that way.
+ */
+const signIn =
+  (options: { readonly trustLoopback: boolean }) =>
+  <E, R>(
+    httpEffect: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
+  ) =>
+    Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      const path = new URL(request.url, "http://kestrel").pathname;
+
+      if (
+        !guarded(path) ||
+        open.has(path) ||
+        (options.trustLoopback &&
+          Option.exists(request.remoteAddress, (remote) =>
+            loopback.has(remote),
+          ))
+      ) {
+        return yield* httpEffect;
+      }
+
+      const token = tokenOf(request);
+      const devices = yield* Devices;
+
+      const signedIn =
+        token === undefined
+          ? Option.none()
+          : yield* devices.authenticate(token);
+
+      return Option.isSome(signedIn) ? yield* httpEffect : unpaired;
+    });
+
+/**
+ * A one-time sign-in link, such as the desktop app opens for its window:
+ * sets the window's cookie as the device that asked for it, then goes to the
+ * page.
+ */
+const connect = HttpRouter.add("GET", `/${connectPath}*`, (request) =>
+  Effect.gen(function* () {
+    const devices = yield* Devices;
+    const path = new URL(request.url, "http://kestrel").pathname;
+    const code = path.slice(`/${connectPath}`.length);
+
+    return yield* devices.connect(code).pipe(
+      Effect.map((session) =>
+        // From /auth/connect/<code>, `../../` is the page's root, under
+        // whichever path it's served from
+        HttpServerResponse.redirect("../../").pipe(
+          HttpServerResponse.setCookieUnsafe(
+            sessionCookie,
+            session,
+            cookieOptions(request),
+          ),
+        ),
+      ),
+      Effect.catchTag("PairingRefused", (refused) =>
+        Effect.succeed(
+          HttpServerResponse.text(refused.message, { status: 403 }),
+        ),
+      ),
+    );
+  }),
+);
+
 /**
  * Serves the API and the web client over plain HTTP, with the sources behind
  * it. The sources stay in what it provides, for a host in the same process,
@@ -91,7 +186,8 @@ const push = Layer.unwrap(
  */
 export const layer = (options: ServeOptions) =>
   HttpRouter.serve(
-    Layer.mergeAll(routes, go2rtc, push, webClient(options.web)),
+    Layer.mergeAll(routes, go2rtc, push, connect, webClient(options.web)),
+    { middleware: signIn({ trustLoopback: loopback.has(options.hostname) }) },
   ).pipe(
     Layer.provide(
       BunHttpServer.layer({
@@ -107,6 +203,10 @@ export const layer = (options: ServeOptions) =>
     Layer.merge(Sync.layer),
     Layer.provide([Go2rtc.layer, Attention.layer, Library.layer]),
     Layer.provide(Push.layer),
+    // One `Devices` for the routes and the sign-in check, so a code made by
+    // one is known to the other
+    Layer.provide(Devices.layer),
+    Layer.provide(Identity.layer(options)),
     // Last, so the routes and go2rtc share one connection to each source.
     Layer.provideMerge(Sources.layer),
   );

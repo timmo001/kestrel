@@ -28,8 +28,9 @@ import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
-import { call } from "./api.ts";
+import { call, onUnpaired } from "./api.ts";
 import { loadCameras } from "./cameras.ts";
+import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
 import {
   phBell,
@@ -42,6 +43,7 @@ import {
   phVideoCamera,
 } from "./icons.ts";
 import { livePage } from "./live.ts";
+import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import { find } from "./shared.ts";
@@ -98,11 +100,14 @@ const offline = find("gw-banner", "offline");
 
 const offlineMessage = document.querySelector("p.offline-message");
 
+/** Whether the server has said this browser isn't paired, which the Pair page sorts out. */
+let unpaired = false;
+
 /** The sources, or null when the server itself can't be reached. */
 const showConnection = async () => {
   const sources = await call((api) => api.sources.list()).catch(() => null);
 
-  if (offline !== null) offline.open = sources === null;
+  if (offline !== null) offline.open = sources === null && !unpaired;
 
   if (offlineMessage !== null && sources === null) {
     offlineMessage.textContent = "Can't reach the server. Trying again…";
@@ -196,6 +201,22 @@ const settings = settingsPage({ onSaved: reloadCameras });
 
 void settings.start();
 
+const devices = devicesPanel();
+
+void devices.start();
+
+// Pairing: once paired, the app starts again with the server's cookie, so
+// every page loads as a paired browser
+const pair = pairPage({ onPaired: () => location.assign(href("live")) });
+
+onUnpaired(() => {
+  unpaired = true;
+
+  if (offline !== null) offline.open = false;
+
+  if (currentPage !== "pair") navigate(href("pair"), { replace: true });
+});
+
 /** Today on the first source's clock where there's one, or the browser's. */
 let today = "";
 
@@ -221,6 +242,7 @@ const isPage = Schema.is(
     "events",
     "sources",
     "settings",
+    "pair",
     "notFound",
   ]),
 );
@@ -231,6 +253,7 @@ const pageTitles: Record<Page, string> = {
   events: "Events",
   sources: "Sources",
   settings: "Settings",
+  pair: "Pair this browser",
   notFound: "Page not found",
 };
 
@@ -245,6 +268,7 @@ const pageIcons: Record<Page, string> = {
   events: phBellRinging,
   sources: phHardDrives,
   settings: phGear,
+  pair: phGear,
   notFound: phVideoCamera,
 };
 
@@ -292,6 +316,8 @@ const showPage = (location: Location) => {
   if (page === "live") requestAnimationFrame(live.focus);
 
   if (page === "live" && cameras !== undefined) void live.show(cameras);
+
+  if (page === "pair") pair.open();
 };
 
 AtomRegistry.make().subscribe(currentLocation, showPage, { immediate: true });

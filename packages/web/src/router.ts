@@ -70,6 +70,8 @@ export const routes = {
   events: route("/events", NoParams, NoSearch),
   sources: route("/sources", NoParams, NoSearch),
   settings: route("/settings", NoParams, NoSearch),
+  /** Pairs this browser with the server, from a code typed in or in the address's `#code=`. */
+  pair: route("/pair", NoParams, NoSearch),
 } as const;
 
 // oxlint-disable-next-line typescript/no-explicit-any -- each route keeps its own param and search types

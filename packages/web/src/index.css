@@ -81,6 +81,25 @@ gw-page {
   gap: var(--gw-space-4);
 }
 
+/* A pairing link's QR code, black on white whatever the theme, so a phone's
+   camera reads it */
+.devices-qr {
+  width: 12rem;
+  padding: var(--gw-space-2);
+  background: #fff;
+  border-radius: var(--gw-radius-sm, 4px);
+}
+
+.devices-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.page[data-page="pair"] gw-card {
+  max-width: 32rem;
+}
+
 /* The cameras and their controls as one dark panel filling the window under
    the app bar, as the Recordings player does, at its full size from the
    first paint */

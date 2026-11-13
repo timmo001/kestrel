@@ -38,6 +38,16 @@ export const ownRecordingsFolder = Effect.gen(function* () {
   return path.join(yield* stateFolder, "recordings");
 });
 
+/**
+ * Where the owner token is kept: whoever can read it owns the server, such
+ * as `kestrel pair` and the desktop app on the same machine.
+ */
+export const ownerTokenFile = Effect.gen(function* () {
+  const path = yield* Path.Path;
+
+  return path.join(yield* stateFolder, "owner.token");
+});
+
 /** The folder for what the server keeps for itself, such as `~/.local/state/kestrel`. */
 export const stateFolder = Effect.gen(function* () {
   const path = yield* Path.Path;

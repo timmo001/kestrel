@@ -534,6 +534,55 @@
             heading="Recording"
             description="What the server records and how long recordings are kept"
           ></gw-expansion>
+          <!-- The devices paired with the server, and a code to pair another -->
+          <gw-expansion
+            class="settings-devices"
+            heading="Devices"
+            description="The browsers, phones and apps that can use this server"
+          >
+            <gw-stack gap="m">
+              <gw-row>
+                <gw-button
+                  class="devices-pair"
+                  appearance="outlined"
+                  variant="neutral"
+                  >Pair a device</gw-button
+                >
+              </gw-row>
+              <gw-alert class="devices-code" hidden></gw-alert>
+              <div class="devices-qr" hidden></div>
+              <gw-table class="devices-list"></gw-table>
+            </gw-stack>
+          </gw-expansion>
+        </section>
+
+        <!-- Pairing: a browser the server doesn't know yet lands here, with a
+             code typed in or carried in a link or QR code -->
+        <section class="page" data-page="pair" hidden>
+          <gw-page-header
+            heading="Pair this browser"
+            description="Kestrel only shows its cameras to devices paired with it."
+            level="2"
+          ></gw-page-header>
+          <gw-card>
+            <gw-stack gap="m">
+              <p>
+                Get a code from Settings, Devices, Pair a device on a browser
+                that's already paired, or run <code>kestrel pair</code> on the
+                server.
+              </p>
+              <gw-input
+                class="pair-code"
+                label="Pairing code"
+                placeholder="ABCD-EFGH"
+                autocomplete="one-time-code"
+              ></gw-input>
+              <gw-alert class="pair-error" tone="danger" hidden></gw-alert>
+              <gw-row>
+                <gw-button class="pair-submit">Pair</gw-button>
+              </gw-row>
+            </gw-stack>
+          </gw-card>
         </section>
 
         <!-- An address that isn't one of the pages -->

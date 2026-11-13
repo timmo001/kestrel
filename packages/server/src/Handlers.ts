@@ -14,11 +14,21 @@ import {
   type SourceInfo,
 } from "@timmo001/kestrel-core";
 import { toMp4 } from "@timmo001/kestrel-format-mp4";
-import { Effect, Layer, Stream } from "effect";
-import { HttpMiddleware, HttpServerResponse } from "effect/http";
-import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
-import { Api } from "./Api.ts";
+import { Effect, Layer, Option, Stream } from "effect";
+import {
+  HttpMiddleware,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/http";
+import {
+  HttpApiBuilder,
+  HttpApiSchema,
+  HttpApiSecurity,
+} from "effect/http-api";
+import { Api, connectPath, PairingRefused, sessionCookie } from "./Api.ts";
 import { Attention } from "./Attention.ts";
+import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
+import { Identity } from "./Identity.ts";
 import { streamNames, viewsOf } from "./go2rtc/Go2rtc.ts";
 import { Library } from "./Library.ts";
 import { capability, Sources } from "./Sources.ts";
@@ -277,7 +287,68 @@ const SystemHandlers = HttpApiBuilder.group(Api, "system", (handlers) =>
   ),
 );
 
-/** The API's routes, needing the `Sources` and `Attention`. */
+/** The cookie a paired browser signs in with, for setting it. */
+const sessionSecurity = HttpApiSecurity.apiKey({
+  key: sessionCookie,
+  in: "cookie",
+});
+
+const DevicesHandlers = HttpApiBuilder.group(
+  Api,
+  "devices",
+  Effect.fn(function* (handlers) {
+    const devices = yield* Devices;
+    const identity = yield* Identity;
+    const server = { id: identity.id, name: identity.name };
+
+    return handlers
+      .handle("server", () => Effect.succeed(server))
+      .handle("pair", ({ payload }) =>
+        Effect.gen(function* () {
+          const { device, token } = yield* devices.pair(payload);
+
+          if (payload.kind !== "browser") return { device, server, token };
+
+          // A browser gets a cookie it can't read, rather than the token
+          const request = yield* HttpServerRequest.HttpServerRequest;
+
+          yield* HttpApiBuilder.securitySetCookie(
+            sessionSecurity,
+            token,
+            cookieOptions(request),
+          );
+
+          return { device, server };
+        }),
+      )
+      .handle("code", () => devices.code)
+      .handle("link", () =>
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const token = tokenOf(request);
+
+          const signedIn =
+            token === undefined
+              ? Option.none()
+              : yield* devices.authenticate(token);
+
+          if (Option.isNone(signedIn)) {
+            return yield* new PairingRefused({
+              message: "Only a paired device can sign a window in",
+            });
+          }
+
+          return {
+            path: `${connectPath}${yield* devices.link(signedIn.value)}`,
+          };
+        }),
+      )
+      .handle("list", () => devices.list)
+      .handle("revoke", ({ params }) => devices.revoke(params.id));
+  }),
+);
+
+/** The API's routes, needing the `Sources`, `Attention`, `Devices` and `Identity`. */
 export const routes = HttpApiBuilder.layer(Api, {
   openapiPath: "/api/openapi.json",
 }).pipe(
@@ -288,5 +359,6 @@ export const routes = HttpApiBuilder.layer(Api, {
     RecordingsHandlers,
     EventsHandlers,
     SystemHandlers,
+    DevicesHandlers,
   ]),
 );

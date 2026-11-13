@@ -1,12 +1,20 @@
 /**
  * The server's API from the page: a typed client over the same origin, and
- * the live events as server-sent events.
+ * the live events as server-sent events. A call the server refuses because
+ * this browser isn't paired tells `onUnpaired`.
  */
 import { CameraEvent } from "@timmo001/kestrel-core";
 import { Api } from "@timmo001/kestrel-server/api";
 import { Effect, Schema } from "effect";
-import { FetchHttpClient } from "effect/http";
+import { FetchHttpClient, HttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
+
+let whenUnpaired = () => {};
+
+/** Runs `listener` when the server says this browser isn't paired, such as after it's removed. */
+export const onUnpaired = (listener: () => void) => {
+  whenUnpaired = listener;
+};
 
 /**
  * An address on the server, under the path the page is served from: the
@@ -18,7 +26,14 @@ export const serverUrl = (path: string) => new URL(path, document.baseURI);
 // Made on each call rather than when the module loads, so modules that only
 // need `serverUrl` load without a page, such as in tests
 const client = Effect.suspend(() =>
-  HttpApiClient.make(Api, { baseUrl: serverUrl("./") }),
+  HttpApiClient.make(Api, {
+    baseUrl: serverUrl("./"),
+    transformClient: HttpClient.tap((response) =>
+      Effect.sync(() => {
+        if (response.status === 401) whenUnpaired();
+      }),
+    ),
+  }),
 ).pipe(Effect.provide(FetchHttpClient.layer));
 
 type Client = Effect.Success<typeof client>;
