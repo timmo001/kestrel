@@ -1,9 +1,10 @@
 /**
  * Copies the mise-pinned go2rtc into `vendor/`, which the build puts in the
  * app, so the app has its own where mise isn't on the path, such as at login.
+ * It's `go2rtc.exe` on Windows.
  */
 import { chmod, copyFile, mkdir } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 const which = Bun.spawnSync(["mise", "which", "go2rtc"], {
   cwd: import.meta.dir,
@@ -17,7 +18,7 @@ if (!which.success || source === "") {
 }
 
 const vendor = join(import.meta.dir, "..", "vendor");
-const target = join(vendor, "go2rtc");
+const target = join(vendor, basename(source));
 
 await mkdir(vendor, { recursive: true });
 

@@ -32,7 +32,11 @@ const resources = join(import.meta.dir, "..");
 
 // The go2rtc built into the app, so it runs where mise isn't on the path,
 // such as at login
-process.env.KESTREL_GO2RTC ??= join(resources, "go2rtc", "go2rtc");
+process.env.KESTREL_GO2RTC ??= join(
+  resources,
+  "go2rtc",
+  process.platform === "win32" ? "go2rtc.exe" : "go2rtc",
+);
 
 // The recorder login `mise run auth:save` keeps, for a source in
 // sources.json that leaves it out, as `serve:server` loads it

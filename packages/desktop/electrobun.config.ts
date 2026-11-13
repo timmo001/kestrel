@@ -5,6 +5,8 @@
  */
 import type { ElectrobunConfig } from "electrobun";
 
+const go2rtc = process.platform === "win32" ? "go2rtc.exe" : "go2rtc";
+
 export default {
   app: {
     name: "Kestrel",
@@ -32,7 +34,7 @@ export default {
     copy: {
       "../web/dist": "web",
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
-      "vendor/go2rtc": "go2rtc/go2rtc",
+      [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
     },
     mac: {
       bundleCEF: false,
