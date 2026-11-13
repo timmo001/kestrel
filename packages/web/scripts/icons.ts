@@ -47,6 +47,7 @@ const names = [
   "speaker-high",
   "speaker-low",
   "speaker-slash",
+  "squares-four",
   "stop",
   "x",
 ];
