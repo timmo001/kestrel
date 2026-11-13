@@ -230,7 +230,7 @@ jobs:
 
       # Verify with: gh attestation verify <file> -R timmo001/kestrel
       - name: Attest the release files
-        uses: timmo001/workflows/.github/actions/attest-release-assets@ec70016a91999259142a156104978174490a0831 # 20261110.0
+        uses: timmo001/workflows/.github/actions/attest-release-assets@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
         with:
           # One file each, as the action needs
           subject-patterns: |
@@ -269,7 +269,7 @@ jobs:
           ref: ${{ env.RELEASE_VERSION }}
 
       - name: Render PKGBUILD
-        uses: timmo001/workflows/.github/actions/prepare-arch-bin@ec70016a91999259142a156104978174490a0831 # 20261110.0
+        uses: timmo001/workflows/.github/actions/prepare-arch-bin@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
         with:
           releaseVersion: ${{ env.RELEASE_VERSION }}
           packageName: kestrel-nvr
@@ -296,7 +296,7 @@ jobs:
   arch-bin:
     name: Arch package (kestrel-nvr-bin)
     needs: prepare-arch-bin
-    uses: timmo001/workflows/.github/workflows/build-arch-package.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/build-arch-package.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       package-name: kestrel-nvr-bin
       package-files-artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
@@ -311,7 +311,7 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    uses: timmo001/workflows/.github/workflows/attach-release-arch-package.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/attach-release-arch-package.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       artifact-name: ${{ needs.arch-bin.outputs.artifact-name }}
       release-tag: ${{ github.event.release.tag_name }}
@@ -322,7 +322,7 @@ jobs:
     needs: prepare-arch-bin
     permissions:
       contents: read
-    uses: timmo001/workflows/.github/workflows/publish-aur.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/publish-aur.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       package-name: kestrel-nvr-bin
       artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
@@ -345,7 +345,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: timmo001/workflows/.github/workflows/build-container-image.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       image: ghcr.io/timmo001/kestrel
       version: ${{ github.event.release.tag_name }}
@@ -359,7 +359,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: timmo001/workflows/.github/workflows/build-container-image.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       image: ghcr.io/timmo001/kestrel-app
       version: ${{ github.event.release.tag_name }}
@@ -413,7 +413,7 @@ jobs:
   home-assistant-apps:
     name: Home Assistant apps repository
     needs: image-app
-    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@9bb6ae3c2a1542cec4195b63f9516c83001e578e # 20261113.0
     with:
       repository: timmo001/home-assistant-apps
     secrets:
