@@ -16,8 +16,8 @@ and work that depends on one waits for it.
 
 ## Repository
 
-- It's private for now, but write as if it were public: no credentials, home
-  paths, host names or addresses from anyone's network.
+- It's public: no credentials, home paths, host names or addresses from
+  anyone's network.
 - Recorder credentials are never printed, logged or passed on a command line.
 - Each part is a private Bun workspace package under `packages/<name>/`:
   `core` holds what every source shares (ids, shapes, errors and the
@@ -72,7 +72,8 @@ and work that depends on one waits for it.
 ## Checks and rollout
 
 - `mise run check` runs lint, types and formatting; `mise run test` runs the
-  tests. CI is off while the repository is private, so run both before a
-  push. The hk pre-push hook runs the shared lints and `mise run lint`.
+  tests. Run both before a push; CI runs them again, with the shared lints,
+  and the Desktop workflow builds the app on Linux and Windows. The hk
+  pre-push hook runs the shared lints and `mise run lint`.
 - Once checks pass, commit through `dot git commit` and push. Tick the step or
   issue off with a link to the commit.

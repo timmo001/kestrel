@@ -1,0 +1,78 @@
+---
+# Builds the desktop app on Linux and Windows, and keeps each one's installer
+# as an artifact. Electrobun only builds for the system it runs on.
+name: Desktop
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/desktop.yml
+      - bun.lock
+      - mise.lock
+      - mise.toml
+      - packages/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/desktop.yml
+      - bun.lock
+      - mise.lock
+      - mise.toml
+      - packages/**
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the web client
+        run: bun run --filter @timmo001/kestrel-web build
+
+      - name: Build
+        working-directory: packages/desktop
+        run: bun run package
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kestrel-desktop-${{ runner.os }}
+          path: packages/desktop/artifacts/
+          if-no-files-found: error

@@ -1,7 +1,6 @@
 // Pre-push checks: the shared base from timmo001/workflows, plus every
 // package's lint. Types and tests are left to `mise run check` and `mise run
-// test`, since CI stays off while the repository is private. Run the hook's
-// steps by hand with `hk check --all`.
+// test`, which CI runs too. Run the hook's steps by hand with `hk check --all`.
 amends "package://github.com/timmo001/workflows/releases/download/20261108.2/hk-base@20261108.2.0#/base.pkl"
 
 // Shared skills are synced copies owned by the skills repository. .mise/locks
