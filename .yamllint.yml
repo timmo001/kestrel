@@ -6,7 +6,6 @@ ignore: |
   dist/
   .mise/
   .agents/skills/
-  .scripts/linux/flatpak/shared-modules/
 
 rules:
   document-start:

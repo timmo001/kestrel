@@ -181,50 +181,10 @@ jobs:
           path: linux-packages/
           if-no-files-found: error
 
-  # The Flatpak bundle, from the x86_64 build. It builds ffmpeg and the tray
-  # library itself, so it only runs for a release or when started by hand.
-  flatpak:
-    name: Flatpak
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-          submodules: true
-
-      - name: Install flatpak-builder
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-
-      - name: Download the x86_64 build
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: kestrel-desktop-Linux-X64
-          path: artifacts/kestrel-desktop-Linux-X64
-
-      - name: Build the Flatpak
-        run: |
-          version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
-          packages/desktop/scripts/release-archives.sh artifacts "$version" archives
-          .scripts/linux/flatpak/build.sh "archives/kestrel-nvr-$version-linux-x86_64.tar.gz" "$version" flatpak
-
-      - name: Upload the Flatpak
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
-        with:
-          name: kestrel-flatpak
-          path: flatpak/
-          if-no-files-found: error
-
   release:
     name: Attach to the release
     if: github.event_name == 'release'
-    needs:
-      - build
-      - flatpak
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -242,11 +202,11 @@ jobs:
           path: artifacts
           pattern: kestrel-desktop-*
 
-      - name: Download Linux packages and the Flatpak
+      - name: Download Linux packages
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: release
-          pattern: "{kestrel-packages-*,kestrel-flatpak}"
+          pattern: kestrel-packages-*
           merge-multiple: true
 
       # The kestrel-nvr archives are what mise, aqua, Arch and the container
@@ -277,7 +237,6 @@ jobs:
             release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
             release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-aarch64.tar.gz
             release/kestrel-nvr-${{ github.event.release.tag_name }}-windows-x86_64.zip
-            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-x86_64.flatpak
             release/kestrel-nvr_${{ github.event.release.tag_name }}-1_amd64.deb
             release/kestrel-nvr_${{ github.event.release.tag_name }}-1_arm64.deb
             release/kestrel-nvr-${{ github.event.release.tag_name }}-1.x86_64.rpm

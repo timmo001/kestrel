@@ -1,6 +1,6 @@
 ---
 title: Install
-description: Install Kestrel from the timmo pacman repository or the AUR, as a Home Assistant app or container, as a .deb, .rpm or Flatpak, with mise, or from a release.
+description: Install Kestrel from the timmo pacman repository or the AUR, as a Home Assistant app or container, as a .deb or .rpm, with mise, or from a release.
 ---
 
 Kestrel is one package, `kestrel-nvr`, for Linux on x86_64 and aarch64 and
@@ -13,8 +13,8 @@ Only released versions are packaged, and a client only works with a server
 of the same version, so update every device together. Each one says which
 side is older and how to update it when they differ.
 
-Recording needs `ffmpeg`. The packages recommend it, and the container, the
-Home Assistant app and the Flatpak bring their own.
+Recording needs `ffmpeg`. The packages recommend it, and the container and
+the Home Assistant app bring their own.
 
 ## Arch Linux
 
@@ -71,19 +71,6 @@ sudo dnf install ./kestrel-nvr-<version>-1.x86_64.rpm
 
 On Debian and Ubuntu, `--no-install-recommends` leaves out the desktop
 app's libraries and `ffmpeg`, for a box that only runs `kestrel serve`.
-
-## Flatpak
-
-Each release has a Flatpak bundle of the desktop app for x86_64, with
-`ffmpeg` built in:
-
-```sh
-flatpak install --user ./kestrel-nvr-<version>-linux-x86_64.flatpak
-flatpak run dev.timmo.kestrel
-```
-
-It runs in Flatpak's sandbox, so Start at login is left out; start it from
-your desktop's own autostart settings instead.
 
 ## Windows
 

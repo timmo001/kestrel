@@ -306,7 +306,7 @@ front. The Windows build hasn't been tried on a real machine yet.
 
 Tick Start at login in the tray to start it in the tray when you log in. It
 adds `~/.config/autostart/dev.timmo.kestrel.desktop`; untick it to remove
-that again. It's Linux only, and left out of the Flatpak. With mise, Start
+that again. It's Linux only. With mise, Start
 at login points at that version, so tick it again after upgrading.
 
 While the app runs its own server, stop the background one with `mise run
