@@ -56,5 +56,5 @@ if [ "$1" = "serve" ]; then
 fi
 
 # Settings come from the config folder and the environment, never from a .env
-# file wherever kestrel happens to be run
-exec "$bundle/bin/bun" --no-env-file "$app/cli/kestrel.js" "$@"
+# or bunfig.toml wherever kestrel happens to be run
+exec "$bundle/bin/bun" --no-env-file --config="$app/cli/bunfig.toml" "$app/cli/kestrel.js" "$@"

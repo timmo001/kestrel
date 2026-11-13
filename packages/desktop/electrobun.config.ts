@@ -45,6 +45,7 @@ export default {
       "vendor/kestrel.js": "cli/kestrel.js",
       "scripts/kestrel": "kestrel",
       "scripts/kestrel.cmd": "kestrel.cmd",
+      "scripts/bunfig.toml": "cli/bunfig.toml",
     },
     mac: {
       bundleCEF: false,

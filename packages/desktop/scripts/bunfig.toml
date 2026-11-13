@@ -1,0 +1,3 @@
+# Bun settings for the kestrel command, passed with --config, so Bun never
+# reads a bunfig.toml from the folder kestrel is run in, which could preload
+# code. Nothing to set.

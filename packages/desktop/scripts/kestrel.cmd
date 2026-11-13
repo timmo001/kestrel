@@ -17,6 +17,6 @@ if /i "%~1"=="serve" (
 )
 
 rem Settings come from the config folder and the environment, never from a
-rem .env file wherever kestrel happens to be run
-"%bundle%\bin\bun.exe" --no-env-file "%app%cli\kestrel.js" %*
+rem .env or bunfig.toml wherever kestrel happens to be run
+"%bundle%\bin\bun.exe" --no-env-file --config="%app%cli\bunfig.toml" "%app%cli\kestrel.js" %*
 exit /b %errorlevel%
