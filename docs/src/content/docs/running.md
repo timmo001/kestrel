@@ -171,8 +171,14 @@ window, so Kestrel keeps running without Pitchfork or a terminal. It
 listens on `127.0.0.1:7380` like `serve:server`, with go2rtc built in, and
 takes its sources from `sources.json`. For a recorder that leaves its
 address and login out there, it reads the file `mise run auth:save` keeps;
-it doesn't read `.env.local`, since that needs 1Password. Linux only for
-now.
+it doesn't read `.env.local`, since that needs 1Password.
+
+Each [release](https://github.com/timmo001/kestrel/releases) has it for
+Linux and Windows (x64): unpack the Setup file and run the installer in it.
+Neither is signed, so Windows asks before running it. Recording needs
+`ffmpeg` on the path, or `KESTREL_FFMPEG`; the app doesn't bring its own.
+The Windows build hasn't been tried on a real machine yet, and Start at
+login is Linux only.
 
 Closing the window leaves it running in the tray. The tray menu opens the
 window again, shows whether the server is running, how many sources are

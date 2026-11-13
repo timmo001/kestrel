@@ -51,9 +51,10 @@ mise run serve:server
 Open <https://server.kestrel.localhost>. The docs in [`docs/`](docs) cover
 the settings, the API and the protocol.
 
-To keep it running without a terminal, `mise run desktop:install` installs
-the desktop app, which runs the server itself and stays in the tray (Linux
-only for now).
+To keep it running without a terminal, install the desktop app, which runs
+the server itself and stays in the tray: download it for Linux or Windows
+from the [releases](https://github.com/timmo001/kestrel/releases), or build
+and install it here with `mise run desktop:install`.
 
 The server has no login and listens on `127.0.0.1` by default, so only open it
 up to a network where everyone who can reach it should see your cameras. A
