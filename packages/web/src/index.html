@@ -78,6 +78,24 @@
                   label="Cameras at once"
                   value="all"
                 ></gw-segmented>
+                <!-- The picked camera's sound, where any camera has it: on
+                     or off, and how loud -->
+                <span
+                  class="controls-divider live-sound-divider"
+                  aria-hidden="true"
+                  hidden
+                ></span>
+                <gw-button class="live-sound" label="Unmute" hidden></gw-button>
+                <gw-range
+                  class="live-volume"
+                  label="Volume"
+                  label-hidden
+                  unit="%"
+                  step="5"
+                  readout
+                  value="100"
+                  hidden
+                ></gw-range>
               </gw-row>
               <gw-row
                 class="controls-transport"
@@ -178,6 +196,12 @@
                     <dd>
                       Swap the picked camera's two views, such as its wide and
                       telephoto lenses, as a click on the small one does
+                    </dd>
+                    <dt><kbd>U</kbd></dt>
+                    <dd>
+                      Sound on or off for the picked camera, where it has a
+                      microphone. Each camera keeps its own, with its volume,
+                      and only the picked one plays
                     </dd>
                     <dt><kbd>F</kbd></dt>
                     <dd>Full screen</dd>

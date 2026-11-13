@@ -42,6 +42,9 @@ const names = [
   "scissors",
   "skip-back",
   "skip-forward",
+  "speaker-high",
+  "speaker-low",
+  "speaker-slash",
   "stop",
 ];
 

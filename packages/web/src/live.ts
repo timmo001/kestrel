@@ -7,12 +7,12 @@
  * on to the next page past the edge. A camera that moves is steered in Move
  * mode, and one with a second view, such as a telephoto lens, plays both,
  * the other small in a corner, and swaps them without reloading either. The
- * layout, page, picked camera, each
- * camera's view and zoom and how many cameras there were are kept in this
- * browser, so the placeholders take the cameras' places before they're
- * known. A camera whose source can't be reached says why over its tile.
- * The players only run while the page shows, so a hidden page
- * streams nothing.
+ * picked camera's sound plays where it has a microphone and its sound is on,
+ * each camera with its own volume. The layout, page, picked camera, each
+ * camera's view, zoom and sound and how many cameras there were are kept in
+ * this browser, so the placeholders take the cameras' places before they're
+ * known. A camera whose source can't be reached says why over its tile. The
+ * players only run while the page shows, so a hidden page streams nothing.
  */
 import type { Camera, CameraView, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
@@ -33,6 +33,9 @@ import {
   phPause,
   phPlay,
   phQuestion,
+  phSpeakerHigh,
+  phSpeakerLow,
+  phSpeakerSlash,
 } from "./icons.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
@@ -83,14 +86,19 @@ const definePlayer = async (path: string) => {
   }
 };
 
+/** Whether a camera, or one of its views, carries its sound. */
+const hasSound = (camera: Camera) =>
+  camera.live?.sound === true || camera.views.some((view) => view.live.sound);
+
 /** A player for one of a camera's views, or its only one. */
-const livePlayer = (view: CameraView | undefined) => {
+const livePlayer = (camera: Camera, view: CameraView | undefined) => {
   const player = document.createElement("dvr-live");
 
   player.mode = "mse,hls";
-  // Video only: the recorder offers an audio track but sends nothing on it,
-  // and a player waiting for that audio never starts
-  player.media = "video";
+  // Sound only where the camera sends it: the recorder offers a sound track
+  // but sends nothing on it, and a player waiting for that never starts
+  player.media =
+    (view?.live ?? camera.live)?.sound === true ? "video,audio" : "video";
 
   if (view !== undefined) player.dataset["view"] = view.key;
 
@@ -199,6 +207,23 @@ const decodeKeptLenses = Schema.decodeUnknownOption(
   Schema.Record(Schema.String, Schema.String),
 );
 
+/** Each camera's sound, by its id: whether it's on and how loud, from 0 to 100. */
+const KeptSounds = Schema.Record(
+  Schema.String,
+  Schema.Struct({
+    on: Schema.Boolean,
+    volume: Schema.Number.check(
+      Schema.isGreaterThanOrEqualTo(0),
+      Schema.isLessThanOrEqualTo(100),
+    ),
+  }),
+);
+
+const decodeKeptSounds = Schema.decodeUnknownOption(KeptSounds);
+
+/** A camera's sound until it's changed: off, at full volume. */
+const quiet = { on: false, volume: 100 };
+
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {
   const values = keptAt(storageKey);
@@ -226,6 +251,8 @@ const kept = () => {
     ),
     /** Each camera's view picked, for a camera with more than one. */
     lenses: Option.getOrElse(decodeKeptLenses(values?.["lenses"]), () => ({})),
+    /** Each camera's sound, for a camera with a microphone. */
+    sounds: Option.getOrElse(decodeKeptSounds(values?.["sounds"]), () => ({})),
   };
 };
 
@@ -283,6 +310,9 @@ export const livePage = (): LivePage => {
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const moveButton = find("gw-button", "live-move");
+  const soundButton = find("gw-button", "live-sound");
+  const soundDivider = find("span", "live-sound-divider");
+  const volumeRange = find("gw-range", "live-volume");
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");
   const shortcutsPopover = find("gw-popover", "live-shortcuts");
@@ -302,6 +332,17 @@ export const livePage = (): LivePage => {
   let problems: ReadonlyMap<Camera["source"], string> = new Map();
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
+
+  /** Each camera's sound, by camera id, kept from last time. */
+  const sounds = new Map<string, { on: boolean; volume: number }>(
+    Object.entries(saved.sounds),
+  );
+
+  /**
+   * Whether the browser held the sound back, as it does until the page has
+   * had a click or a key; the next one lets it play.
+   */
+  let soundHeld = false;
 
   /** Set below: shows each picture at its zoom, and the controls to match. */
   let showZoom: () => void = () => undefined;
@@ -456,6 +497,7 @@ export const livePage = (): LivePage => {
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
   setIcon(moveButton, phJoystick, "Move the camera (M)");
+  setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
   setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   previousButton?.setAttribute("aria-keyshortcuts", "PageUp");
@@ -466,6 +508,7 @@ export const livePage = (): LivePage => {
   captureButton?.setAttribute("aria-keyshortcuts", "s");
   moveButton?.setAttribute("aria-keyshortcuts", "m");
   moveButton?.toggleAttribute("toggle", true);
+  soundButton?.setAttribute("aria-keyshortcuts", "u");
   helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
@@ -497,6 +540,102 @@ export const livePage = (): LivePage => {
     moveButton.pressed = steer.on();
   };
 
+  /** The picked camera's tile, for a camera with sound. */
+  const soundTile = () =>
+    tiles.find((tile) => tile.stream.id === picked && hasSound(tile.stream));
+
+  /** A camera's sound, as kept, or off at full volume, its volume in the slider's 5% steps. */
+  const soundOf = (camera: Camera) => {
+    const sound = sounds.get(camera.id) ?? quiet;
+
+    return { ...sound, volume: Math.round(sound.volume / 5) * 5 };
+  };
+
+  const setSound = (camera: Camera, sound: { on: boolean; volume: number }) => {
+    sounds.set(camera.id, sound);
+    keep(storageKey, { sounds: Object.fromEntries(sounds) });
+    showSound();
+  };
+
+  /**
+   * Plays the picked camera's sound alone, where it's on, from the view it
+   * shows big, at its own volume, and keeps every other player quiet. Sound
+   * and its volume show where any camera has sound.
+   */
+  const showSound = () => {
+    const tile = soundTile();
+    const sound = tile === undefined ? quiet : soundOf(tile.stream);
+    const heard = sound.on && !soundHeld ? tile : undefined;
+
+    for (const each of tiles) {
+      for (const player of [each.player, each.inset]) {
+        const video = player?.querySelector("video") ?? null;
+
+        if (video === null) continue;
+
+        video.volume = soundOf(each.stream).volume / 100;
+        video.muted = each !== heard || player !== each.player;
+      }
+    }
+
+    const any = streams.some(hasSound);
+
+    // The icon shows whether it's on, so the button stays plain, named for
+    // what a press does
+    setIcon(
+      soundButton,
+      !sound.on || sound.volume === 0
+        ? phSpeakerSlash
+        : sound.volume < 50
+          ? phSpeakerLow
+          : phSpeakerHigh,
+      sound.on ? "Mute (U)" : "Unmute (U)",
+    );
+
+    if (soundDivider !== null) soundDivider.hidden = !any;
+
+    if (soundButton !== null) {
+      soundButton.hidden = !any;
+      soundButton.disabled = tile === undefined;
+    }
+
+    if (volumeRange !== null) {
+      volumeRange.hidden = !any;
+      volumeRange.disabled = tile === undefined;
+      volumeRange.value = sound.volume;
+    }
+  };
+
+  const toggleSound = () => {
+    const tile = soundTile();
+
+    if (tile === undefined) return;
+
+    const sound = soundOf(tile.stream);
+
+    // Sound that's on but held back by the browser plays, rather than going off
+    if (soundHeld && sound.on) {
+      soundHeld = false;
+      showSound();
+
+      return;
+    }
+
+    setSound(tile.stream, { ...sound, on: !sound.on });
+  };
+
+  // Sound held back until the page had a click or a key plays after the
+  // next, once the Sound button has seen it
+  const release = () => {
+    if (!soundHeld) return;
+
+    soundHeld = false;
+    showSound();
+  };
+
+  document.addEventListener("click", release);
+  document.addEventListener("keyup", release);
+
   const steer = steering({
     area: grid,
     picked: steerTile,
@@ -512,6 +651,21 @@ export const livePage = (): LivePage => {
   };
 
   moveButton?.addEventListener("click", toggleMove);
+  soundButton?.addEventListener("click", toggleSound);
+
+  // Turning it up plays the sound, as it would on a speaker
+  volumeRange?.addEventListener("input", () => {
+    const tile = soundTile();
+
+    if (tile === undefined) return;
+
+    const volume = volumeRange.value;
+
+    setSound(tile.stream, {
+      on: volume > 0 || soundOf(tile.stream).on,
+      volume,
+    });
+  });
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
@@ -581,6 +735,7 @@ export const livePage = (): LivePage => {
     steer.show();
     showMove();
     showZoom();
+    showSound();
   };
 
   /** Picks a camera on the page, which the zoom keys and buttons act on. */
@@ -807,11 +962,12 @@ export const livePage = (): LivePage => {
           (view) => view.key !== shownView?.key,
         );
 
-        const player = stream.live === null ? null : livePlayer(shownView);
+        const player =
+          stream.live === null ? null : livePlayer(stream, shownView);
 
         const inset =
           player !== null && otherView !== undefined
-            ? livePlayer(otherView)
+            ? livePlayer(stream, otherView)
             : null;
 
         const picture = player === null ? element("img") : null;
@@ -891,12 +1047,31 @@ export const livePage = (): LivePage => {
     }
 
     // On the page each player makes its video: the page's controls stand in
-    // for the video's own
+    // for the video's own, and it starts quiet until its sound is picked
     for (const tile of tiles) {
       for (const player of [tile.player, tile.inset]) {
         const video = player?.querySelector("video") ?? null;
 
-        if (video !== null) video.controls = false;
+        if (video === null) continue;
+
+        video.controls = false;
+        video.muted = true;
+
+        // The browser mutes sound that started without a click or a key, so
+        // it's held back until the next one, still on for that camera
+        video.addEventListener("volumechange", () => {
+          const shown = soundTile();
+
+          if (
+            video.muted &&
+            !soundHeld &&
+            shown?.player === player &&
+            soundOf(shown.stream).on
+          ) {
+            soundHeld = true;
+            showSound();
+          }
+        });
       }
 
       if (!paused) connect(tile);
@@ -1232,6 +1407,7 @@ export const livePage = (): LivePage => {
     ["0", zoom.whole],
     ["s", capture],
     ["m", toggleMove],
+    ["u", toggleSound],
     ["l", nextLens],
     ["z", zoom.toggleFill],
     ["f", () => fullscreenButton?.click()],

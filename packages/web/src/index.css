@@ -869,6 +869,17 @@ kbd {
   background: var(--gw-color-border-normal);
 }
 
+/* The track, then its value close after it */
+.live-volume .gw-range-control {
+  flex: none;
+  width: 6rem;
+}
+
+.live-volume .gw-range-readout {
+  min-width: 4ch;
+  text-align: start;
+}
+
 .player-clock {
   padding-inline: var(--gw-space-2);
   color: var(--gw-color-text-strong);
