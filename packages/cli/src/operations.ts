@@ -112,6 +112,18 @@ export const operations: ReadonlyArray<Operation> = [
     access: "read",
   },
   {
+    name: "jobs",
+    description:
+      "What the server does by itself, such as copying recordings from sources, recording each camera and clearing out old recordings: each job's state, progress, last run and last error, with the recordings copied lately",
+    access: "read",
+  },
+  {
+    name: "usage",
+    description:
+      "The server's memory and CPU, with go2rtc and ffmpeg, against the limits background work keeps to, the machine's memory and load, the recordings' disk use by camera, and whether background work is waiting and why",
+    access: "read",
+  },
+  {
     name: "servers",
     description: "The Kestrel servers on this network, found over mDNS",
     access: "read",

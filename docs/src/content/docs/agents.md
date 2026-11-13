@@ -19,6 +19,8 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel events`                                       | The newest events                                           |
 | `kestrel devices`                                      | The devices paired with the server                          |
 | `kestrel devices remove <id>`                          | Unpairs a device                                            |
+| `kestrel jobs`                                         | What the server does by itself, and how each is getting on  |
+| `kestrel usage`                                        | The server's memory, CPU and disk use against its limits    |
 | `kestrel pair`                                         | A one-time code and QR code for another device              |
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
 | `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |

@@ -3,8 +3,9 @@
  * The `kestrel` CLI: the cameras' status, recordings and events from the
  * server, with `--json` for scripts and agents, `agent tools --json` for
  * Code Mode and `mcp` to serve the same operations over MCP. `pair` pairs
- * it with a server, or shows a code for another device, and `devices`
- * lists or removes the paired ones.
+ * it with a server, or shows a code for another device, `devices`
+ * lists or removes the paired ones, and `jobs` and `usage` say what the
+ * server does by itself and how much of the machine it uses.
  *
  * @module
  */
@@ -27,8 +28,10 @@ import {
 } from "@timmo001/kestrel-core";
 import type {
   Device,
+  Job,
   PairingCode,
   ServerInfo,
+  UsageReport,
 } from "@timmo001/kestrel-server/api";
 import { browse, type FoundServer } from "@timmo001/kestrel-core/discovery";
 import { hostname } from "node:os";
@@ -89,6 +92,8 @@ type Output =
   | { readonly days: ReadonlyArray<RecordedDay> }
   | { readonly events: ReadonlyArray<CameraEvent> }
   | { readonly devices: ReadonlyArray<Device> }
+  | { readonly jobs: ReadonlyArray<Job> }
+  | UsageReport
   | { readonly pairing: PairingCode }
   | { readonly servers: ReadonlyArray<FoundServer> }
   | {
@@ -702,6 +707,126 @@ const devices = devicesList.pipe(
   Command.withSubcommands([devicesRemove]),
 );
 
+const megabyte = 1024 * 1024;
+
+/** Bytes in MB, or GB from a gigabyte. */
+const bytesText = (bytes: number) =>
+  bytes >= 1024 * megabyte
+    ? `${(bytes / (1024 * megabyte)).toFixed(1)} GB`
+    : `${Math.round(bytes / megabyte)} MB`;
+
+/** An ISO time as `2026-11-13 19:20`. */
+const shortTime = (iso: string) => iso.replace("T", " ").slice(0, 16);
+
+const jobs = Command.make(
+  "jobs",
+  { json },
+  Effect.fn("jobs")(function* ({ json }) {
+    const list = yield* (yield* ServerClient).call((api) =>
+      api.activity.jobs(),
+    );
+
+    if (json) return yield* printJson({ jobs: list });
+
+    for (const job of list) {
+      yield* Console.log(
+        `${job.id}  ${job.state}  ${job.detail}  since ${shortTime(job.since)}`,
+      );
+
+      if (job.progress !== undefined) {
+        yield* Console.log(
+          `  ${job.progress.done} of ${job.progress.total} copied this pass, ${bytesText(job.progress.bytes)}`,
+        );
+      }
+
+      for (const source of job.sources ?? []) {
+        yield* Console.log(
+          `  ${source.source}  ${source.copied} copied, ${source.left} left, ${bytesText(source.bytes)}`,
+        );
+      }
+
+      if (job.lastRun !== undefined) {
+        yield* Console.log(
+          `  last run ${shortTime(job.lastRun.at)}: ${job.lastRun.summary}`,
+        );
+      }
+
+      if (job.lastError !== undefined) {
+        yield* Console.log(
+          `  last error ${shortTime(job.lastError.at)}: ${job.lastError.message}`,
+        );
+      }
+    }
+
+    const recent = list.flatMap((job) => job.recent ?? []);
+
+    if (recent.length > 0) yield* Console.log("\nCopied lately");
+
+    for (const each of recent) {
+      yield* Console.log(
+        `  ${each.camera}  ${each.begin.replace("T", " ")}  ${bytesText(each.bytes)}  at ${shortTime(each.at)}`,
+      );
+    }
+  }),
+).pipe(
+  Command.withDescription(
+    "What the server does by itself, such as copying from sources, recording and clearing out, and how each is getting on",
+  ),
+);
+
+const usage = Command.make(
+  "usage",
+  { json },
+  Effect.fn("usage")(function* ({ json }) {
+    const report = yield* (yield* ServerClient).call((api) =>
+      api.activity.usage(),
+    );
+
+    if (json) return yield* printJson(report);
+
+    const { now, limits, disk } = report;
+    const cores = Math.max(now.cores, 1);
+
+    yield* Console.log(
+      report.holdUp === undefined
+        ? `Background work can run, copying up to ${limits.copyRate} MB a second`
+        : `Background work is waiting: ${report.holdUp}`,
+    );
+    yield* Console.log(
+      `Server  ${bytesText(now.kestrelMemory)} of ${limits.memoryLimit} MB memory, ${Math.round(now.kestrelCpu / cores)}% of ${limits.cpuShare}% CPU`,
+    );
+
+    for (const each of report.processes) {
+      yield* Console.log(
+        `  ${each.name}  ${bytesText(each.memory)}, ${Math.round(each.cpu)}% of a core`,
+      );
+    }
+
+    yield* Console.log(
+      `Machine  ${bytesText(now.memoryFree)} of ${bytesText(now.memory)} memory free (keeps ${limits.memoryFree}%), ${bytesText(now.swapUsed)} swap, load ${now.load.toFixed(2)} on ${now.cores} cores`,
+    );
+    yield* Console.log(
+      `  waiting on memory ${now.memoryPressure.toFixed(1)}%, on disks ${now.diskPressure.toFixed(1)}% of the time`,
+    );
+
+    if (disk === undefined) return;
+
+    yield* Console.log(
+      `Recordings  ${bytesText(disk.recordings)}, ${bytesText(disk.free)} free of ${bytesText(disk.total)}`,
+    );
+
+    for (const camera of disk.cameras) {
+      yield* Console.log(
+        `  ${camera.camera}  ${camera.files} ${camera.files === 1 ? "file" : "files"}, ${bytesText(camera.bytes)}`,
+      );
+    }
+  }),
+).pipe(
+  Command.withDescription(
+    "The server's memory and CPU against its limits, the machine's, and what recordings take on disk",
+  ),
+);
+
 // The server's code only loads for `serve`, so every other command starts
 // as quickly as before
 const serve = Command.make("serve", {}, () =>
@@ -872,6 +997,8 @@ const cli = Command.make("kestrel").pipe(
     days,
     events,
     devices,
+    jobs,
+    usage,
     pair,
     servers,
     serve,

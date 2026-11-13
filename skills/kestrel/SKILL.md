@@ -1,6 +1,6 @@
 ---
 name: kestrel
-description: Read your cameras' status, recordings and motion or PIR events through the Kestrel server, starting with a Raysharp-made recorder, and save recorded video as MP4. Use when asked whether the recorder or a camera is working, what was recorded on a day, when motion or PIR was last seen, where to watch a camera live, or to save footage from a time.
+description: Read your cameras' status, recordings and motion or PIR events through the Kestrel server, starting with a Raysharp-made recorder, save recorded video as MP4, and see what the server is doing and how much of the machine it uses. Use when asked whether the recorder or a camera is working, what was recorded on a day, when motion or PIR was last seen, where to watch a camera live, to save footage from a time, or whether the server is copying recordings or using too much memory or CPU.
 ---
 
 # Kestrel
@@ -54,5 +54,16 @@ for the recorder's channel 3.
    them are closed up. The recorder sends far faster than real time, so a
    minute of 1080p takes a few seconds and about 35 MB. To watch instead,
    the page's Recordings section plays any row.
+7. For what the server does by itself and how much of the machine it
+   uses, such as when the person asks whether it's copying, why it's slow or
+   whether it's using too much memory: `jobs` lists each job (`copy` from
+   sources, `record:<camera>`, `clear-out`) with its `state` (`idle`,
+   `running`, `waiting` or `failed`), what it's doing, progress, last run
+   and last error, and `recent` for the recordings copied lately. `usage`
+   gives the server's memory and CPU with go2rtc and ffmpeg against its
+   `limits`, the machine's, the recordings' disk use by camera, and
+   `holdUp`, why background work is waiting, if it is. Copying and clearing
+   out wait while the server or the machine is past a limit; live view and
+   recording never do. The limits are changed on the Settings page.
 
 Times are the recorder's own clock, with no time zone.

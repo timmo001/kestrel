@@ -30,6 +30,8 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/events/`                                   | The last 200 events from each source, newest first                            |
 | `GET /api/events/live`                               | Events as server-sent events                                                  |
 | `GET /api/health`                                    | 204 while the server is up                                                    |
+| `GET /api/activity/jobs`                             | Each background job's state, progress, last run and last error                |
+| `GET /api/activity/usage`                            | Memory, CPU and disk use against the limits, and the last hour's readings     |
 | `GET /api/devices/server`                            | The server's lasting `id` and its `name`                                      |
 | `POST /api/devices/pair`                             | Pairs a device with a one-time code; see below                                |
 | `POST /api/devices/code`                             | A new one-time code, and the link a QR code carries                           |

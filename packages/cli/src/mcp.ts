@@ -21,7 +21,7 @@ import {
   version,
 } from "@timmo001/kestrel-core";
 import { browse } from "@timmo001/kestrel-core/discovery";
-import { Device } from "@timmo001/kestrel-server/api";
+import { Device, Job, UsageReport } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import {
@@ -135,6 +135,22 @@ const ServersTool = Tool.make("servers", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
+const JobsTool = Tool.make("jobs", {
+  description:
+    "What the server does by itself, such as copying recordings from sources, recording each camera and clearing out old recordings: each job's state, progress, last run and last error, with the recordings copied lately",
+  success: Schema.Struct({ jobs: Schema.Array(Job) }),
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
+const UsageTool = Tool.make("usage", {
+  description:
+    "The server's memory and CPU, with go2rtc and ffmpeg, against the limits background work keeps to, the machine's memory and load, the recordings' disk use by camera, and whether background work is waiting and why",
+  success: UsageReport,
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
 const Tools = Toolkit.make(
   Status,
   DetailsTool,
@@ -144,6 +160,8 @@ const Tools = Toolkit.make(
   Days,
   Events,
   DevicesTool,
+  JobsTool,
+  UsageTool,
   ServersTool,
 );
 
@@ -213,6 +231,11 @@ const handlers = Effect.gen(function* () {
       client
         .call((api) => api.devices.list())
         .pipe(Effect.map((list) => ({ devices: list }))),
+    jobs: () =>
+      client
+        .call((api) => api.activity.jobs())
+        .pipe(Effect.map((list) => ({ jobs: list }))),
+    usage: () => client.call((api) => api.activity.usage()),
     servers: () =>
       browse("3 seconds").pipe(Effect.map((found) => ({ servers: found }))),
   });

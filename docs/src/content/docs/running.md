@@ -336,8 +336,9 @@ faded on the timeline, with no Play or Download.
 Every 10 minutes the server looks at what each source with recordings of
 its own, such as a recorder, has from within the hours kept, and copies
 what the folder doesn't have yet. It copies one file at a time, at full
-quality: clips first, then continuous footage, newest first. A file is
-written beside its final name and moved into place once whole. Past the
+quality: clips first, then continuous footage, newest first, and reads no
+faster than the copy rate under [Background work](#background-work). A file
+is written beside its final name and moved into place once whole. Past the
 disk share, a file is only copied when an older one would be cleared out
 to make room for it.
 
@@ -374,6 +375,36 @@ Pick the cameras, folder and how long they're kept in the Recording panel
 on the Settings page. They're saved in `sources.json` under `recording`,
 beside the rest of the settings, so every client sees the same ones, and
 the server picks up a change without restarting.
+
+### Background work
+
+Copying from sources and clearing out old recordings keep to limits, so
+the server can share a small machine, such as a Home Assistant Green, with
+everything else on it. Before each file, and while it copies, background
+work waits while any of these is past its limit, and carries on after.
+Clearing out waits at most 10 minutes, then runs anyway, as it frees the
+disk. Live view and the server's own recording never wait.
+
+| Setting       | Default | What it limits                                                                  |
+| ------------- | ------- | ------------------------------------------------------------------------------- |
+| `copyRate`    | 2       | How fast a copy reads from a source, in MB a second                             |
+| `memoryFree`  | 15      | The share of the machine's memory kept free, as a percentage                    |
+| `memoryLimit` | 512     | The most memory the server, go2rtc and ffmpeg may use together, in MB           |
+| `cpuShare`    | 50      | The most of the machine's CPU they may use, as a percentage, over half a minute |
+
+It also waits while the machine is short of memory or its disks are busy,
+from Linux's pressure figures: something waiting for memory over 5% of the
+time, which means it's swapping, or for the disks over 30%. Set the limits
+in the Background work group of the Recording panel; they're saved under
+`recording.limits`.
+
+The Activity page shows each job, such as the copy and each camera's
+recording, with what it's doing, how far through it is, its last run and
+last error, the recordings copied lately, and what each camera's
+recordings take on disk. It also shows the server's memory and CPU against
+these limits and the machine's, with the last hour of each, and says why
+background work is waiting when it is. `kestrel jobs` and `kestrel usage`
+print the same.
 
 After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
