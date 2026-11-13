@@ -398,11 +398,47 @@ void pwa.worker.then(async (registration) => {
 const allConnected = (list: ReadonlyArray<SourceInfo>) =>
   list.every((source) => source.connection.connected);
 
-// Start once the sources are reachable, then keep the health fresh
+/** The connected sources' ids, to tell when one connects or drops. */
+const connectedIds = (list: ReadonlyArray<SourceInfo>) =>
+  list
+    .flatMap((source) => (source.connection.connected ? [source.id] : []))
+    .join(" ");
+
+/**
+ * Keeps the health fresh: often while a source is down, else every half
+ * minute. A source that connects or drops brings or takes its cameras.
+ */
+const watchConnection = (connected: string) => {
+  const delay = (list: ReadonlyArray<SourceInfo> | null) =>
+    list !== null && allConnected(list) ? 30_000 : 5000;
+
+  const check = async (): Promise<void> => {
+    const next = await showConnection();
+
+    if (next !== null && connectedIds(next) !== connected) {
+      await reloadCameras();
+      await events.start(
+        (cameras ?? []).filter((camera) => camera.recordings),
+        today,
+      );
+
+      return watchConnection(connectedIds(next));
+    }
+
+    if (next !== null) await showSources(next);
+
+    setTimeout(() => void check(), delay(next));
+  };
+
+  setTimeout(() => void check(), 5000);
+};
+
+// Start once the server is reachable, with the cameras of the sources it
+// reaches, so one that's down doesn't hold up the rest
 const start = async () => {
   const list = await showConnection();
 
-  if (list === null || !allConnected(list)) {
+  if (list === null) {
     setTimeout(() => void start(), 5000);
 
     return;
@@ -422,11 +458,7 @@ const start = async () => {
     events.start(recorded, today),
   ]);
 
-  setInterval(() => {
-    void showConnection().then((next) =>
-      next === null ? undefined : showSources(next),
-    );
-  }, 30_000);
+  watchConnection(connectedIds(list));
 };
 
 void start();
