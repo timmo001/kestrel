@@ -13,7 +13,7 @@ every package.
 
 ### Home Assistant
 
-The [Home Assistant app](/install#home-assistant) runs the server on Home
+The [Home Assistant app](/install) runs the server on Home
 Assistant OS. Open **Kestrel** from the sidebar: Home Assistant has already
 signed you in, so it needs no pairing. Other devices pair with it at
 `http://homeassistant.local:7380`. The app shares the host's network, so it
@@ -24,17 +24,11 @@ in the app's own data.
 
 ### Docker
 
-```sh
-docker run -d --name kestrel --network host --restart unless-stopped \
-  -e KESTREL_NAME="Kestrel" -v kestrel:/data ghcr.io/timmo001/kestrel
-docker exec kestrel kestrel pair
-```
-
-The image runs as its own `kestrel` user and keeps its config, state and
-recordings in `/data`, with `ffmpeg` built in. On the host's network it
-announces itself so devices find it; with `-p 7380:7380` instead, pair them
-by its address. `docker exec kestrel kestrel pair` shows a code for the first
-device. To update, pull the new image and start the container again.
+The [container image](/install) runs as its own `kestrel` user and keeps its
+config, state and recordings in `/data`, with `ffmpeg` built in. On the
+host's network it announces itself so devices find it; with `-p 7380:7380`
+instead, pair them by its address. `docker exec kestrel kestrel pair` shows a
+code for the first device.
 
 ### Linux services
 
@@ -85,16 +79,6 @@ from it.
 
 Everything travels over plain HTTP, so keep the server on your own network.
 To reach it from outside, put it behind a reverse proxy with HTTPS.
-
-## From source
-
-You need [mise](https://mise.jdx.dev), which installs Bun, go2rtc and the
-other tools at the versions the repository pins.
-
-```sh
-mise install
-mise run build
-```
 
 ## Your sources
 

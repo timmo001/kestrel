@@ -1,0 +1,212 @@
+---
+title: Install
+description: Install Kestrel on Linux or Windows from a package, mise or a release archive, on Home Assistant, with Docker, or from source.
+---
+
+Kestrel is one package, `kestrel-nvr`, for Linux on x86_64 and aarch64 and
+for Windows on x64. It has the desktop app, the server and the `kestrel`
+command in one: `kestrel` opens the app, `kestrel serve` runs the server with
+no window, and anything else is the [CLI](/agents). The server also comes as
+a container image and a Home Assistant app.
+
+Only released versions are packaged, and a client only works with a server
+of the same version, so update every device together. Each one says which
+side is older and how to update it when they differ.
+
+Recording needs `ffmpeg`. The packages recommend it, and the container and
+the Home Assistant app bring their own.
+
+<Tabs syncKey="os">
+<Tab title="Linux">
+
+Install the package for your distribution, or use mise or the archive on any
+distribution. The Arch, `.deb` and `.rpm` packages come with services to run
+the server; see [Linux services](/running#linux-services).
+
+<Tabs syncKey="method">
+<Tab title="Arch Linux">
+
+`kestrel-nvr-bin` is in the unofficial `timmo` pacman repository, for x86_64.
+Add it before the other repository sections in `/etc/pacman.conf`:
+
+```ini title="/etc/pacman.conf"
+[timmo]
+SigLevel = PackageRequired DatabaseOptional TrustedOnly
+Server = https://packages.timmo.dev/$arch
+```
+
+```sh
+sudo pacman -Syu kestrel-nvr-bin
+```
+
+It's in the AUR too, for x86_64 and aarch64:
+
+```sh
+yay -S kestrel-nvr-bin
+```
+
+The desktop app's libraries (`webkit2gtk-4.1`, `gtk3` and
+`libayatana-appindicator`) and `ffmpeg` are optional, so a box with no
+desktop takes the package for `kestrel serve` alone.
+
+</Tab>
+<Tab title="Debian / Ubuntu">
+
+Each [release](https://github.com/timmo001/kestrel/releases) has a `.deb`
+for amd64 and arm64. Install it with `apt`, so its dependencies come too:
+
+```sh
+sudo apt install ./kestrel-nvr_<version>-1_amd64.deb
+```
+
+`--no-install-recommends` leaves out the desktop app's libraries and
+`ffmpeg`, for a box that only runs `kestrel serve`.
+
+</Tab>
+<Tab title="Fedora">
+
+Each [release](https://github.com/timmo001/kestrel/releases) has an `.rpm`
+for x86_64 and aarch64:
+
+```sh
+sudo dnf install ./kestrel-nvr-<version>-1.x86_64.rpm
+```
+
+</Tab>
+<Tab title="mise">
+
+[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive and
+keeps it up to date:
+
+```sh
+mise use -g github:timmo001/kestrel
+```
+
+This puts the `kestrel` command on your path, without the menu entry or
+services. The app needs the desktop libraries listed under Arch Linux;
+`kestrel` says which are missing.
+
+</Tab>
+<Tab title="Archive">
+
+Each release has a `kestrel-nvr-<version>-linux-<arch>.tar.gz` archive, with
+the bundle in `lib/kestrel-nvr` and the `kestrel` command in `bin`:
+
+```sh
+tar -xzf kestrel-nvr-<version>-linux-x86_64.tar.gz
+kestrel-nvr-<version>-linux-x86_64/bin/kestrel serve
+```
+
+Like mise, it has no menu entry or services, and the app needs the desktop
+libraries.
+
+</Tab>
+</Tabs>
+
+</Tab>
+<Tab title="Windows">
+
+<Tabs syncKey="method">
+<Tab title="Installer">
+
+Each [release](https://github.com/timmo001/kestrel/releases) has
+`Kestrel-Setup-<version>-windows-x86_64.zip`: unpack it and run
+`Kestrel-Setup.exe`. It isn't signed, so Windows asks before running it.
+When the app's server is on a newer version, the app offers to update itself
+to match.
+
+</Tab>
+<Tab title="mise">
+
+[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive and
+keeps it up to date:
+
+```powershell
+mise use -g github:timmo001/kestrel
+```
+
+This puts the `kestrel` command on your path.
+
+</Tab>
+<Tab title="Archive">
+
+Each release has a `kestrel-nvr-<version>-windows-x86_64.zip` archive, with
+the bundle in `lib\kestrel-nvr` and the `kestrel` command in `bin`:
+
+```powershell
+Expand-Archive kestrel-nvr-<version>-windows-x86_64.zip .
+.\kestrel-nvr-<version>-windows-x86_64\bin\kestrel.cmd serve
+```
+
+</Tab>
+</Tabs>
+
+</Tab>
+<Tab title="Home Assistant">
+
+The Home Assistant app runs the server on Home Assistant OS, for amd64 and
+aarch64. Add the repository with all my apps:
+
+[![Add the repository to Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Ftimmo001%2Fhome-assistant-apps)
+
+Then install Kestrel and start it. See
+[Home Assistant](/running#home-assistant) for where it keeps its files and
+how other devices reach it.
+
+</Tab>
+<Tab title="Docker">
+
+`ghcr.io/timmo001/kestrel` runs the server, for amd64 and arm64:
+
+```sh
+docker run -d --name kestrel --network host --restart unless-stopped \
+  -e KESTREL_NAME="Kestrel" -v kestrel:/data ghcr.io/timmo001/kestrel
+docker exec kestrel kestrel pair
+```
+
+See [Docker](/running#docker) for what the image keeps where and how
+devices pair with it.
+
+</Tab>
+<Tab title="From source">
+
+You need [mise](https://mise.jdx.dev), which installs Bun, go2rtc and the
+other tools at the versions the repository pins:
+
+```sh
+mise install
+mise run build
+mise run serve:server
+```
+
+`serve:server` runs the server in the background; see
+[Starting the server](/running#starting-the-server). To keep it running
+without a terminal, `mise run desktop:install` builds the desktop app and
+installs it for you.
+
+</Tab>
+</Tabs>
+
+## Checking a download
+
+Release files come with a `SHA256SUMS` file and a GitHub attestation. Check
+one with:
+
+```sh
+gh attestation verify <file> -R timmo001/kestrel
+```
+
+## Updating
+
+Update every device to the same version:
+
+| Installed with | How to update                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------ |
+| Arch Linux     | `sudo pacman -Syu`, or your AUR helper                                                                 |
+| Debian, Fedora | Install the new package from the [latest release](https://github.com/timmo001/kestrel/releases/latest) |
+| mise           | `mise up`                                                                                              |
+| Windows        | Choose **Update Kestrel** in the app when it offers                                                    |
+| Home Assistant | Update the Kestrel app under Settings, Apps                                                            |
+| Docker         | Pull `ghcr.io/timmo001/kestrel` and start the container again                                          |
+
+On Linux, restart the server's service after updating the package.
