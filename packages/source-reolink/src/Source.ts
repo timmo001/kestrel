@@ -1510,6 +1510,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
             camera: cameraOf(channel),
             main: channel.main,
             sub: channel.sub,
+            sound: true,
           };
 
           // Its lens zoom only changes the telephoto picture

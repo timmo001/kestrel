@@ -88,6 +88,11 @@ export interface LiveFeed {
    */
   readonly subRatio?: number;
   /**
+   * Whether its streams carry the camera's sound. Left out, they're played
+   * without it, since some offer a sound track that never sends anything.
+   */
+  readonly sound?: boolean;
+  /**
    * For a camera with other pictures, such as a second lens: the main
    * picture's name and whether the lens zoom changes it.
    */

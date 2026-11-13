@@ -14,6 +14,8 @@ export const LiveStreams = Schema.Struct({
   sub: Schema.NullOr(Schema.String),
   /** The width over height to draw a squeezed sub stream at; `null` for its own shape. */
   subRatio: Schema.NullOr(Schema.Number),
+  /** Whether they carry the camera's sound. */
+  sound: Schema.Boolean,
 });
 
 export interface LiveStreams extends Schema.Schema.Type<typeof LiveStreams> {}

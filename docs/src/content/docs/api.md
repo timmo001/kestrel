@@ -131,10 +131,12 @@ A camera's other views have streams named after them, such as
 `reolink-hub_1_telephoto` for a TrackMix's telephoto lens on a Reolink hub.
 It has no sub stream, so it plays its main stream in every layout.
 
-The DVR8-4575 offers an audio track on every stream but sends nothing on it,
-and an MSE player that asks for audio waits for it forever. The page plays
-video only, with go2rtc's own `video-rtc.js` player and `media` set to
-`video`, so do the same in other players.
+`sound` says whether the streams carry the camera's sound, as a Reolink
+camera's do. The DVR8-4575 offers an audio track on every stream but sends
+nothing on it, and an MSE player that asks for audio waits for it forever, so
+its `sound` is `false`. The page uses go2rtc's own `video-rtc.js` player,
+with `media` set to `video,audio` where `sound` is `true` and to `video`
+otherwise, so do the same in other players.
 
 ## Moving a camera
 
