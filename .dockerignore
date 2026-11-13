@@ -1,0 +1,3 @@
+# The Dockerfile takes everything from a release's archive, so it needs none
+# of the repository
+*

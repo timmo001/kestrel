@@ -1,9 +1,12 @@
 ---
 # Builds the desktop app on Linux (x86_64 and aarch64) and Windows, and
 # keeps each one's bundle and installer as an artifact. Electrobun only
-# builds for the system it runs on. On a published release it attaches the
-# kestrel-nvr archive of each, which every package is made from, each
-# installer and their attestation to the release.
+# builds for the system it runs on. Each Linux build also makes the .deb,
+# .rpm and container images, and runs kestrel serve from each. On a
+# published release it attaches the kestrel-nvr archive of each, which every
+# package is made from, each installer and their attestation to the release,
+# then publishes the Arch package, the container images and the Home
+# Assistant app.
 name: Desktop
 
 on:
@@ -15,6 +18,8 @@ on:
     paths:
       - .github/workflows/desktop.yml
       - .scripts/**
+      - Dockerfile
+      - home-assistant/**
       - bun.lock
       - docs/**
       - mise.lock
@@ -56,14 +61,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # The one version the server and every client share, in packages/core
-      - name: Check Kestrel's version matches the release
-        if: github.event_name == 'release' && runner.os == 'Linux'
+      # The one version the server and every client share, in packages/core,
+      # which the Home Assistant app gives too
+      - name: Check Kestrel's version
+        if: runner.os == 'Linux'
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
-          if [ "$version" != "$TAG" ]; then
+          app="$(sed -n 's/^version: //p' home-assistant/app/config.yaml)"
+          if [ "$app" != "$version" ]; then
+            echo "::error::The Home Assistant app's version is $app, but Kestrel's is $version"
+            exit 1
+          fi
+          if [ -n "$TAG" ] && [ "$version" != "$TAG" ]; then
             echo "::error::Kestrel's version is $version, but the release is $TAG"
             exit 1
           fi
@@ -117,8 +128,10 @@ jobs:
           packages/desktop/scripts/release-archives.sh "$RUNNER_TEMP/artifacts" "$version" linux-packages
           mise x "nfpm@$NFPM_VERSION" -- .scripts/linux/package.sh \
             "linux-packages/kestrel-nvr-$version-linux-$arch.tar.gz" "$version" "$arch" linux-packages
-          # The release job makes the archives again, beside Windows'
-          rm linux-packages/*.tar.gz
+          # The release job makes the archives again, beside Windows'. This
+          # one is kept back for the container image.
+          mkdir -p "$RUNNER_TEMP/archive"
+          mv linux-packages/*.tar.gz "$RUNNER_TEMP/archive/"
 
       # As on a box with no desktop: without the recommended packages
       - name: Install the .deb and run kestrel serve
@@ -136,6 +149,29 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:7380/
           curl -fsS http://127.0.0.1:7380/api/devices/server
           kill "$server"
+
+      # From this build's archive, as a release builds them from its own
+      - name: Build the container images and run kestrel serve in one
+        if: runner.os == 'Linux'
+        run: |
+          version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
+          for target in server app; do
+            docker build --build-arg VERSION="$version" \
+              --build-context archive="$RUNNER_TEMP/archive" \
+              --target "$target" --tag "kestrel-$target:check" .
+          done
+          docker run --rm --entrypoint ffmpeg kestrel-server:check -hide_banner -version
+          docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 kestrel-server:check
+          for _ in $(seq 30); do
+            curl -fsS http://127.0.0.1:7390/api/health && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:7390/
+          # Paired devices only, once it listens on the network
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7390/api/cameras)" = 401 ]
+          docker exec kestrel kestrel --version
+          docker logs kestrel
+          docker rm --force kestrel
 
       - name: Upload Linux packages
         if: runner.os == 'Linux'
@@ -213,8 +249,8 @@ jobs:
           pattern: "{kestrel-packages-*,kestrel-flatpak}"
           merge-multiple: true
 
-      # The kestrel-nvr archives are what mise, aqua, Arch, Nix and the
-      # container are made from; the Setup files install the app themselves
+      # The kestrel-nvr archives are what mise, aqua, Arch and the container
+      # are made from; the Setup files install the app themselves
       - name: Package the release
         env:
           TAG: ${{ github.event.release.tag_name }}
@@ -333,3 +369,83 @@ jobs:
         logo.svg
     secrets:
       AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+
+  # The container images, from the release's archives once they're attached:
+  # the server, and the Home Assistant app
+  image-server:
+    name: Container image (server)
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    with:
+      image: ghcr.io/timmo001/kestrel
+      version: ${{ github.event.release.tag_name }}
+      target: server
+      build-args: VERSION=${{ github.event.release.tag_name }}
+      latest: ${{ !github.event.release.prerelease }}
+
+  image-app:
+    name: Container image (Home Assistant app)
+    needs: release
+    permissions:
+      contents: read
+      packages: write
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    with:
+      image: ghcr.io/timmo001/kestrel-app
+      version: ${{ github.event.release.tag_name }}
+      target: app
+      build-args: VERSION=${{ github.event.release.tag_name }}
+      home-assistant: true
+      latest: ${{ !github.event.release.prerelease }}
+
+  # The Supervisor shows the app's CHANGELOG.md from the default branch, so
+  # the release notes are copied there. The ruleset blocks GITHUB_TOKEN from
+  # pushing to main, so this pushes with an admin's token, which can bypass
+  # it. A missing changelog shouldn't fail the release, so failures only warn.
+  app-changelog:
+    name: Home Assistant app changelog
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.RELEASE_COMMIT_TOKEN }}
+
+      - name: Write the changelog
+        env:
+          RELEASE_NOTES: ${{ github.event.release.body }}
+        run: printf '%s\n' "$RELEASE_NOTES" | tr -d '\r' > home-assistant/app/CHANGELOG.md
+
+      - name: Commit the changelog
+        env:
+          RELEASE_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          if git diff --quiet -- home-assistant/app/CHANGELOG.md; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add home-assistant/app/CHANGELOG.md
+          git commit -m "Update the Home Assistant app's changelog for $RELEASE_VERSION"
+          git push
+
+      - name: Warn about the missing changelog
+        if: failure()
+        run: echo "::warning title=Home Assistant app changelog::Couldn't commit the release notes to home-assistant/app/CHANGELOG.md. Check RELEASE_COMMIT_TOKEN, then update the file by hand."
+
+  # Asks timmo001/home-assistant-apps to copy this release's app folder, now
+  # its image is pushed
+  home-assistant-apps:
+    name: Home Assistant apps repository
+    needs: image-app
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@ec70016a91999259142a156104978174490a0831 # 20261110.0
+    with:
+      repository: timmo001/home-assistant-apps
+    secrets:
+      token: ${{ secrets.RELEASE_COMMIT_TOKEN }}
