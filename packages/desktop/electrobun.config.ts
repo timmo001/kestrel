@@ -1,13 +1,14 @@
 /**
  * How Hutch builds the app: a Bun main process that runs the server and opens
  * the window, a preload script for the page, the built web client, the
- * built docs site, go2rtc, and the `kestrel` command with the CLI it runs,
+ * built docs site, go2rtc, yt-dlp, and the `kestrel` command with the CLI it runs,
  * for `kestrel serve` with no window. It uses the system's webview, not CEF.
  */
 import type { ElectrobunConfig } from "electrobun";
 import { version } from "../core/src/Version.ts";
 
 const go2rtc = process.platform === "win32" ? "go2rtc.exe" : "go2rtc";
+const ytDlp = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 
 export default {
   app: {
@@ -40,6 +41,9 @@ export default {
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
       [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
       "licenses/go2rtc.LICENSE": "go2rtc/LICENSE",
+      [`vendor/${ytDlp}`]: `yt-dlp/${ytDlp}`,
+      "licenses/yt-dlp.LICENSE": "yt-dlp/LICENSE",
+      "licenses/yt-dlp.THIRD_PARTY_LICENSES": "yt-dlp/THIRD_PARTY_LICENSES",
       "../../LICENSE": "LICENSE",
       // The one `kestrel` command and the CLI it runs, with the server in it
       "vendor/kestrel.js": "cli/kestrel.js",

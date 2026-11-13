@@ -44,4 +44,6 @@ package() {
   install -Dm644 kestrel-nvr.sysusers "$pkgdir/usr/lib/sysusers.d/kestrel-nvr.conf"
   install -Dm644 "$bundle/Resources/app/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 "$bundle/Resources/app/go2rtc/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/go2rtc.LICENSE"
+  install -Dm644 "$bundle/Resources/app/yt-dlp/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/yt-dlp.LICENSE"
+  install -Dm644 "$bundle/Resources/app/yt-dlp/THIRD_PARTY_LICENSES" "$pkgdir/usr/share/licenses/$pkgname/yt-dlp.THIRD_PARTY_LICENSES"
 }

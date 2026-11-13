@@ -56,5 +56,9 @@ contents:
     dst: /usr/share/licenses/kestrel-nvr/LICENSE
   - src: go2rtc.LICENSE
     dst: /usr/share/licenses/kestrel-nvr/go2rtc.LICENSE
+  - src: yt-dlp.LICENSE
+    dst: /usr/share/licenses/kestrel-nvr/yt-dlp.LICENSE
+  - src: yt-dlp.THIRD_PARTY_LICENSES
+    dst: /usr/share/licenses/kestrel-nvr/yt-dlp.THIRD_PARTY_LICENSES
 scripts:
   postinstall: postinstall.sh

@@ -139,6 +139,7 @@ jobs:
         run: |
           sudo apt-get install -y --no-install-recommends ./linux-packages/kestrel-nvr_*.deb
           kestrel --version
+          /opt/kestrel-nvr/Resources/app/yt-dlp/yt-dlp --version
           export KESTREL_CONFIG="$RUNNER_TEMP/config" KESTREL_STATE="$RUNNER_TEMP/state"
           kestrel serve &
           server=$!
@@ -161,6 +162,7 @@ jobs:
               --target "$target" --tag "kestrel-$target:check" .
           done
           docker run --rm --entrypoint ffmpeg kestrel-server:check -hide_banner -version
+          docker run --rm --entrypoint /opt/kestrel-nvr/lib/kestrel-nvr/Resources/app/yt-dlp/yt-dlp kestrel-server:check --version
           docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 kestrel-server:check
           for _ in $(seq 30); do
             curl -fsS http://127.0.0.1:7390/api/health && break
