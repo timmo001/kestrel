@@ -2,7 +2,7 @@
 name: Kestrel
 # The one version Kestrel's server and clients share, as in
 # packages/core/src/Version.ts; CI checks they match
-version: 0.5.4
+version: 0.5.5
 slug: kestrel
 description: Your cameras, recordings and events in one place
 url: https://github.com/timmo001/kestrel
