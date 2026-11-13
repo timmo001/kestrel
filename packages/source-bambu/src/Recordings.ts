@@ -4,7 +4,8 @@
  * makes of each print, as a camera of its own so the two don't play over
  * each other. Each file ends when it was last written. They're MJPEG, so
  * each is handed over by downloading it and converting it to H.264 with
- * ffmpeg, `KESTREL_FFMPEG` or the one on the path, one file at a time.
+ * ffmpeg, `KESTREL_FFMPEG` or the one on the path, one file at a time;
+ * background work converts at the lowest priority.
  *
  * @module
  */
@@ -38,6 +39,7 @@ import {
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { constants, setPriority } from "node:os";
 import {
   download,
   lastWritten,
@@ -63,6 +65,37 @@ interface Listed extends PrinterFile {
 
 /** A local time as seconds since 1970, read as UTC, as the printer keeps its clock. */
 const toSeconds = (time: string) => Date.parse(`${time}Z`) / 1000;
+
+/**
+ * ffmpeg, at the lowest priority for background work, so anything else on
+ * the machine comes first. `nice` sets it before ffmpeg starts its threads,
+ * which each keep their own; Windows has no `nice`, so `lower` sets it there.
+ */
+const lowest = (
+  background: boolean,
+  ffmpeg: string,
+  args: ReadonlyArray<string>,
+) => {
+  const options = {
+    detached: false,
+    stdin: "ignore",
+    stdout: "ignore",
+    stderr: "ignore",
+  } as const;
+
+  return background && process.platform !== "win32"
+    ? ChildProcess.make("nice", ["-n", "19", ffmpeg, ...args], options)
+    : ChildProcess.make(ffmpeg, args, options);
+};
+
+/** Drops a background process to the lowest priority on Windows, where priority covers the whole process. */
+const lower = (background: boolean, pid: number) =>
+  background && process.platform === "win32"
+    ? Effect.try({
+        try: () => setPriority(pid, constants.priority.PRIORITY_LOW),
+        catch: (error) => error,
+      }).pipe(Effect.ignore)
+    : Effect.void;
 
 const services = NodeChildProcessSpawner.layer.pipe(
   Layer.provideMerge(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -206,16 +239,10 @@ export const printerRecordings = Effect.fnUntraced(function* (
         if (pace !== undefined) yield* pace.room;
 
         const code = yield* Effect.scoped(
-          spawner
-            .spawn(
-              ChildProcess.make(ffmpeg, args, {
-                detached: false,
-                stdin: "ignore",
-                stdout: "ignore",
-                stderr: "ignore",
-              }),
-            )
-            .pipe(Effect.flatMap((handle) => handle.exitCode)),
+          spawner.spawn(lowest(pace !== undefined, ffmpeg, args)).pipe(
+            Effect.tap((handle) => lower(pace !== undefined, handle.pid)),
+            Effect.flatMap((handle) => handle.exitCode),
+          ),
         );
 
         if (code !== 0) {
