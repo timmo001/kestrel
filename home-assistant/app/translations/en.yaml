@@ -1,0 +1,7 @@
+---
+configuration:
+  hide_sidebar:
+    name: Hide the Home Assistant sidebar
+    description: >-
+      Give Kestrel the whole screen, with a menu button in its app bar to show
+      Home Assistant's sidebar when you need it.

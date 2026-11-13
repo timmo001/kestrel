@@ -50,13 +50,28 @@ const ingressPath = /^\/api\/hassio_ingress\/[\w-]+$/;
 /** The page's `<base>` as the build writes it. */
 const rootBase = '<base href="/" />';
 
+/** The Home Assistant app's options file, as the Supervisor writes it. */
+const decodeAppOptions = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({ hide_sidebar: Schema.optional(Schema.Boolean) }),
+  ),
+);
+
 /**
  * The built web client from `directory`. A path outside the API that names a
  * file gets that file, and any other gets the page, which the service worker
  * and the page's own links work from. Under Home Assistant's ingress, the
- * page's `<base>` is its ingress path, so its links and calls stay under it.
+ * page's `<base>` is its ingress path, so its links and calls stay under it,
+ * and a meta tag tells it whether to hide Home Assistant's sidebar, from the
+ * app's `hide_sidebar` option, which is on unless it's turned off.
  */
-const webClient = (directory: string, options: { readonly ingress: boolean }) =>
+const webClient = (
+  directory: string,
+  options: {
+    readonly ingress: boolean;
+    readonly appOptions?: string | undefined;
+  },
+) =>
   HttpRouter.add("GET", "/*", (request) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -87,8 +102,23 @@ const webClient = (directory: string, options: { readonly ingress: boolean }) =>
       ) {
         const html = yield* fs.readFileString(page);
 
+        const hideSidebar =
+          options.appOptions === undefined ||
+          (yield* fs.readFileString(options.appOptions).pipe(
+            Effect.map((text) =>
+              Option.match(decodeAppOptions(text), {
+                onNone: () => true,
+                onSome: (app) => app.hide_sidebar !== false,
+              }),
+            ),
+            Effect.orElseSucceed(() => true),
+          ));
+
         return HttpServerResponse.html(
-          html.replace(rootBase, `<base href="${prefix}/" />`),
+          html.replace(
+            rootBase,
+            `<base href="${prefix}/" /><meta name="kestrel-home-assistant-sidebar" content="${hideSidebar ? "hide" : "show"}" />`,
+          ),
         ).pipe(HttpServerResponse.setHeader("cache-control", "no-cache"));
       }
 
@@ -123,6 +153,11 @@ export interface ServeOptions {
   readonly ingressPort?: number | undefined;
   /** The address ingress requests come from: the Supervisor's by default. */
   readonly ingressFrom?: string | undefined;
+  /**
+   * The Home Assistant app's options file, for its `hide_sidebar` option on
+   * the ingress page.
+   */
+  readonly appOptions?: string | undefined;
 }
 
 /** The Supervisor's address, the only one the ingress port answers by default. */
@@ -289,7 +324,7 @@ const connect = HttpRouter.add("GET", `/${connectPath}*`, (request) =>
  * `KESTREL_WEB`, the built web client, `packages/web/dist` beside this
  * package by default; and for the Home Assistant app, `KESTREL_INGRESS_PORT`,
  * with `KESTREL_INGRESS_FROM` for where ingress comes from, the Supervisor by
- * default.
+ * default, and `KESTREL_APP_OPTIONS` for the app's options file.
  */
 export const fromEnvironment = Effect.gen(function* () {
   const path = yield* Path.Path;
@@ -315,12 +350,15 @@ export const fromEnvironment = Effect.gen(function* () {
     Config.String("KESTREL_INGRESS_FROM"),
   );
 
+  const appOptions = yield* Config.option(Config.String("KESTREL_APP_OPTIONS"));
+
   return layer({
     hostname,
     port,
     web,
     ingressPort: Option.getOrUndefined(ingressPort),
     ingressFrom: Option.getOrUndefined(ingressFrom),
+    appOptions: Option.getOrUndefined(appOptions),
   });
 });
 
@@ -361,7 +399,10 @@ export const layer = (options: ServeOptions) =>
             routes,
             go2rtc,
             push,
-            webClient(options.web, { ingress: true }),
+            webClient(options.web, {
+              ingress: true,
+              appOptions: options.appOptions,
+            }),
           ),
           { middleware: ingressGuard(options.ingressFrom ?? supervisor) },
         ).pipe(

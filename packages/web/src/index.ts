@@ -37,6 +37,7 @@ import { call, onMismatched, onUnpaired } from "./api.ts";
 import { loadCameras } from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
+import { homeAssistantSidebar } from "./home-assistant.ts";
 import {
   phBell,
   phBellRinging,
@@ -369,6 +370,9 @@ const brand = find("a", "brand");
 /** The bar's padding, the gaps between its parts and the links, and the two action buttons at their smallest. */
 const barExtras = 12 * 2 + 12 * 2 + 4 * (navLinks.length - 1) + 40 * 2 + 16;
 
+/** The menu button and the gap after it, when it opens Home Assistant's sidebar. */
+const sidebarButton = 40 + 12;
+
 /** Each link's padding either side of its text. */
 const linkPadding = 12 * 2;
 
@@ -389,7 +393,10 @@ const fitNav = () => {
   );
 
   appBar.menuBelow = Math.ceil(
-    brand.getBoundingClientRect().width + links + barExtras,
+    brand.getBoundingClientRect().width +
+      links +
+      barExtras +
+      (appBar.hasAttribute("data-ha-sidebar") ? sidebarButton : 0),
   );
 };
 
@@ -399,6 +406,12 @@ void document.fonts.ready.then(fitNav);
 
 // A theme can change the font, and with it the links' widths
 theme.subscribe(() => requestAnimationFrame(fitNav));
+
+const sidebarItem = find("button", "ha-sidebar");
+
+if (appBar !== null && sidebarItem !== null) {
+  homeAssistantSidebar(appBar, sidebarItem, fitNav);
+}
 
 // The bar's overflow menu: the docs, and notifications where the browser can
 // push, subscribing it to the server's pushes and saying where they stand

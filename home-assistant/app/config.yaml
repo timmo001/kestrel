@@ -29,5 +29,10 @@ map:
     read_only: false
 environment:
   KESTREL_INGRESS_PORT: "8099"
+  KESTREL_APP_OPTIONS: /data/options.json
   KESTREL_RECORDINGS: /media/kestrel
   KESTREL_NAME: Home Assistant
+options:
+  hide_sidebar: true
+schema:
+  hide_sidebar: bool

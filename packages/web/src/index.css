@@ -61,6 +61,24 @@ body {
   outline-offset: var(--gw-focus-offset, 2px);
 }
 
+/* Home Assistant's sidebar, in the app bar's menu on a phone. Wider, the
+   bar's menu button shows, and opens the sidebar instead of the menu */
+.ha-sidebar {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ha-sidebar[hidden],
+gw-app-bar:not([collapsed]) .ha-sidebar {
+  display: none;
+}
+
+gw-app-bar[data-ha-sidebar]:not([collapsed])::part(menu) {
+  display: inline-grid;
+}
+
 /* The app bar sits straight above, so only the bottom needs room */
 gw-page {
   padding-block-end: var(--gw-space-5);

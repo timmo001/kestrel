@@ -21,6 +21,10 @@ Remove a device in **Settings > Devices** and it's signed out at once.
 
 The server speaks plain HTTP, so a paired device's sign-in is only as private as your network. Version for version, every device must run the same Kestrel as this app, and says how to update when it doesn't.
 
+## The sidebar
+
+Kestrel takes the whole screen: Home Assistant hides its sidebar and header while it's open. Select the menu button at the start of the app bar to show the sidebar again; on a phone, it's in the app bar's menu instead. To keep the sidebar, turn off the `hide_sidebar` option.
+
 ## Recordings
 
 Recordings Kestrel makes itself, and copies of recordings from your recorders and cameras, are kept in Home Assistant's media folder, under `kestrel`, so they show in its media browser. Settings and paired devices are kept in the app's own data.

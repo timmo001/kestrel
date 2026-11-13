@@ -15,7 +15,10 @@ every package.
 
 The [Home Assistant app](/install) runs the server on Home
 Assistant OS. Open **Kestrel** from the sidebar: Home Assistant has already
-signed you in, so it needs no pairing. Other devices pair with it at
+signed you in, so it needs no pairing. It hides Home Assistant's sidebar to
+give Kestrel the whole screen; the menu button at the start of the app bar,
+or in its menu on a phone, shows it again, and the app's `hide_sidebar`
+option keeps it. Other devices pair with it at
 `http://homeassistant.local:7380`. The app shares the host's network, so it
 announces itself where devices can find it, and runs go2rtc on port 11984,
 out of the way of another go2rtc, such as Frigate's. Recordings go in Home
@@ -413,3 +416,4 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 | `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                 |
 | `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links           |
 | `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets            |
+| `KESTREL_APP_OPTIONS`      | None                             | The Home Assistant app's options file, which the app sets          |
