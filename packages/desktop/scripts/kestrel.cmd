@@ -1,0 +1,20 @@
+@echo off
+rem The one `kestrel` command, from inside the app's bundle. With nothing
+rem after it, it opens the desktop app; `kestrel serve` runs the server with
+rem no window, and anything else is the CLI, on the bundle's own Bun.
+setlocal
+set "app=%~dp0"
+set "bundle=%app%..\.."
+
+if "%~1"=="" (
+  start "" "%bundle%\bin\launcher.exe"
+  exit /b 0
+)
+
+if /i "%~1"=="serve" (
+  if not defined KESTREL_WEB set "KESTREL_WEB=%app%web"
+  if not defined KESTREL_GO2RTC set "KESTREL_GO2RTC=%app%go2rtc\go2rtc.exe"
+)
+
+"%bundle%\bin\bun.exe" "%app%cli\kestrel.js" %*
+exit /b %errorlevel%

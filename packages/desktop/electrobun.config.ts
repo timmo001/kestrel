@@ -1,7 +1,8 @@
 /**
  * How Hutch builds the app: a Bun main process that runs the server and opens
  * the window, a preload script for the page, the built web client, the
- * built docs site and go2rtc. It uses the system's webview, not CEF.
+ * built docs site, go2rtc, and the `kestrel` command with the CLI it runs,
+ * for `kestrel serve` with no window. It uses the system's webview, not CEF.
  */
 import type { ElectrobunConfig } from "electrobun";
 import { version } from "../core/src/Version.ts";
@@ -38,6 +39,10 @@ export default {
       "../../docs/dist/client": "docs",
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
       [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
+      // The one `kestrel` command and the CLI it runs, with the server in it
+      "vendor/kestrel.js": "cli/kestrel.js",
+      "scripts/kestrel": "kestrel",
+      "scripts/kestrel.cmd": "kestrel.cmd",
     },
     mac: {
       bundleCEF: false,

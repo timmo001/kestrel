@@ -1,0 +1,58 @@
+#!/bin/sh
+# The one `kestrel` command, from inside the app's bundle. With nothing
+# after it, it opens the desktop app, once the libraries the window needs are
+# there. `kestrel serve` runs the server with no window, and anything else is
+# the CLI, both on the bundle's own Bun, so they run on a box with no display.
+set -eu
+
+app="$(dirname "$(readlink -f "$0")")"
+bundle="$(cd "$app/../.." && pwd)"
+
+# The libraries the desktop app's window and tray load, and each
+# distribution's package for them
+missing() {
+  ldconfig="$(command -v ldconfig || echo /sbin/ldconfig)"
+
+  # Without ldconfig, such as on NixOS, leave it to the launcher to say
+  [ -x "$ldconfig" ] || return 0
+
+  found="$("$ldconfig" -p)"
+
+  for library in libwebkit2gtk-4.1.so.0 libgtk-3.so.0 libayatana-appindicator3.so.1; do
+    case "$found" in
+      *"$library"*) ;;
+      *) printf '%s\n' "$library" ;;
+    esac
+  done
+}
+
+desktop() {
+  libraries="$(missing)"
+
+  if [ -n "$libraries" ]; then
+    {
+      printf 'The desktop app needs libraries that are missing:\n%s\n\n' "$libraries"
+      printf 'Install them, then run kestrel again:\n'
+      printf '  Arch:            sudo pacman -S webkit2gtk-4.1 gtk3 libayatana-appindicator\n'
+      printf '  Debian, Ubuntu:  sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0 libayatana-appindicator3-1\n'
+      printf '  Fedora:          sudo dnf install webkit2gtk4.1 gtk3 libayatana-appindicator-gtk3\n\n'
+      printf 'Or run the server with no window: kestrel serve\n'
+    } >&2
+    exit 1
+  fi
+
+  exec "$bundle/bin/launcher" "$@"
+}
+
+if [ "$#" -eq 0 ]; then
+  desktop
+fi
+
+if [ "$1" = "serve" ]; then
+  # The web client and go2rtc built into the bundle
+  KESTREL_WEB="${KESTREL_WEB:-$app/web}"
+  KESTREL_GO2RTC="${KESTREL_GO2RTC:-$app/go2rtc/go2rtc}"
+  export KESTREL_WEB KESTREL_GO2RTC
+fi
+
+exec "$bundle/bin/bun" "$app/cli/kestrel.js" "$@"
