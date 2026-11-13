@@ -180,6 +180,11 @@ export const prune = Effect.fnUntraced(function* (options: RetentionOptions) {
   const now = yield* Clock.currentTimeMillis;
   const files = yield* stored(options.folder);
 
+  // Nothing recorded yet, and the folder may not exist to read its disk
+  if (files.length === 0) {
+    return { expired: 0, forSpace: 0, bytes: 0 } satisfies Cleared;
+  }
+
   const settled = files.filter((file) => now - file.modified > settling);
 
   const expired = settled.filter(
