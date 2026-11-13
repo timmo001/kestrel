@@ -17,7 +17,8 @@
     "@effect/platform-bun": "4.1.4",
     "@timmo001/kestrel-core": "workspace:*",
     "@timmo001/kestrel-server": "workspace:*",
-    "effect": "4.1.4"
+    "effect": "4.1.4",
+    "uqr": "0.1.3"
   },
   "devDependencies": {
     "@effect/tsgo": "0.68.1",

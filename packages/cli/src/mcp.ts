@@ -19,6 +19,7 @@ import {
   SourceId,
   SourceInfo,
 } from "@timmo001/kestrel-core";
+import { Device } from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import {
@@ -106,6 +107,14 @@ const Events = Tool.make("events", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
+const DevicesTool = Tool.make("devices", {
+  description:
+    "The devices paired with the server, such as browsers, phones and this CLI",
+  success: Schema.Struct({ devices: Schema.Array(Device) }),
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
 const Tools = Toolkit.make(
   Status,
   DetailsTool,
@@ -114,6 +123,7 @@ const Tools = Toolkit.make(
   Recordings,
   Days,
   Events,
+  DevicesTool,
 );
 
 const handlers = Effect.gen(function* () {
@@ -178,6 +188,10 @@ const handlers = Effect.gen(function* () {
       client
         .call((api) => api.events.recent())
         .pipe(Effect.map((list) => ({ events: list }))),
+    devices: () =>
+      client
+        .call((api) => api.devices.list())
+        .pipe(Effect.map((list) => ({ devices: list }))),
   });
 });
 

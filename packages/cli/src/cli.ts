@@ -2,7 +2,9 @@
 /**
  * The `kestrel` CLI: the cameras' status, recordings and events from the
  * server, with `--json` for scripts and agents, `agent tools --json` for
- * Code Mode and `mcp` to serve the same operations over MCP.
+ * Code Mode and `mcp` to serve the same operations over MCP. `pair` pairs
+ * it with a server, or shows a code for another device, and `devices`
+ * lists or removes the paired ones.
  *
  * @module
  */
@@ -22,6 +24,12 @@ import {
   type SourceId,
   type SourceInfo,
 } from "@timmo001/kestrel-core";
+import type {
+  Device,
+  PairingCode,
+  ServerInfo,
+} from "@timmo001/kestrel-server/api";
+import { hostname } from "node:os";
 import {
   Console,
   Effect,
@@ -31,10 +39,14 @@ import {
   Schema,
   Stream,
 } from "effect";
-import { Command, Flag } from "effect/cli";
+import { Argument, Command, Flag } from "effect/cli";
+import { FetchHttpClient } from "effect/http";
+import { renderUnicodeCompact } from "uqr";
+import { connection, localServer, writeSaved } from "./connection.ts";
 import { serveMcp } from "./mcp.ts";
 import {
   ClientError,
+  clientFor,
   operations,
   resolveCamera,
   resolveSource,
@@ -66,6 +78,15 @@ type Output =
   | { readonly recordings: ReadonlyArray<Recording> }
   | { readonly days: ReadonlyArray<RecordedDay> }
   | { readonly events: ReadonlyArray<CameraEvent> }
+  | { readonly devices: ReadonlyArray<Device> }
+  | { readonly pairing: PairingCode }
+  | {
+      readonly paired: {
+        readonly server: ServerInfo;
+        readonly device: Device;
+        readonly file: string;
+      };
+    }
   | {
       readonly file: string;
       readonly bytes: number;
@@ -477,6 +498,166 @@ const download = Command.make(
   ),
 );
 
+const pair = Command.make(
+  "pair",
+  {
+    json,
+    code: Argument.String("code").pipe(
+      Argument.withDescription(
+        "The code from the server, such as ABCD-EFGH; without one, shows a code for another device",
+      ),
+      Argument.optional,
+    ),
+    server: Flag.String("server").pipe(
+      Flag.withDescription(
+        "The server's address, such as http://192.168.1.20:7380; the saved one or this machine's by default",
+      ),
+      Flag.optional,
+    ),
+  },
+  Effect.fn("pair")(function* ({ json, code, server }) {
+    if (Option.isNone(code)) {
+      const local = yield* connection;
+
+      const made = yield* (yield* ServerClient)
+        .call((api) => api.devices.code())
+        .pipe(
+          Effect.mapError((error) =>
+            local.server === localServer && Option.isNone(local.token)
+              ? new ClientError({
+                  message:
+                    "Only the server's owner can make a code here: run this as the user the server runs as, such as `sudo -u kestrel kestrel pair`, or use Settings, Devices on a paired browser",
+                })
+              : error,
+          ),
+        );
+
+      if (json) return yield* printJson({ pairing: made });
+
+      yield* Console.log(
+        `Pairing code ${made.code}, for one device, until ${new Date(made.expires).toLocaleTimeString()}`,
+      );
+
+      if (made.link === undefined) {
+        return yield* Console.log(
+          "This server only listens on this machine, so no other device can reach it yet",
+        );
+      }
+
+      yield* Console.log(`\nScan it, or open ${made.link}\n`);
+      yield* Console.log(renderUnicodeCompact(made.link));
+
+      return;
+    }
+
+    const { server: current } = yield* connection;
+    const target = Option.getOrElse(server, () => current).replace(/\/+$/, "");
+
+    const paired = yield* clientFor(target, Option.none()).pipe(
+      Effect.flatMap((client) =>
+        client.devices.pair({
+          payload: {
+            code: code.value,
+            name: `Command line on ${hostname()}`,
+            kind: "cli",
+          },
+        }),
+      ),
+      Effect.provide(FetchHttpClient.layer),
+      Effect.catchTag("PairingRefused", () =>
+        Effect.fail(
+          new ClientError({
+            message:
+              "That code didn't work: it may be mistyped, used or out of time. Get a new one and try again",
+          }),
+        ),
+      ),
+      Effect.mapError((error) =>
+        error instanceof ClientError
+          ? error
+          : new ClientError({
+              message: `Couldn't pair with ${target}: ${error.message}`,
+            }),
+      ),
+    );
+
+    if (paired.token === undefined) {
+      return yield* new ClientError({
+        message: "The server paired this CLI but sent no token back",
+      });
+    }
+
+    const file = yield* writeSaved({
+      server: target,
+      serverId: paired.server.id,
+      token: paired.token,
+    });
+
+    if (json) {
+      return yield* printJson({
+        paired: { server: paired.server, device: paired.device, file },
+      });
+    }
+
+    yield* Console.log(
+      `Paired with ${paired.server.name} at ${target}, and saved in ${file}`,
+    );
+  }),
+).pipe(
+  Command.withDescription(
+    "Pair this CLI with a server by a code, or with no code, show a code and QR code for another device",
+  ),
+);
+
+const devicesList = Command.make(
+  "devices",
+  { json },
+  Effect.fn("devices")(function* ({ json }) {
+    const list = yield* (yield* ServerClient).call((api) => api.devices.list());
+
+    if (json) return yield* printJson({ devices: list });
+
+    if (list.length === 0) {
+      return yield* Console.log(
+        "No devices are paired yet: `kestrel pair` shows a code for one",
+      );
+    }
+
+    for (const device of list) {
+      yield* Console.log(
+        `${device.id}  ${device.name}  ${device.kind}  last used ${device.lastSeen?.replace("T", " ").slice(0, 16) ?? "never"}`,
+      );
+    }
+  }),
+);
+
+const devicesRemove = Command.make(
+  "remove",
+  {
+    id: Argument.String("id").pipe(
+      Argument.withDescription("The device's id, from `kestrel devices`"),
+    ),
+  },
+  Effect.fn("devicesRemove")(function* ({ id }) {
+    yield* (yield* ServerClient).call((api) =>
+      api.devices.revoke({ params: { id } }),
+    );
+
+    yield* Console.log(`Unpaired ${id}`);
+  }),
+).pipe(
+  Command.withDescription(
+    "Unpair a device, so its token and its windows stop working",
+  ),
+);
+
+const devices = devicesList.pipe(
+  Command.withDescription(
+    "The devices paired with the server, such as browsers, phones and this CLI",
+  ),
+  Command.withSubcommands([devicesRemove]),
+);
+
 /** The Code Mode manifest: every operation with how an agent may use it. */
 const agentTools = Command.make(
   "tools",
@@ -517,6 +698,8 @@ const cli = Command.make("kestrel").pipe(
     download,
     days,
     events,
+    devices,
+    pair,
     agent,
     mcp,
   ]),
@@ -524,6 +707,8 @@ const cli = Command.make("kestrel").pipe(
 
 cli.pipe(
   Command.run({ version: "0.0.0" }),
-  Effect.provide(Layer.mergeAll(ServerClient.layer, BunServices.layer)),
+  Effect.provide(
+    ServerClient.layer.pipe(Layer.provideMerge(BunServices.layer)),
+  ),
   BunRuntime.runMain,
 );
