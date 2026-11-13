@@ -141,7 +141,14 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       const into = at - toSeconds(recording.begin);
       const current = tile.player.clip();
 
-      if (current?.begin !== recording.begin) {
+      // The same recording, grown since it loaded, as today's newest does,
+      // loads again from where it got to once the playhead reaches its old end
+      const grown =
+        current?.begin === recording.begin &&
+        current.end < recording.end &&
+        at >= toSeconds(current.end);
+
+      if (current?.begin !== recording.begin || grown) {
         started.push(tile.player.play(recording, into, playing));
         continue;
       }

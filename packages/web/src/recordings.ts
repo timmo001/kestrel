@@ -141,6 +141,9 @@ const daySeconds = 24 * 60 * 60;
 /** How often where it's playing is kept, in milliseconds. */
 const keepEvery = 2000;
 
+/** How often today's recordings are read again, in milliseconds. */
+const refreshEvery = 30_000;
+
 /** Where this page's settings are kept, as Upkeep keeps its pages'. */
 const storageKey = "kestrel.recordings";
 
@@ -1373,6 +1376,30 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     event.preventDefault();
     action();
   });
+
+  // Today's newest recording is still being made, as one from a camera
+  // recording all the time is, so the list is read again now and then and it
+  // runs on up to now, while the page shows
+  let refreshing = false;
+
+  setInterval(() => {
+    if (
+      refreshing ||
+      page?.hidden !== false ||
+      document.hidden ||
+      day !== isoDay(new Date())
+    ) {
+      return;
+    }
+
+    refreshing = true;
+
+    void showRecordings()
+      .catch(() => undefined)
+      .finally(() => {
+        refreshing = false;
+      });
+  }, refreshEvery);
 
   // Each control's key, in its tooltip and for assistive technology
   const shortcuts: ReadonlyArray<
