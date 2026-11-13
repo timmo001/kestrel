@@ -23,10 +23,12 @@ import type { RecordedDay, Recording } from "./Recordings.ts";
 import type { Connection } from "./Sources.ts";
 import type { LocalTime } from "./Times.ts";
 
-/** One frame of recorded H.264 video. */
+/** One frame of recorded H.264 or H.265 video. */
 export interface RecordedFrame {
-  /** A key frame, which starts with its SPS, PPS and SEI. */
+  /** A key frame, which starts with its parameter sets (VPS for H.265, SPS, PPS) and SEI. */
   readonly key: boolean;
+  /** H.265 when `"h265"`; H.264 when left out, as most sources send. */
+  readonly codec?: "h264" | "h265" | undefined;
   /**
    * When it was recorded, in microseconds since 1970, on the recorder's own
    * clock: local time with no zone, so read it as if it were UTC.

@@ -1,7 +1,7 @@
 /**
  * Writing recorded video as MP4: the frames a source sends written as
  * fragmented MP4, which a browser plays as it arrives and any player opens
- * as a file.
+ * as a file. H.264 and H.265 both go in as they are.
  *
  * @module
  */
@@ -36,15 +36,22 @@ export const avcCodec = (data: Uint8Array) => {
   return "avc1.640028";
 };
 
+/**
+ * Any H.265 a camera sends, Main profile up to level 5; the MP4's own
+ * `hvcC` box, made from the first key frame, has the exact profile.
+ */
+export const hevcCodec = "hvc1.1.6.L150.90";
+
 /** Gaps longer than this, such as between motion clips, play as one frame. */
 const longestGap = 2;
 
 /**
  * Writes frames as fragmented MP4, a fragment per key frame group, and
  * passes the bytes on as they're written. Frames before the first key frame,
- * and any that don't move time forward, are left out. Time runs from 0 at the
- * first frame, with gaps between files closed up, `speedUp` times faster
- * than it was recorded.
+ * and any that don't move time forward, are left out. It ends where the
+ * codec changes, such as at a file recorded before a camera changed to
+ * H.265, as one MP4 holds one. Time runs from 0 at the first frame, with
+ * gaps between files closed up, `speedUp` times faster than it was recorded.
  */
 export const toMp4 = <E>(
   frames: Stream.Stream<RecordedFrame, E>,
@@ -72,18 +79,22 @@ export const toMp4 = <E>(
         target: new StreamTarget(new WritableStream({ write })),
       });
 
-      const source = new EncodedVideoPacketSource("avc");
-
-      output.addVideoTrack(source);
-
+      let source: EncodedVideoPacketSource | undefined;
+      let codec: RecordedFrame["codec"];
       let previous: RecordedFrame | undefined;
       let timestamp = 0;
 
       /** Adds the frame before this one, now that its duration is known. */
       const add = async (frame: RecordedFrame | undefined) => {
-        if (previous === undefined) {
+        if (previous === undefined || source === undefined) {
           if (frame === undefined || !frame.key) return;
 
+          // The track takes the first key frame's codec
+          codec = frame.codec ?? "h264";
+          source = new EncodedVideoPacketSource(
+            codec === "h265" ? "hevc" : "avc",
+          );
+          output.addVideoTrack(source);
           await output.start();
           previous = frame;
 
@@ -116,7 +127,7 @@ export const toMp4 = <E>(
           timestamp === 0
             ? {
                 decoderConfig: {
-                  codec: avcCodec(previous.data),
+                  codec: codec === "h265" ? hevcCodec : avcCodec(previous.data),
                   codedWidth: previous.width,
                   codedHeight: previous.height,
                 },
@@ -150,6 +161,9 @@ export const toMp4 = <E>(
       });
 
       return frames.pipe(
+        Stream.takeWhile(
+          (frame) => codec === undefined || (frame.codec ?? "h264") === codec,
+        ),
         Stream.mapEffect((frame) => step(() => add(frame))),
         Stream.concat(Stream.fromEffect(finish)),
         Stream.flattenIterable,

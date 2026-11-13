@@ -2,10 +2,10 @@
  * A hub or recorder's files, handed over by replaying each over Reolink's
  * own protocol on port 9000, as its HTTP API won't prepare a download.
  * Replays come as H.265 or H.264 with no timing of their own, so each is
- * put in an MP4 with ffmpeg, `KESTREL_FFMPEG` or the one on the path, and
- * H.265 is converted to H.264 on the way. One file at a time, written to
- * disk as it comes; background work reads it at the copy rate and converts
- * on one thread, at the lowest priority.
+ * put in an MP4 with ffmpeg, `KESTREL_FFMPEG` or the one on the path, as it
+ * is, with nothing converted. One file at a time, written to disk as it
+ * comes; background work reads it at the copy rate and runs ffmpeg at the
+ * lowest priority.
  *
  * @module
  */
@@ -115,8 +115,8 @@ export const deviceReplays = Effect.fnUntraced(function* (
     Effect.orElseSucceed(() => "ffmpeg"),
   );
 
-  // Replays and conversions are heavy, so they take turns
-  const converting = yield* Semaphore.make(1);
+  // Replays are heavy on the device and the disk, so they take turns
+  const replaying = yield* Semaphore.make(1);
 
   const unavailable = (message: string) =>
     new SourceUnavailable({ message: `${name} ${message}` });
@@ -205,38 +205,14 @@ export const deviceReplays = Effect.fnUntraced(function* (
 
         const hevc = reading.codec() === "H265";
 
-        // Background work converts on one thread, so the machine keeps the rest;
-        // a short lookahead holds a few 4K frames rather than gigabytes
-        const threads = ["-threads", pace === undefined ? "4" : "1"];
-
-        // Frames in the order they show, with a key frame every few seconds to seek to
-        const encode = hevc
-          ? [
-              "-c:v",
-              "libx264",
-              "-preset",
-              "veryfast",
-              "-x264-params",
-              "rc-lookahead=4:sync-lookahead=0",
-              "-crf",
-              "26",
-              "-pix_fmt",
-              "yuv420p",
-              "-bf",
-              "0",
-              "-g",
-              "50",
-              ...threads,
-            ]
-          : ["-c:v", "copy"];
-
+        // Copied as it is, so nothing is converted; H.265 is tagged `hvc1`,
+        // as browsers that play it want
         const args = [
           "-hide_banner",
           "-loglevel",
           "error",
           "-nostdin",
           "-y",
-          ...threads,
           "-f",
           hevc ? "hevc" : "h264",
           "-r",
@@ -245,7 +221,9 @@ export const deviceReplays = Effect.fnUntraced(function* (
           raw,
           "-map",
           "0:v:0",
-          ...encode,
+          "-c:v",
+          "copy",
+          ...(hevc ? ["-tag:v", "hvc1"] : []),
           "-movflags",
           "+faststart",
           mp4,
@@ -262,13 +240,13 @@ export const deviceReplays = Effect.fnUntraced(function* (
 
         if (code !== 0) {
           return yield* unavailable(
-            `couldn't convert a video: ffmpeg exited with code ${code}`,
+            `couldn't put a video in an MP4: ffmpeg exited with code ${code}`,
           );
         }
 
         yield* fs.remove(raw);
       }).pipe(
-        (effect) => converting.withPermit(effect),
+        (effect) => replaying.withPermit(effect),
         Effect.onError(() => clear),
       );
 

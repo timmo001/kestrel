@@ -3,7 +3,8 @@
  * Media Source Extensions rather than a plain video source: the length is
  * known from the start, a seek past what's loaded asks the server for video
  * from there, and only a few minutes around the playhead stay in memory, as
- * the recorder sends far faster than it plays.
+ * the recorder sends far faster than it plays. H.264 and H.265 both play
+ * where the browser can, each MP4 telling which it holds.
  */
 import { serverUrl } from "./api.ts";
 
@@ -70,7 +71,35 @@ const ahead = 90;
 const behind = 30;
 
 /** Any H.264 the recorder sends fits this; the MP4's own header has the exact profile. */
-const mimeType = 'video/mp4; codecs="avc1.640028"';
+const avcType = 'video/mp4; codecs="avc1.640028"';
+
+/** Any H.265 a camera sends, such as a Reolink hub's, as the server writes it. */
+const hevcType = 'video/mp4; codecs="hvc1.1.6.L150.90"';
+
+const encoder = new TextEncoder();
+
+const hvcC = encoder.encode("hvcC");
+
+const avcC = encoder.encode("avcC");
+
+const holds = (bytes: Uint8Array, box: Uint8Array) =>
+  bytes.some(
+    (_, index) =>
+      index + box.length <= bytes.length &&
+      box.every((each, offset) => bytes[index + offset] === each),
+  );
+
+/** An MP4's type from its start, by its sample entry's configuration box, or undefined until that has come. */
+const typeOf = (bytes: Uint8Array) => {
+  if (holds(bytes, hvcC)) return hevcType;
+
+  if (holds(bytes, avcC)) return avcType;
+
+  return undefined;
+};
+
+/** How much of an MP4's start is read looking for its type before giving up. */
+const headLimit = 256 * 1024;
 
 const once = (target: EventTarget, type: string) =>
   new Promise<void>((resolve) => {
@@ -129,6 +158,10 @@ export const playerFor = (
   let buffer: SourceBuffer | undefined;
   let loading: AbortController | undefined;
   let loadingFrom = 0;
+  /** Where in the clip the latest load started, in seconds. */
+  let loadStart = -1;
+  /** The type the source buffer reads, H.264 or H.265. */
+  let bufferType = "";
   /** Where the video's time 0 is in the clip: 0, unless the browser plays the MP4 directly from a later start. */
   let base = 0;
   let objectUrl = "";
@@ -206,11 +239,8 @@ export const playerFor = (
   const load = async (from: number) => {
     const clip = current;
     const media = source;
-    const target = buffer;
 
-    if (clip === undefined || media === undefined || target === undefined) {
-      return;
-    }
+    if (clip === undefined || media === undefined) return;
 
     loading?.abort();
 
@@ -221,16 +251,9 @@ export const playerFor = (
     const total = toSeconds(clip.end) - toSeconds(clip.begin);
 
     loading = controller;
+    loadStart = start;
     // In the video's time, as the seeks it's checked against are
     loadingFrom = start / view.speedUp;
-    await settle(target);
-
-    if (signal.aborted) return;
-
-    // A new MP4 starts here: reset the parser and place its time at `start`
-    if (media.readyState === "open") target.abort();
-
-    target.timestampOffset = start / view.speedUp;
 
     try {
       const response = await fetch(
@@ -247,11 +270,37 @@ export const playerFor = (
       }
 
       const reader = response.body.getReader();
+      let target: SourceBuffer | undefined;
+      let head = new Uint8Array(0);
 
       for (;;) {
         const { done, value } = await reader.read();
 
         if (done || signal.aborted) break;
+
+        if (target === undefined) {
+          // Held until the MP4's header says which codec it is
+          const joined = new Uint8Array(head.length + value.length);
+
+          joined.set(head);
+          joined.set(value, head.length);
+          head = joined;
+
+          const type = typeOf(head);
+
+          if (type === undefined && head.length < headLimit) continue;
+
+          target = await bufferFor(media, type ?? avcType);
+
+          if (signal.aborted || source !== media) return;
+
+          // A new MP4 starts here: reset the parser and place its time at `start`
+          if (media.readyState === "open") target.abort();
+
+          target.timestampOffset = start / view.speedUp;
+          await append(target, signal, head);
+          continue;
+        }
 
         await append(target, signal, value);
       }
@@ -261,13 +310,16 @@ export const playerFor = (
       loading = undefined;
 
       // The whole clip is in: let the video end there. Short of that the
-      // download was cut off, and "waiting" picks it up again
-      if (
-        loadedUntil() >= (total - 3) / view.speedUp &&
-        media.readyState === "open"
-      ) {
-        await settle(target);
-        media.endOfStream();
+      // download was cut off, or stopped where the recordings change codec:
+      // "waiting" picks it up again, or here when the playhead is already
+      // at the end of what's loaded
+      if (loadedUntil() >= (total - 3) / view.speedUp) {
+        if (target !== undefined && media.readyState === "open") {
+          await settle(target);
+          media.endOfStream();
+        }
+      } else if (!isLoaded(video.currentTime)) {
+        resume();
       }
     } catch (error) {
       if (signal.aborted) return;
@@ -275,6 +327,52 @@ export const playerFor = (
       loading = undefined;
       events.onProblem(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  /**
+   * The source buffer for an MP4 of `type`, changing the one there is to it
+   * where they differ, such as at a camera's older H.264 recordings. A
+   * browser that can't play it, as many can't play H.265, says so.
+   */
+  const bufferFor = async (media: MediaSource, type: string) => {
+    if (!MediaSource.isTypeSupported(type)) {
+      throw new Error(
+        type === hevcType
+          ? "This browser can't play H.265 video. Download the recording to play it in another player, or open Kestrel in a browser that plays H.265, such as Chrome, Edge or Safari."
+          : "This browser can't play this video.",
+      );
+    }
+
+    const existing = buffer;
+
+    if (existing === undefined) {
+      const created = media.addSourceBuffer(type);
+
+      buffer = created;
+      bufferType = type;
+
+      return created;
+    }
+
+    await settle(existing);
+
+    if (bufferType !== type) {
+      existing.changeType(type);
+      bufferType = type;
+    }
+
+    return existing;
+  };
+
+  /**
+   * Loads on from the end of what's loaded. A load that got no further, such
+   * as one that stopped where a camera's recordings change codec, goes on
+   * from the next second instead.
+   */
+  const resume = () => {
+    const until = loadedUntil() * view.speedUp;
+
+    void load(Math.floor(until) <= loadStart ? Math.ceil(until + 0.5) : until);
   };
 
   /** Whether the load under way starts at or just before `time`, so will reach it soon. */
@@ -301,7 +399,7 @@ export const playerFor = (
       loading === undefined &&
       !isLoaded(video.currentTime)
     ) {
-      void load(loadedUntil() * view.speedUp);
+      resume();
     }
   });
 
@@ -311,6 +409,8 @@ export const playerFor = (
     current = undefined;
     source = undefined;
     buffer = undefined;
+    bufferType = "";
+    loadStart = -1;
     video.removeAttribute("src");
     video.load();
 
@@ -337,7 +437,7 @@ export const playerFor = (
     // MP4 starts at `from`, so the video's time runs from there
     if (
       typeof MediaSource === "undefined" ||
-      !MediaSource.isTypeSupported(mimeType)
+      !MediaSource.isTypeSupported(avcType)
     ) {
       base = start;
       video.src = clipUrl(
@@ -363,10 +463,10 @@ export const playerFor = (
     if (source !== media) return;
 
     media.duration = length / view.speedUp;
-    buffer = media.addSourceBuffer(mimeType);
 
-    // With no video yet this only sets where playback starts, once the
-    // first fragment arrives; the load from there is already coming
+    // The source buffer comes with the first load, once its MP4 says which
+    // codec it is. With no video yet this only sets where playback starts,
+    // once the first fragment arrives; the load from there is already coming
     if (start > 0) video.currentTime = start / view.speedUp;
 
     void load(start);
