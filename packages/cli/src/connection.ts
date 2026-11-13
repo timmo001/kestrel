@@ -80,13 +80,24 @@ export const ownerToken = Effect.gen(function* () {
   );
 });
 
-/** The server to talk to, and the token to sign in with, if there is one. */
-export const connection = Effect.gen(function* () {
+/**
+ * The server to talk to, `named` where there's one, and the token to sign
+ * in with, if there is one.
+ */
+export const connectionTo = Effect.fn("connectionTo")(function* (
+  named: Option.Option<string>,
+) {
   const saved = yield* readSaved;
-  const given = yield* Config.option(Config.String("KESTREL_SERVER"));
+
+  const given = Option.map(named, (server) => server.replace(/\/+$/, ""));
+
+  const fromEnvironment = yield* Config.option(Config.String("KESTREL_SERVER"));
 
   const server = Option.getOrElse(
-    Option.orElse(given, () => Option.map(saved, (each) => each.server)),
+    Option.orElse(
+      Option.orElse(given, () => fromEnvironment),
+      () => Option.map(saved, (each) => each.server),
+    ),
     () => localServer,
   );
 
@@ -109,3 +120,6 @@ export const connection = Effect.gen(function* () {
 
   return { server, token, saved };
 });
+
+/** The server to talk to, and the token to sign in with, if there is one. */
+export const connection = connectionTo(Option.none());

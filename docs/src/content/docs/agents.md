@@ -21,6 +21,7 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel devices remove <id>`                          | Unpairs a device                                            |
 | `kestrel pair`                                         | A one-time code and QR code for another device              |
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
+| `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |
 
 `-c` takes a camera's id, such as `swann/1`; while there's one source, its
 camera's own id, such as `1`, is enough. `details` shows the only source
@@ -46,11 +47,11 @@ Run it from the repository with `bun packages/cli/src/cli.ts`.
 ## Code Mode and MCP
 
 `kestrel agent tools --json` prints the Code Mode manifest: every
-operation, its access and the command behind it. `download` and `pair` are
-the `write`s, since they save a file or a token. `kestrel mcp` serves the
-other operations over MCP on stdio, as read-only tools; a video file means
-nothing in an MCP reply, and pairing is for a person to do, so those two
-stay in the CLI.
+operation, its access and the command behind it. `download`, `pair` and
+`config copy` are the `write`s, since they save a file, a token or another
+server's settings. `kestrel mcp` serves the other operations over MCP on
+stdio, as read-only tools; a video file means nothing in an MCP reply, and
+pairing and copying are for a person to do, so those stay in the CLI.
 
 ## The skill
 

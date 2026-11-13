@@ -9,8 +9,9 @@ Prefer the `kestrel` Code Mode namespace, then the MCP server
 (`kestrel mcp`); fall back to the CLI with `--json`. They talk to the
 server at `KESTREL_SERVER`, else the one `kestrel pair` saved, else
 `http://127.0.0.1:7380`. Every operation only reads from the sources;
-`download` writes a file here and `pair` saves a token, so they're the
-writes, and they're in the CLI only.
+`download` writes a file here, `pair` saves a token and `config copy`
+replaces another server's settings, so they're the writes, and they're in
+the CLI only. Only run `config copy` when the person asks for it.
 
 A server only answers paired devices. When a call says this CLI needs
 pairing, tell the person: they get a code from Settings, Devices on a

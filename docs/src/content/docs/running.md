@@ -140,6 +140,25 @@ once. It fills in the references and saves the result to
 uses that file while it's there. After changing the login, run it again;
 `mise run auth:forget` removes the file.
 
+## Copying your setup to another server
+
+To move to a server on another machine, such as the Home Assistant app,
+pair the CLI with it (see [Agents](/agents)), then run:
+
+```sh
+kestrel config copy --server http://<server>:7380
+```
+
+It sends this machine's sources, their logins, the camera names and order,
+and what's recorded and for how long, through the other server's API, so
+there's no SSH or Docker involved. A field your `sources.json` leaves empty
+is filled in from the environment or `~/.config/kestrel/recorder.env`,
+such as `KESTREL_RAYSHARP_PASSWORD`. The recordings folder is left to the
+other server, since it's a path on this machine. Where the other server
+has sources this machine doesn't, it stops and says which; `--replace`
+drops them. The logins travel over plain HTTP, so copy over your own
+network, not across the internet.
+
 ## Starting the server
 
 ```sh

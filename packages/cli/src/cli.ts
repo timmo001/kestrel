@@ -42,9 +42,16 @@ import {
 import { Argument, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import { renderUnicodeCompact } from "uqr";
-import { connection, localServer, writeSaved } from "./connection.ts";
+import {
+  connection,
+  connectionTo,
+  localServer,
+  writeSaved,
+} from "./connection.ts";
+import { localSettings } from "./copy.ts";
 import { serveMcp } from "./mcp.ts";
 import {
+  asClientError,
   ClientError,
   clientFor,
   operations,
@@ -80,6 +87,13 @@ type Output =
   | { readonly events: ReadonlyArray<CameraEvent> }
   | { readonly devices: ReadonlyArray<Device> }
   | { readonly pairing: PairingCode }
+  | {
+      readonly copied: {
+        readonly server: string;
+        readonly sources: ReadonlyArray<string>;
+        readonly dropped: ReadonlyArray<string>;
+      };
+    }
   | {
       readonly paired: {
         readonly server: ServerInfo;
@@ -658,6 +672,93 @@ const devices = devicesList.pipe(
   Command.withSubcommands([devicesRemove]),
 );
 
+const configCopy = Command.make(
+  "copy",
+  {
+    json,
+    server: Flag.String("server").pipe(
+      Flag.withDescription(
+        "The server to copy to, such as http://192.168.1.20:7380; the one `kestrel pair` saved by default",
+      ),
+      Flag.optional,
+    ),
+    replace: Flag.Boolean("replace").pipe(
+      Flag.withDescription(
+        "Drop the other server's sources that this machine doesn't have",
+      ),
+      Flag.withDefault(false),
+    ),
+  },
+  Effect.fn("configCopy")(function* ({ json, server, replace }) {
+    const target = yield* connectionTo(server);
+
+    if (target.server === localServer) {
+      return yield* new ClientError({
+        message:
+          "That's this machine's own server: name the other one with --server, or pair with it first",
+      });
+    }
+
+    const client = yield* clientFor(target.server, target.token).pipe(
+      Effect.provide(FetchHttpClient.layer),
+    );
+
+    const call = <A, E extends Error>(
+      use: (api: typeof client) => Effect.Effect<A, E>,
+    ) => use(client).pipe(Effect.mapError(asClientError(target.server)));
+
+    const kinds = yield* call((api) => api.sources.kinds());
+    const theirs = yield* call((api) => api.sources.settings());
+    const ours = yield* localSettings(kinds);
+
+    const dropped = theirs.sources
+      .filter((source) => !ours.sources.some((each) => each.id === source.id))
+      .map((source) => source.id);
+
+    if (dropped.length > 0 && !replace) {
+      return yield* new ClientError({
+        message: `${target.server} has sources this machine doesn't: ${dropped.join(", ")}. Run again with --replace to drop them`,
+      });
+    }
+
+    // Saved against what the other server has now, so a change made there
+    // in the meantime isn't overwritten
+    yield* call((api) =>
+      api.sources.save({
+        payload: {
+          sources: ours.sources,
+          cameras: ours.cameras,
+          order: ours.order,
+          recording: ours.recording,
+          // The settings read back always carry one
+          revision: theirs.revision ?? "",
+        },
+      }),
+    );
+
+    const copied = ours.sources.map((source) => source.id);
+
+    if (json) {
+      return yield* printJson({
+        copied: { server: target.server, sources: copied, dropped },
+      });
+    }
+
+    yield* Console.log(
+      `Copied ${copied.length} source${copied.length === 1 ? "" : "s"} (${copied.join(", ")}) to ${target.server}${dropped.length > 0 ? `, dropping ${dropped.join(", ")}` : ""}`,
+    );
+  }),
+).pipe(
+  Command.withDescription(
+    "Copy this machine's sources, logins and camera names to another server, through its API",
+  ),
+);
+
+const config = Command.make("config").pipe(
+  Command.withDescription("This machine's setup"),
+  Command.withSubcommands([configCopy]),
+);
+
 /** The Code Mode manifest: every operation with how an agent may use it. */
 const agentTools = Command.make(
   "tools",
@@ -669,7 +770,7 @@ const agentTools = Command.make(
         name: operation.name,
         description: operation.description,
         access: operation.access,
-        command: ["kestrel", operation.name],
+        command: ["kestrel", ...operation.name.split(" ")],
         json: true,
       })),
     });
@@ -700,6 +801,7 @@ const cli = Command.make("kestrel").pipe(
     events,
     devices,
     pair,
+    config,
     agent,
     mcp,
   ]),

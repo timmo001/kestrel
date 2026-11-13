@@ -88,6 +88,12 @@ export const operations: ReadonlyArray<Operation> = [
     access: "read",
   },
   {
+    name: "config copy",
+    description:
+      "Copy this machine's sources, logins and camera names to another paired server, replacing its own",
+    access: "write",
+  },
+  {
     name: "pair",
     description:
       "Pair this CLI with a server by a code, or with no code, show a code and QR code for another device; saves the token on this machine",
@@ -112,12 +118,22 @@ export const clientFor = (
 
 type Client = Effect.Success<ReturnType<typeof clientFor>>;
 
+/** A failed call to `server` as a `ClientError`, saying how to pair where it refused this CLI. */
+export const asClientError = (server: string) => (error: Error) =>
+  new ClientError({
+    // The server refuses a CLI it doesn't know
+    message:
+      HttpClientError.isHttpClientError(error) && error.response?.status === 401
+        ? `The server at ${server} needs this CLI paired: get a code from Settings, Devices on a paired browser, then run \`kestrel pair <code> --server ${server}\``
+        : error.message,
+  });
+
 /** The Kestrel server's API, as the CLI and MCP server call it. */
 export class ServerClient extends Context.Service<
   ServerClient,
   {
     /** Runs one call against the server, with its failures as a `ClientError`. */
-    readonly call: <A, E>(
+    readonly call: <A, E extends Error>(
       use: (client: Client) => Effect.Effect<A, E>,
     ) => Effect.Effect<A, ClientError>;
   }
@@ -129,22 +145,7 @@ export class ServerClient extends Context.Service<
       const client = yield* clientFor(server, token);
 
       return ServerClient.of({
-        call: (use) =>
-          use(client).pipe(
-            Effect.mapError(
-              (error) =>
-                new ClientError({
-                  // The server refuses a CLI it doesn't know
-                  message:
-                    HttpClientError.isHttpClientError(error) &&
-                    error.response?.status === 401
-                      ? `The server at ${server} needs this CLI paired: get a code from Settings, Devices on a paired browser, then run \`kestrel pair <code> --server ${server}\``
-                      : error instanceof Error
-                        ? error.message
-                        : String(error),
-                }),
-            ),
-          ),
+        call: (use) => use(client).pipe(Effect.mapError(asClientError(server))),
       });
     }),
   ).pipe(Layer.provide(FetchHttpClient.layer));
