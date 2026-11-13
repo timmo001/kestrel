@@ -1,20 +1,20 @@
-On a Home Assistant Green, 0.4.0 still ran out of memory once it reached the Reolink hub's recordings. Converting them has its own limits now, and new motion clips no longer wait behind a long copy.
+Reolink hub clips are no longer converted. They're kept in H.265 as the hub recorded them, which is what took a Home Assistant Green to the edge in 0.4.x. There's also an Activity page to see what Kestrel is doing and what it's allowed to use.
 
-## Converting recordings
+## H.265 kept as it is
 
-The Reolink hub records in 4K H.265, which Kestrel converts to H.264 as it copies. In 0.4.0, ffmpeg used every core with x264's full lookahead and held dozens of 4K frames at once: 2.5 GB on an 8-core laptop, and about 1 GB on the Green, before the limits could step in. The whole replay was also held in memory before conversion started.
+The hub records in 4K H.265. Up to 0.4.1, Kestrel converted every clip to H.264 as it copied, and one 4K conversion could hold about 500 MB and a core and a half on a Green for twenty minutes.
 
-- Replays go to disk as they arrive, at the copy rate, and wait on the same limits as any other copy.
-- Background conversions run ffmpeg on one thread with a short lookahead, and wait for room before they start. A 4K hub clip now converts in about 400 MB, where 0.4.0 took 2.5 GB.
-- Playing a clip that isn't copied yet converts on up to four threads, so it still starts quickly.
-- Bambu Lab footage converts the same way.
+- Hub clips go into an MP4 as they are, with no conversion, so copying is mostly disk work now.
+- The Recordings page plays H.265 where the browser can, which includes Chrome, Edge and Safari. Where it can't, it says so; download the clip to play it in another player.
+- Playing across a camera's older H.264 clips and newer H.265 ones switches between them as it goes.
+- Bambu Lab footage is MJPEG, so it's still converted, at the lowest priority.
 
-Hub clips convert slowly on a Green, several minutes each, but they no longer take it down.
+## Activity
 
-## Recent clips first
+- Memory, CPU, disk and copy rate each show what's used against what background work is allowed, with the allowance drawn on the graph. They turn amber past it.
+- Errors and job runs go to an activity log, kept for 7 days, with tables for errors, recent copies and jobs.
+- Every table has a quick search, filters and a date and time filter, all remembered.
 
-Motion clips were already copied newest first, but each pass worked through the whole list it started with. On a first run that can be thousands of files, so new motion waited hours. A copy now looks again every 10 minutes, so new clips go ahead of older ones still waiting.
+## Agents
 
-## Docs
-
-- The install docs are in one place, with a tab for each platform.
+- An OpenCode plugin for the `kestrel` Code Mode tools, and `kestrel agent call` to run them from the command line.
