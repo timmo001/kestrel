@@ -88,8 +88,11 @@ const icons = {
   exitFullscreen: phCornersIn,
 };
 
-/** The speeds on the toggle; any other is typed in beside it. */
+/** The speeds on the toggle; any other is typed in from its Custom option. */
 const speeds = ["0.5", "1", "2", "4", "8", "16", "24", "32"];
+
+/** The toggle's last option, which opens a field for any other speed. */
+const customSpeed = "custom";
 
 const slowest = 0.1;
 const fastest = 32;
@@ -250,6 +253,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const previousButton = find("gw-button", "control-previous");
   const nextButton = find("gw-button", "control-next");
   const speedToggle = find("gw-segmented", "control-speed");
+  const speedCustom = find("gw-popover", "speed-custom");
   const speedOther = find("gw-input", "control-speed-other");
   const cutButton = find("gw-button", "control-cut");
   const captureButton = find("gw-button", "control-capture");
@@ -291,6 +295,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   /** The stream and speed-up playing, which the caption names. */
   let shownView = fullView;
+
+  /** What the toggle's Custom option says now, so it's only remade when that changes. */
+  let shownCustomLabel: string | undefined;
 
   /** All of them together, earliest first, for the table and the timeline's clicks. */
   let recordings: ReadonlyArray<Recording> = [];
@@ -756,10 +763,32 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     player?.view(view);
     showState();
 
-    // The toggle marks a preset, and the field shows whichever speed it is,
-    // unless it's being typed in or stepped, which it's left to
+    // The toggle marks a preset, or Custom, named for the speed, for any
+    // other. The field shows the speed, unless it's being typed in
+    const preset = speeds.includes(speed);
+    const customLabel = preset ? "Custom" : speedLabel(speed);
+
     if (speedToggle !== null) {
-      speedToggle.value = speeds.includes(speed) ? speed : "";
+      // Not while it's typed in, as new options would take the popover's
+      // anchor away; it's named once the popover closes
+      if (
+        customLabel !== shownCustomLabel &&
+        speedOther?.matches(":focus-within") !== true
+      ) {
+        const focused = speedToggle.matches(":focus-within");
+
+        speedToggle.options = [
+          ...speeds.map((value) => ({ value, label: speedLabel(value) })),
+          { value: customSpeed, label: customLabel },
+        ];
+        shownCustomLabel = customLabel;
+
+        if (focused) {
+          void speedToggle.updateComplete.then(() => speedToggle.focus());
+        }
+      }
+
+      speedToggle.value = preset ? speed : customSpeed;
     }
 
     if (speedOther !== null && !speedOther.matches(":focus-within")) {
@@ -774,23 +803,35 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   };
 
   if (speedToggle !== null) {
-    speedToggle.options = speeds.map((value) => ({
-      value,
-      label: speedLabel(value),
-    }));
-    on(speedToggle, "change", () => setSpeed(speedToggle.value));
+    on(speedToggle, "change", () => {
+      if (speedToggle.value !== customSpeed) setSpeed(speedToggle.value);
+    });
+    // Custom opens its field each time it's picked, beside it
+    on(speedToggle, "pick", (event) => {
+      if (event.detail.value === customSpeed) {
+        speedCustom?.show(speedToggle.optionFor(customSpeed));
+      }
+    });
   }
 
+  // Closed with no other speed typed, the toggle goes back to the speed
+  // playing
+  speedCustom?.addEventListener("close", () => {
+    if (speedOther !== null) speedOther.value = speed;
+
+    showSpeed();
+  });
+
   // A speed in range takes effect as it's typed. One out of range is pulled
-  // into it on leaving the field, rather than shown as an error line that
-  // would push the timeline down
+  // into it on leaving the field, rather than shown as an error line
   speedOther?.addEventListener("input", () => {
     const typed = Number(speedOther.value);
 
-    // Emptied, it's back to normal speed
-    if (speedOther.value === "") setSpeed("1");
-    else if (isSpeed(typed)) setSpeed(String(typed));
-    else showSpeed();
+    if (speedOther.value !== "" && isSpeed(typed)) setSpeed(String(typed));
+  });
+
+  speedOther?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") speedCustom?.close();
   });
 
   speedOther?.addEventListener("focusout", () => {

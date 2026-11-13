@@ -881,7 +881,6 @@ gw-table gw-sheet {
   .live-volume,
   .control-stop,
   .control-frame,
-  .player-controls .control-speed-other,
   .control-cut,
   .control-download {
     display: none;
