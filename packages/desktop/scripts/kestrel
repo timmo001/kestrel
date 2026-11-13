@@ -41,7 +41,7 @@ desktop() {
     exit 1
   fi
 
-  exec "$bundle/bin/launcher" "$@"
+  exec "$bundle/bin/launcher"
 }
 
 if [ "$#" -eq 0 ]; then
