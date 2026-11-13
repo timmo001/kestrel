@@ -1,9 +1,10 @@
-Recordings gets a Custom speed, and clips fade into each other again as they play on.
+Recordings now shows which clips are only on a camera's SD card, before you click them, and says plainly why they won't play.
 
 ## Recordings
 
-- Custom is the last option on the speed toggle. It opens a small popover with the field focused, ready to type any speed from 0.1× to 32×, and once it's set the option shows that speed, such as 5×. Enter or a click outside closes it; closed with nothing typed, the toggle goes back to the speed playing. This replaces the field that sat beside the toggle, so it now works on a phone too.
+- Clips a camera lists on its SD card but won't hand over are striped on the timeline instead of just faded, so they stand out from recordings that play. The key under the timeline gets an "Only on the camera" entry whenever there are any. Some Reolink cameras on their own, without a hub or recorder, behave this way, and Kestrel's own recordings of them still play as usual.
+- Clicking one of those clips says it's only on the camera's SD card and that the camera doesn't share those. Hovering over it says the same.
 
 ## Fixes
 
-- When one recording ran on into the next, the picture went to the loading shimmer instead of holding the last frame and fading into the next clip. Each camera's tile now holds its own last frame while the next clip loads, with one camera or several, and when a speed change switches stream.
+- The note over the player stayed up after a click elsewhere on the timeline, until a recording started. Any click on the timeline now clears it.
