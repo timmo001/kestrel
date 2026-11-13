@@ -1,16 +1,12 @@
 ---
 # Builds the desktop app on Linux and Windows, and keeps each one's installer
-# as an artifact. Electrobun only builds for the system it runs on.
+# as an artifact. Electrobun only builds for the system it runs on. On a
+# published release it attaches both installers to the release.
 name: Desktop
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/desktop.yml
-      - bun.lock
-      - mise.lock
-      - mise.toml
-      - packages/**
+  # Every pull request, since both builds are required checks
+  pull_request: {}
   push:
     branches:
       - main
@@ -20,11 +16,14 @@ on:
       - mise.lock
       - mise.toml
       - packages/**
+  release:
+    types:
+      - published
   workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'release' }}
 
 permissions:
   contents: read
@@ -46,6 +45,17 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Check the app's version matches the release
+        if: github.event_name == 'release' && runner.os == 'Linux'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="$(sed -n 's/^ *version: "\(.*\)",$/\1/p' packages/desktop/electrobun.config.ts)"
+          if [ "$version" != "$TAG" ]; then
+            echo "::error::The app's version is $version, but the release is $TAG"
+            exit 1
+          fi
 
       - name: Set up mise
         uses: jdx/mise-action@5ac50f778e26fac95da98d50503682459e86d566
@@ -76,3 +86,30 @@ jobs:
           name: kestrel-desktop-${{ runner.os }}
           path: packages/desktop/artifacts/
           if-no-files-found: error
+
+  release:
+    name: Attach to the release
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+          pattern: kestrel-desktop-*
+
+      - name: Attach installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir release
+          cp artifacts/kestrel-desktop-Linux/linux-x64-Kestrel-Setup.tar.gz \
+            "release/Kestrel-$TAG-linux-x64-Setup.tar.gz"
+          cp artifacts/kestrel-desktop-Windows/win-x64-Kestrel-Setup.zip \
+            "release/Kestrel-$TAG-windows-x64-Setup.zip"
+          (cd release && sha256sum -- * > SHA256SUMS)
+          gh release upload "$TAG" release/* --clobber --repo "$GITHUB_REPOSITORY"
