@@ -59,8 +59,9 @@ modules:
   - name: kestrel
     buildsystem: simple
     build-commands:
-      # The desktop app loads WebKitGTK 4.1 from the runtime
-      - ldconfig -p | grep -q libwebkit2gtk-4.1.so.0
+      # The desktop app loads WebKitGTK 4.1 from the runtime. The build has no
+      # loader cache to ask, so ask pkg-config.
+      - pkg-config --exists webkit2gtk-4.1
       - mkdir -p /app/kestrel-nvr /app/bin
       - cp -a lib/kestrel-nvr/. /app/kestrel-nvr/
       - ln -s /app/kestrel-nvr/Resources/app/kestrel /app/bin/kestrel
