@@ -17,6 +17,7 @@ import {
   UnknownCamera,
   type CameraId,
   type LocalTime,
+  type Pace,
   type RecordedDay,
   type RecordedFrame,
   type Recording,
@@ -146,6 +147,7 @@ export const printerRecordings = Effect.fnUntraced(function* (
     from: number,
     to: number,
     every: number | undefined,
+    pace: Pace | undefined,
   ) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -160,12 +162,17 @@ export const printerRecordings = Effect.fnUntraced(function* (
       const avi = path.join(folder, "video.avi");
       const mp4 = path.join(folder, "video.mp4");
 
+      // Background work converts on one thread, so the machine keeps the rest;
+      // a short lookahead holds a few frames rather than many
+      const threads = ["-threads", pace === undefined ? "4" : "1"];
+
       const args = [
         "-hide_banner",
         "-loglevel",
         "error",
         "-nostdin",
         "-y",
+        ...threads,
         "-i",
         avi,
         "-map",
@@ -174,6 +181,8 @@ export const printerRecordings = Effect.fnUntraced(function* (
         "libx264",
         "-preset",
         "veryfast",
+        "-x264-params",
+        "rc-lookahead=4:sync-lookahead=0",
         "-crf",
         "28",
         "-pix_fmt",
@@ -183,13 +192,18 @@ export const printerRecordings = Effect.fnUntraced(function* (
         "0",
         "-g",
         "50",
+        ...threads,
         "-movflags",
         "+faststart",
         mp4,
       ];
 
       yield* Effect.gen(function* () {
+        if (pace !== undefined) yield* pace.room;
+
         yield* download(login, file.path, avi);
+
+        if (pace !== undefined) yield* pace.room;
 
         const code = yield* Effect.scoped(
           spawner
@@ -315,9 +329,9 @@ export const printerRecordings = Effect.fnUntraced(function* (
 
       return Stream.fromIterable(parts).pipe(
         Stream.flatMap((file) =>
-          Stream.unwrap(converted(file, from, to, options.every)).pipe(
-            Stream.mapError(handOver),
-          ),
+          Stream.unwrap(
+            converted(file, from, to, options.every, options.pace),
+          ).pipe(Stream.mapError(handOver)),
         ),
       );
     }),

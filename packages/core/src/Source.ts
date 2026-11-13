@@ -131,6 +131,14 @@ export interface SourcePtz {
   ) => Effect.Effect<void, SourceUnavailable | UnknownCamera | NotSupported>;
 }
 
+/** How background work, such as copying, keeps to the limits. */
+export interface Pace {
+  /** The most bytes a second to read. */
+  readonly bytesPerSecond: number;
+  /** Waits while background work should. */
+  readonly room: Effect.Effect<unknown>;
+}
+
 /** Recordings, for a source that keeps them. */
 export interface SourceRecordings {
   /** Days with recordings on any of its cameras in a month, such as `2026-11`. */
@@ -154,6 +162,12 @@ export interface SourceRecordings {
     readonly end: LocalTime;
     readonly stream: "main" | "sub";
     readonly every?: number | undefined;
+    /**
+     * For background work: a source that does heavy work of its own before
+     * its frames come, such as replaying or converting a file, keeps to it.
+     * One whose frames come as they're read is held back by its reader.
+     */
+    readonly pace?: Pace | undefined;
   }) => Effect.Effect<
     Stream.Stream<RecordedFrame, SourceUnavailable>,
     SourceUnavailable | NoRecordings | UnknownCamera

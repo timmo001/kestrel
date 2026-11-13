@@ -1158,6 +1158,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         begin: options.begin,
         end: options.end,
         every: options.every,
+        pace: options.pace,
       });
     },
   );

@@ -8,6 +8,7 @@
  */
 import * as NodeSocket from "@effect/platform-node-shared/NodeSocket";
 import {
+  Cause,
   Deferred,
   Duration,
   Effect,
@@ -15,6 +16,7 @@ import {
   Queue,
   Redacted,
   Schema,
+  Stream,
 } from "effect";
 import * as Socket from "effect/socket/Socket";
 import {
@@ -106,12 +108,13 @@ export interface Session {
   /** Its device type, such as `ipc` or `homehub`, and how many channels it has. */
   readonly device: { readonly type: string; readonly channels: number };
   /**
-   * A recorded file, replayed from start to end as fast as the device sends
-   * it, as its media stream: see `Media.decode`.
+   * A recorded file, replayed from start to end as its media stream (see
+   * `Media.decoder`), in the pieces it comes in. The device sends no faster
+   * than they're read, as a few waiting pieces leave the connection unread.
    */
   readonly replay: (
     options: ReplayOptions,
-  ) => Effect.Effect<Uint8Array, SessionError>;
+  ) => Stream.Stream<Uint8Array, SessionError>;
 }
 
 const Command = {
@@ -130,6 +133,10 @@ const lastHandle = 239;
 
 const defaultTimeout = Duration.seconds(20);
 const defaultIdle = Duration.seconds(3);
+
+/** How many of a replay's messages wait to be read before the connection is left unread. */
+const replayBacklog = 32;
+
 const empty = new Uint8Array(0);
 const encoder = new TextEncoder();
 const xmlHead = '<?xml version="1.0" encoding="UTF-8" ?>';
@@ -399,29 +406,16 @@ export const open = Effect.fnUntraced(function* (
     return handle;
   };
 
-  const replay: Session["replay"] = (options) =>
-    Effect.gen(function* () {
-      const id = nextHandle();
-      const queue = yield* Queue.unbounded<Frame, SessionError>();
+  const replay: Session["replay"] = (options) => {
+    const id = nextHandle();
+    const stop = stopXml(options);
 
-      replays.set(id, queue);
+    return Stream.unwrap(
+      Effect.gen(function* () {
+        const queue = yield* Queue.bounded<Frame, SessionError>(replayBacklog);
 
-      const stop = stopXml(options);
+        replays.set(id, queue);
 
-      const stopped = Effect.gen(function* () {
-        replays.delete(id);
-
-        if (stop !== undefined) {
-          yield* request({
-            cmd: Command.replayStop,
-            channel: nextHandle(),
-            number: 0,
-            payload: sealed(stop, id),
-          }).pipe(Effect.ignore);
-        }
-      });
-
-      return yield* Effect.gen(function* () {
         yield* send(
           encodeFrame({
             cmd: Command.replay,
@@ -444,24 +438,49 @@ export const open = Effect.fnUntraced(function* (
           return yield* new ReplayRefused({ status: first.status });
         }
 
-        const chunks = [mediaOf(first)];
+        let ended = false;
 
         // Nothing marks the end, so a pause does, or a 201 where firmware sends one
-        for (;;) {
-          const next = yield* Queue.take(queue).pipe(
+        const next = Effect.gen(function* () {
+          if (ended) return yield* Cause.done();
+
+          const taken = yield* Queue.take(queue).pipe(
             Effect.timeoutOption(options.idle ?? defaultIdle),
           );
 
-          if (Option.isNone(next)) break;
+          if (Option.isNone(taken)) return yield* Cause.done();
 
-          chunks.push(mediaOf(next.value));
+          if (taken.value.status === 201) ended = true;
 
-          if (next.value.status === 201) break;
-        }
+          return [mediaOf(taken.value)] as const;
+        });
 
-        return concat(...chunks);
-      }).pipe(Effect.ensuring(stopped));
-    });
+        return Stream.succeed(mediaOf(first)).pipe(
+          Stream.concat(Stream.fromPull(Effect.succeed(next))),
+        );
+      }),
+    ).pipe(
+      Stream.ensuring(
+        Effect.gen(function* () {
+          const queue = replays.get(id);
+
+          replays.delete(id);
+
+          // Lets the connection's reader go on if it waits for room in the queue
+          if (queue !== undefined) yield* Queue.shutdown(queue);
+
+          if (stop !== undefined) {
+            yield* request({
+              cmd: Command.replayStop,
+              channel: nextHandle(),
+              number: 0,
+              payload: sealed(stop, id),
+            }).pipe(Effect.ignore);
+          }
+        }),
+      ),
+    );
+  };
 
   return {
     device: {

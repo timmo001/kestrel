@@ -3,18 +3,25 @@
  * own protocol on port 9000, as its HTTP API won't prepare a download.
  * Replays come as H.265 or H.264 with no timing of their own, so each is
  * put in an MP4 with ffmpeg, `KESTREL_FFMPEG` or the one on the path, and
- * H.265 is converted to H.264 on the way. One file at a time.
+ * H.265 is converted to H.264 on the way. One file at a time, written to
+ * disk as it comes; background work reads it at the copy rate and converts
+ * on one thread.
  *
  * @module
  */
 import * as NodeChildProcessSpawner from "@effect/platform-node-shared/NodeChildProcessSpawner";
 import * as NodeFileSystem from "@effect/platform-node-shared/NodeFileSystem";
 import * as NodePath from "@effect/platform-node-shared/NodePath";
-import { Codec, Media, Session } from "@timmo001/kestrel-protocol-baichuan";
-import { SourceUnavailable, type LocalTime } from "@timmo001/kestrel-core";
+import { Media, Session } from "@timmo001/kestrel-protocol-baichuan";
+import {
+  SourceUnavailable,
+  type LocalTime,
+  type Pace,
+} from "@timmo001/kestrel-core";
 import * as Mp4 from "@timmo001/kestrel-format-mp4";
 import {
   Config,
+  Duration,
   Effect,
   FileSystem,
   Layer,
@@ -47,15 +54,18 @@ const fallbackFps = 15;
 /** A local time as seconds since 1970, read as UTC, as the device keeps its clock. */
 const toSeconds = (time: string) => Date.parse(`${time}Z`) / 1000;
 
+/** What a replay held, counted as it's written out. */
+interface Counted {
+  count: number;
+  first: number;
+  last: number;
+}
+
 /** Frames a second, from how far the device's wrapping microsecond counter moved. */
-const fpsOf = (frames: ReadonlyArray<Media.MediaFrame>) => {
-  const first = frames.at(0)?.microseconds ?? 0;
-  const last = frames.at(-1)?.microseconds ?? 0;
+const fpsOf = ({ count, first, last }: Counted) => {
   const span = (last - first + 2 ** 32) % 2 ** 32;
 
-  return frames.length > 1 && span > 0
-    ? ((frames.length - 1) * 1e6) / span
-    : fallbackFps;
+  return count > 1 && span > 0 ? ((count - 1) * 1e6) / span : fallbackFps;
 };
 
 const services = NodeChildProcessSpawner.layer.pipe(
@@ -95,6 +105,7 @@ export const deviceReplays = Effect.fnUntraced(function* (
     from: number,
     to: number,
     every: number | undefined,
+    pace: Pace | undefined,
   ) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
@@ -113,30 +124,58 @@ export const deviceReplays = Effect.fnUntraced(function* (
       const mp4 = path.join(folder, "video.mp4");
 
       yield* Effect.gen(function* () {
-        const bytes = yield* Effect.scoped(
-          Session.connect({
-            host: options.host,
-            username: options.username,
-            password: options.password,
-          }).pipe(
-            Effect.flatMap((session) =>
-              session.replay({ channel, file: file.name }),
-            ),
-          ),
+        const reading = Media.decoder();
+        const counted: Counted = { count: 0, first: 0, last: 0 };
+
+        const pieces = Session.connect({
+          host: options.host,
+          username: options.username,
+          password: options.password,
+        }).pipe(
+          Effect.map((session) => session.replay({ channel, file: file.name })),
+          Stream.unwrap,
         );
 
-        const media = Media.decode(bytes);
+        const paced =
+          pace === undefined
+            ? pieces
+            : pieces.pipe(
+                Stream.tap(() => pace.room),
+                Stream.throttle({
+                  cost: (chunks) =>
+                    chunks.reduce((total, chunk) => total + chunk.length, 0),
+                  units: pace.bytesPerSecond,
+                  duration: Duration.seconds(1),
+                  burst: pace.bytesPerSecond,
+                  strategy: "shape",
+                }),
+              );
 
-        if (media.frames.length === 0) {
+        // Written as it comes, so a whole file is never held at once
+        yield* paced.pipe(
+          Stream.flatMap((piece) => Stream.fromIterable(reading.push(piece))),
+          Stream.concat(
+            Stream.suspend(() => Stream.fromIterable(reading.end())),
+          ),
+          Stream.map((frame) => {
+            if (counted.count === 0) counted.first = frame.microseconds;
+            counted.count += 1;
+            counted.last = frame.microseconds;
+
+            return frame.data;
+          }),
+          Stream.run(fs.sink(raw)),
+        );
+
+        if (counted.count === 0) {
           return yield* unavailable("replayed a file with no video");
         }
 
-        yield* fs.writeFile(
-          raw,
-          Codec.concat(...media.frames.map((frame) => frame.data)),
-        );
+        const hevc = reading.codec() === "H265";
 
-        const hevc = media.codec === "H265";
+        // Background work converts on one thread, so the machine keeps the rest;
+        // a short lookahead holds a few 4K frames rather than gigabytes
+        const threads = ["-threads", pace === undefined ? "4" : "1"];
 
         // Frames in the order they show, with a key frame every few seconds to seek to
         const encode = hevc
@@ -145,6 +184,8 @@ export const deviceReplays = Effect.fnUntraced(function* (
               "libx264",
               "-preset",
               "veryfast",
+              "-x264-params",
+              "rc-lookahead=4:sync-lookahead=0",
               "-crf",
               "26",
               "-pix_fmt",
@@ -153,6 +194,7 @@ export const deviceReplays = Effect.fnUntraced(function* (
               "0",
               "-g",
               "50",
+              ...threads,
             ]
           : ["-c:v", "copy"];
 
@@ -162,10 +204,11 @@ export const deviceReplays = Effect.fnUntraced(function* (
           "error",
           "-nostdin",
           "-y",
+          ...threads,
           "-f",
           hevc ? "hevc" : "h264",
           "-r",
-          fpsOf(media.frames).toFixed(3),
+          fpsOf(counted).toFixed(3),
           "-i",
           raw,
           "-map",
@@ -175,6 +218,8 @@ export const deviceReplays = Effect.fnUntraced(function* (
           "+faststart",
           mp4,
         ];
+
+        if (pace !== undefined) yield* pace.room;
 
         const code = yield* Effect.scoped(
           spawner
@@ -220,6 +265,7 @@ export const deviceReplays = Effect.fnUntraced(function* (
       readonly begin: LocalTime;
       readonly end: LocalTime;
       readonly every?: number | undefined;
+      readonly pace?: Pace | undefined;
     }) => {
       const from = toSeconds(request.begin);
       const to = toSeconds(request.end);
@@ -227,7 +273,14 @@ export const deviceReplays = Effect.fnUntraced(function* (
       return Stream.fromIterable(request.files).pipe(
         Stream.flatMap((file) =>
           Stream.unwrap(
-            replayed(file, request.channel, from, to, request.every),
+            replayed(
+              file,
+              request.channel,
+              from,
+              to,
+              request.every,
+              request.pace,
+            ),
           ).pipe(Stream.mapError(handOver)),
         ),
       );

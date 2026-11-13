@@ -32,6 +32,7 @@ export type {
   CameraInfo,
   LiveFeed,
   LiveView,
+  Pace,
   RecordedFrame,
   Source,
   SourceEvents,
