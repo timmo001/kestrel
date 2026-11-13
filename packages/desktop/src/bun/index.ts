@@ -1,7 +1,8 @@
 /**
  * The desktop app's main process: runs the Kestrel server, opens its page in
  * a window with Groundwork's desktop defaults and keeps running in the tray
- * once the window closes. The tray shows how the server is doing.
+ * once the window closes. The tray shows how the server is doing and opens
+ * the docs built into the app.
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +12,7 @@ import { BunServices } from "@effect/platform-bun";
 import {
   Effect,
   FileSystem,
+  Layer,
   ManagedRuntime,
   Stream,
   SubscriptionRef,
@@ -24,6 +26,7 @@ import {
 } from "@timmo001/groundwork-desktop/main";
 
 import config from "../../desktop.config.ts";
+import { DesktopDocs } from "./docs.ts";
 import { DesktopServer, type Status } from "./server.ts";
 
 const port = Number(process.env.KESTREL_PORT ?? 7380);
@@ -63,10 +66,13 @@ for (const [key, value] of Object.entries(parseEnv(saved))) {
 }
 
 const runtime = ManagedRuntime.make(
-  DesktopServer.layer({
-    port,
-    web: process.env.KESTREL_WEB ?? join(resources, "web"),
-  }),
+  Layer.merge(
+    DesktopServer.layer({
+      port,
+      web: process.env.KESTREL_WEB ?? join(resources, "web"),
+    }),
+    DesktopDocs.layer(join(resources, "docs")),
+  ),
 );
 
 const plural = (count: number, one: string) =>
@@ -91,6 +97,7 @@ const statusLine = (status: Status): string => {
 
 const trayItems = (status: Status): TrayItem[] => [
   { type: "normal", label: statusLine(status), enabled: false },
+  { type: "normal", label: "Docs", action: "docs" },
 ];
 
 const desktop = await openDesktopWindow(Electrobun, {
@@ -112,6 +119,14 @@ const desktop = await openDesktopWindow(Electrobun, {
     await runtime.context();
   },
   trayItems: trayItems({ state: "starting" }),
+  // The docs built into the app, in the system browser
+  onTrayAction: (action) => {
+    if (action !== "docs") return;
+
+    void runtime.runPromise(
+      DesktopDocs.useSync(({ url }) => Electrobun.Utils.openExternal(url)),
+    );
+  },
   createRPC: (requests: DesktopRequests) =>
     BrowserView.defineRPC<DesktopSchema>({
       maxRequestTime: 10_000,

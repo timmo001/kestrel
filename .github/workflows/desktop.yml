@@ -14,6 +14,7 @@ on:
     paths:
       - .github/workflows/desktop.yml
       - bun.lock
+      - docs/**
       - mise.lock
       - mise.toml
       - packages/**
@@ -76,6 +77,10 @@ jobs:
 
       - name: Build the web client
         run: bun run --filter @timmo001/kestrel-web build
+
+      - name: Build the docs
+        working-directory: docs
+        run: bun run build
 
       - name: Build
         working-directory: packages/desktop

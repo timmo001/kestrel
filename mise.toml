@@ -132,13 +132,13 @@ depends = ["lint", "typecheck", "format:check", "docs:check"]
 # both use ports 7380 and 1984 and the same recordings folder.
 [tasks."desktop:start"]
 description = "Build the desktop app for development and open it"
-depends = ["build"]
+depends = ["build", "docs:build"]
 dir = "packages/desktop"
 run = "bun run start"
 
 [tasks."desktop:build"]
 description = "Build the desktop app's release for this system"
-depends = ["build"]
+depends = ["build", "docs:build"]
 dir = "packages/desktop"
 run = "bun run package"
 

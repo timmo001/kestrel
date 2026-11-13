@@ -1,7 +1,7 @@
 /**
  * How Hutch builds the app: a Bun main process that runs the server and opens
- * the window, a preload script for the page, the built web client and
- * go2rtc. It uses the system's webview, not CEF.
+ * the window, a preload script for the page, the built web client, the
+ * built docs site and go2rtc. It uses the system's webview, not CEF.
  */
 import type { ElectrobunConfig } from "electrobun";
 
@@ -33,6 +33,7 @@ export default {
     },
     copy: {
       "../web/dist": "web",
+      "../../docs/dist/client": "docs",
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
       [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
     },
