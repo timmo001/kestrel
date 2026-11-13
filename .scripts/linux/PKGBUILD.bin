@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/bash
+# makepkg reads these variables and sets pkgdir itself
+# shellcheck disable=SC2034,SC2154
 # Maintainer: Aidan Timson (Timmo) <aidan@timmo.dev>
 # The prebuilt package, from a release's kestrel-nvr archive. The release
 # workflow fills in pkgver and the checksums. Only released versions are
