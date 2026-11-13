@@ -35,11 +35,13 @@ import { Go2rtc } from "./go2rtc/Go2rtc.ts";
 import * as Proxy from "./go2rtc/Proxy.ts";
 import { routes } from "./Handlers.ts";
 import { Identity, loopback } from "./Identity.ts";
+import { Jobs } from "./Jobs.ts";
 import { Library } from "./Library.ts";
 import { Push } from "./Push.ts";
 import * as Recording from "./Recording.ts";
 import { Sources } from "./Sources.ts";
 import * as Sync from "./Sync.ts";
+import { Usage } from "./Usage.ts";
 
 /** Home Assistant's ingress path, as the Supervisor sends it in `X-Ingress-Path`. */
 const ingressPath = /^\/api\/hassio_ingress\/[\w-]+$/;
@@ -374,7 +376,13 @@ export const layer = (options: ServeOptions) =>
     Layer.merge(Recording.layer),
     Layer.merge(Sync.layer),
     Layer.merge(Announce.layer(options)),
-    Layer.provide([Go2rtc.layer, Attention.layer, Library.layer]),
+    Layer.provide([
+      Go2rtc.layer,
+      Attention.layer,
+      Library.layer,
+      Jobs.layer,
+      Usage.layer,
+    ]),
     Layer.provide(Push.layer),
     // One `Devices` for the routes and the sign-in check, so a code made by
     // one is known to the other

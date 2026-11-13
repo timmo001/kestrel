@@ -31,8 +31,10 @@ import { Attention } from "./Attention.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Identity } from "./Identity.ts";
 import { streamNames, viewsOf } from "./go2rtc/Go2rtc.ts";
+import { Jobs } from "./Jobs.ts";
 import { Library } from "./Library.ts";
 import { capability, Sources } from "./Sources.ts";
+import { Usage } from "./Usage.ts";
 
 const SourcesHandlers = HttpApiBuilder.group(
   Api,
@@ -288,6 +290,20 @@ const SystemHandlers = HttpApiBuilder.group(Api, "system", (handlers) =>
   ),
 );
 
+const ActivityHandlers = HttpApiBuilder.group(
+  Api,
+  "activity",
+  Effect.fn(function* (handlers) {
+    const jobs = yield* Jobs;
+    const usage = yield* Usage;
+
+    // Pages poll these, so they stay out of the log like the health check
+    return handlers
+      .handle("jobs", () => HttpMiddleware.withLoggerDisabled(jobs.list))
+      .handle("usage", () => HttpMiddleware.withLoggerDisabled(usage.report));
+  }),
+);
+
 /** The cookie a paired browser signs in with, for setting it. */
 const sessionSecurity = HttpApiSecurity.apiKey({
   key: sessionCookie,
@@ -349,7 +365,7 @@ const DevicesHandlers = HttpApiBuilder.group(
   }),
 );
 
-/** The API's routes, needing the `Sources`, `Attention`, `Devices` and `Identity`. */
+/** The API's routes, needing the `Sources`, `Attention`, `Devices`, `Identity`, `Jobs` and `Usage`. */
 export const routes = HttpApiBuilder.layer(Api, {
   openapiPath: "/api/openapi.json",
 }).pipe(
@@ -360,6 +376,7 @@ export const routes = HttpApiBuilder.layer(Api, {
     RecordingsHandlers,
     EventsHandlers,
     SystemHandlers,
+    ActivityHandlers,
     DevicesHandlers,
   ]),
 );

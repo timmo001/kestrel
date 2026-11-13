@@ -201,6 +201,7 @@ export const restored = (
     continuousHours: incoming.recording.continuousHours,
     clipHours: incoming.recording.clipHours,
     diskShare: incoming.recording.diskShare,
+    limits: incoming.recording.limits,
   },
 });
 

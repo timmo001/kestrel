@@ -6,7 +6,10 @@
  * time, at full quality: clips first, then continuous footage, newest first.
  * Past the disk share, a file is only copied when something older would be
  * cleared out for it, and the clear-out runs straight after, so the newest
- * are kept and nothing is copied only to be deleted.
+ * are kept and nothing is copied only to be deleted. Copies read no faster
+ * than the copy rate in the limits, and wait, even part way through a file,
+ * while Kestrel or the machine is past one; the copy job says how it's
+ * getting on.
  *
  * @module
  */
@@ -21,10 +24,14 @@ import {
   Layer,
   Ref,
   Schedule,
+  Stream,
 } from "effect";
+import type { CopySource, Job } from "./Api.ts";
 import { ownRecordingsFolder } from "./Folders.ts";
+import { Jobs } from "./Jobs.ts";
 import { reasonTag } from "./Library.ts";
 import { Sources } from "./Sources.ts";
+import { Usage } from "./Usage.ts";
 
 /** How long between looks at what the sources have. */
 const every = Duration.minutes(10);
@@ -36,6 +43,11 @@ const settling = 5 * 60_000;
 const longest = Duration.minutes(30);
 
 const hour = 3_600_000;
+
+const megabyte = 1024 * 1024;
+
+/** How many of the newest copied recordings the copy job lists. */
+const listed = 20;
 
 const day = 24 * hour;
 
@@ -105,12 +117,21 @@ const wanted = Effect.fnUntraced(function* (
   return found.flat(2);
 });
 
-/** Copies one recording into the folder. */
-const copy = (folder: string, want: Wanted) =>
+/**
+ * Copies one recording into the folder, reading no faster than `rate` MB a
+ * second and waiting part way through while `room` says to, and returns
+ * its path.
+ */
+const copy = (
+  folder: string,
+  want: Wanted,
+  rate: number,
+  room: Effect.Effect<unknown>,
+) =>
   Effect.gen(function* () {
     const video = want.source.recordings?.video;
 
-    if (video === undefined) return;
+    if (video === undefined) return undefined;
 
     const frames = yield* video({
       camera: want.recording.camera,
@@ -119,16 +140,36 @@ const copy = (folder: string, want: Wanted) =>
       stream: "main",
     });
 
-    yield* Nvr.Store.save(
+    const perSecond = rate * megabyte;
+
+    return yield* Nvr.Store.save(
       {
         folder,
         key: want.recording.camera,
         begin: want.recording.begin,
         tags: want.tags,
       },
-      Mp4.toMp4(frames),
+      Mp4.toMp4(frames).pipe(
+        Stream.tap(() => room),
+        Stream.throttle({
+          cost: (chunks) =>
+            chunks.reduce((total, chunk) => total + chunk.length, 0),
+          units: perSecond,
+          duration: Duration.seconds(1),
+          burst: perSecond,
+          strategy: "shape",
+        }),
+      ),
     );
-  }).pipe(Effect.timeout(longest));
+  }).pipe(
+    // Slow copies of big files get longer, at twice the time they need
+    Effect.timeout(
+      Duration.max(
+        longest,
+        Duration.seconds(((want.recording.bytes ?? 0) / (rate * megabyte)) * 2),
+      ),
+    ),
+  );
 
 /**
  * Whether a clear-out would delete something further through its hours
@@ -161,18 +202,70 @@ export const layer = Layer.effectDiscard(
     const sources = yield* Sources;
     const fs = yield* FileSystem.FileSystem;
     const own = yield* ownRecordingsFolder;
+    const jobs = yield* Jobs;
+    const usage = yield* Usage;
+
+    const fresh: Job = {
+      id: "copy",
+      kind: "copy",
+      name: "Copy recordings from sources",
+      state: "idle",
+      detail: "Starts shortly",
+      since: "",
+    };
+
+    const report = (change: (job: Job) => Job) =>
+      jobs.update(fresh.id, (job) => change(job ?? fresh));
+
+    const at = Clock.currentTimeMillis.pipe(
+      Effect.map((now) => new Date(now).toISOString()),
+    );
+
+    /** What the job says while it works, kept for after a wait. */
+    const doing = yield* Ref.make("Looking at what sources have");
+
+    const working = (detail: string) =>
+      Ref.set(doing, detail).pipe(
+        Effect.andThen(report((job) => ({ ...job, state: "running", detail }))),
+      );
+
+    /** Waits while background work should, saying why in the job. */
+    const room = usage
+      .whenRoom((reason) =>
+        report((job) => ({
+          ...job,
+          state: "waiting",
+          detail: `Waiting: ${reason}`,
+        })),
+      )
+      .pipe(
+        Effect.tap((waited) =>
+          waited ? Ref.get(doing).pipe(Effect.flatMap(working)) : Effect.void,
+        ),
+      );
+
+    const failed = (message: string) =>
+      Effect.gen(function* () {
+        const now = yield* at;
+
+        yield* Effect.logWarning(message);
+        yield* report((job) => ({ ...job, lastError: { at: now, message } }));
+      });
 
     const pass = Effect.gen(function* () {
       const settings = (yield* sources.settings).recording;
       const folder = settings.folder ?? own;
+      const rate = settings.limits.copyRate;
 
+      yield* working("Looking at what sources have");
+      yield* room;
       yield* fs.makeDirectory(folder, { recursive: true, mode: 0o700 });
       yield* Nvr.Store.clearPartial(folder);
 
       const found = yield* Effect.forEach(yield* sources.all, (source) =>
         wanted(source, folder, settings).pipe(
           Effect.catch((error) =>
-            Effect.logWarning(
+            failed(
               `Recordings from ${source.id} can't be listed: ${String(error)}`,
             ).pipe(Effect.as([])),
           ),
@@ -193,9 +286,58 @@ export const layer = Layer.effectDiscard(
           .toSorted(newestFirst),
       ];
 
-      if (queue.length === 0) return;
+      const bySource = new Map<string, CopySource>(
+        found
+          .flat()
+          .map((want) => [
+            want.source.id,
+            { source: want.source.id, copied: 0, left: 0, bytes: 0 },
+          ]),
+      );
 
-      yield* Effect.logInfo(`Copying ${queue.length} recordings from sources`);
+      for (const want of queue) {
+        const was = bySource.get(want.source.id);
+
+        if (was !== undefined) {
+          bySource.set(want.source.id, { ...was, left: was.left + 1 });
+        }
+      }
+
+      const progress = { done: 0, total: queue.length, bytes: 0 };
+
+      const tally = (want: Wanted, bytes: number) => {
+        const was = bySource.get(want.source.id);
+
+        progress.done += 1;
+        progress.bytes += bytes;
+
+        if (was !== undefined) {
+          bySource.set(want.source.id, {
+            ...was,
+            copied: was.copied + (bytes > 0 ? 1 : 0),
+            left: was.left - 1,
+            bytes: was.bytes + bytes,
+          });
+        }
+
+        return report((job) => ({
+          ...job,
+          progress: { ...progress },
+          sources: [...bySource.values()],
+        }));
+      };
+
+      yield* report((job) => ({
+        ...job,
+        progress: { ...progress },
+        sources: [...bySource.values()],
+      }));
+
+      if (queue.length > 0) {
+        yield* Effect.logInfo(
+          `Copying ${queue.length} recordings from sources, at up to ${rate} MB a second`,
+        );
+      }
 
       const stored = yield* Ref.make(yield* Nvr.stored(folder));
       const copied = yield* Ref.make({ files: 0, bytes: 0 });
@@ -206,44 +348,108 @@ export const layer = Layer.effectDiscard(
           Effect.gen(function* () {
             const files = yield* Ref.get(stored);
             const used = sum(files);
-            const bytes = want.recording.bytes ?? 0;
             const space = yield* Nvr.disk(folder);
-            const fits = used + bytes <= Nvr.budget(settings, space, used);
+
+            const fits =
+              used + (want.recording.bytes ?? 0) <=
+              Nvr.budget(settings, space, used);
 
             const now = yield* Clock.currentTimeMillis;
 
-            if (!fits && !roomFor(files, want, settings, now)) return;
+            if (!fits && !roomFor(files, want, settings, now)) {
+              return yield* tally(want, 0);
+            }
 
-            yield* copy(folder, want);
+            yield* working(
+              `Copying ${want.recording.camera} from ${want.recording.begin.replace("T", " ")}`,
+            );
+            yield* room;
+
+            const file = yield* copy(folder, want, rate, room);
+
+            if (file === undefined) return yield* tally(want, 0);
+
+            const bytes = Number((yield* fs.stat(file)).size);
+            const when = yield* at;
 
             yield* Ref.update(copied, (total) => ({
               files: total.files + 1,
               bytes: total.bytes + bytes,
             }));
 
-            if (!fits) yield* Nvr.prune({ ...settings, folder });
+            yield* tally(want, bytes);
 
-            yield* Ref.set(stored, yield* Nvr.stored(folder));
+            yield* report((job) => ({
+              ...job,
+              recent: [
+                {
+                  camera: want.recording.camera,
+                  begin: want.recording.begin,
+                  bytes,
+                  at: when,
+                },
+                ...(job.recent ?? []),
+              ].slice(0, listed),
+            }));
+
+            if (fits) {
+              // Counting the folder again reads every file, so add this one
+              yield* Ref.update(stored, (all) => [
+                ...all,
+                {
+                  path: file,
+                  time: new Date(want.recording.begin).getTime(),
+                  bytes,
+                  continuous: want.continuous,
+                  modified: now,
+                },
+              ]);
+            } else {
+              yield* Nvr.prune({ ...settings, folder });
+              yield* Ref.set(stored, yield* Nvr.stored(folder));
+            }
           }).pipe(
             Effect.catch((error) =>
-              Effect.logWarning(
+              failed(
                 `${want.recording.camera} from ${want.recording.begin} can't be copied: ${String(error)}`,
-              ),
+              ).pipe(Effect.andThen(tally(want, 0))),
             ),
           ),
         { discard: true },
       );
 
       const total = yield* Ref.get(copied);
+      const summary = `Copied ${total.files} recordings, ${(total.bytes / 1e9).toFixed(1)} GB`;
+      const now = yield* at;
 
-      yield* Effect.logInfo(
-        `Copied ${total.files} recordings from sources, ${(total.bytes / 1e9).toFixed(1)} GB`,
-      );
+      if (queue.length > 0) {
+        yield* Effect.logInfo(`${summary} from sources`);
+      }
+
+      yield* report((job) => ({
+        ...job,
+        state: "idle",
+        detail: "Looks again in 10 minutes",
+        lastRun: { at: now, summary },
+      }));
     }).pipe(
       Effect.catch((error) =>
-        Effect.logWarning(`Recordings can't be copied: ${String(error)}`),
+        Effect.gen(function* () {
+          const message = `Recordings can't be copied: ${String(error)}`;
+          const now = yield* at;
+
+          yield* Effect.logWarning(message);
+          yield* report((job) => ({
+            ...job,
+            state: "failed",
+            detail: "Tries again in 10 minutes",
+            lastError: { at: now, message },
+          }));
+        }),
       ),
     );
+
+    yield* report((job) => job);
 
     // Gives the sources a moment to connect first
     yield* Effect.sleep(Duration.seconds(30)).pipe(

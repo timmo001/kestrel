@@ -39,7 +39,14 @@ export interface RecordOptions {
   readonly input: string;
   /** How long each file runs. */
   readonly segment: Duration.Duration;
+  /** Told when ffmpeg starts, and what it says when it complains or stops. */
+  readonly report?: (event: RecorderEvent) => Effect.Effect<void>;
 }
+
+/** ffmpeg has started, complained or stopped. */
+export type RecorderEvent =
+  | { readonly kind: "started" }
+  | { readonly kind: "error" | "stopped"; readonly message: string };
 
 /**
  * Records a camera until interrupted. When ffmpeg stops, such as when the
@@ -101,6 +108,8 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
     path.join(folder, "%Y-%m-%d", "%H-%M-%S.mp4"),
   ];
 
+  const report = options.report ?? (() => Effect.void);
+
   const run = Effect.scoped(
     Effect.gen(function* () {
       yield* days;
@@ -115,11 +124,15 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
         }),
       );
 
+      yield* report({ kind: "started" });
+
       yield* handle.stderr.pipe(
         Stream.decodeText,
         Stream.splitLines,
         Stream.runForEach((line) =>
-          Effect.logWarning(`Recording ${options.key}: ${line}`),
+          Effect.logWarning(`Recording ${options.key}: ${line}`).pipe(
+            Effect.andThen(report({ kind: "error", message: line })),
+          ),
         ),
         Effect.ignore,
         Effect.forkScoped,
@@ -142,7 +155,11 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
       );
 
       return yield* run.pipe(
-        Effect.tapError((error) => Effect.logWarning(String(error))),
+        Effect.tapError((error) =>
+          Effect.logWarning(String(error)).pipe(
+            Effect.andThen(report({ kind: "stopped", message: String(error) })),
+          ),
+        ),
         Effect.retry(restart),
       );
     }),

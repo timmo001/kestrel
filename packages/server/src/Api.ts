@@ -2,7 +2,7 @@
  * The server's HTTP API, shared by the server, the web client and the CLI
  * so each side encodes and decodes the same shapes. Each group is named
  * after its path: sources, attention, cameras, recordings, events, the
- * server's health and the paired devices. A camera's routes take its id as two path segments, so
+ * server's health, its jobs and usage, and the paired devices. A camera's routes take its id as two path segments, so
  * `swann/3` reads as itself, such as `/api/cameras/swann/3/recordings`.
  *
  * @module
@@ -15,6 +15,7 @@ import {
   Details,
   InvalidSettings,
   KindInfo,
+  Limits,
   LocalDate,
   LocalMonth,
   LocalTime,
@@ -215,6 +216,167 @@ export class SystemGroup extends HttpApiGroup.make("system").add(
   HttpApiEndpoint.get("health", "/api/health"),
 ) {}
 
+/** One look at how much of the machine Kestrel and everything else uses. */
+export const UsageSample = Schema.Struct({
+  /** When, in milliseconds since 1970. */
+  at: Schema.Number,
+  /** The machine's memory in all, in bytes, or the container's when it has a limit. */
+  memory: Schema.Number,
+  /** How much of it is free for use, in bytes. */
+  memoryFree: Schema.Number,
+  /** How much swap is in use, in bytes. */
+  swapUsed: Schema.Number,
+  /**
+   * The share of the last 10 seconds something on the machine waited for
+   * memory, as a percentage, from Linux's pressure figures; 0 without them.
+   */
+  memoryPressure: Schema.Number,
+  /** The same for the disk. */
+  diskPressure: Schema.Number,
+  /** The machine's CPU cores. */
+  cores: Schema.Number,
+  /** The machine's load over the last minute. */
+  load: Schema.Number,
+  /** The memory Kestrel uses, with go2rtc and ffmpeg, in bytes. */
+  kestrelMemory: Schema.Number,
+  /** The CPU Kestrel uses, with go2rtc and ffmpeg, as a percentage of one core. */
+  kestrelCpu: Schema.Number,
+});
+
+export type UsageSample = typeof UsageSample.Type;
+
+/** One of Kestrel's processes: the server, go2rtc or an ffmpeg. */
+export const ProcessUsage = Schema.Struct({
+  name: Schema.String,
+  /** In bytes. */
+  memory: Schema.Number,
+  /** As a percentage of one core. */
+  cpu: Schema.Number,
+});
+
+export type ProcessUsage = typeof ProcessUsage.Type;
+
+/** What a camera's recordings use in the recordings folder. */
+export const StoredCamera = Schema.Struct({
+  camera: Schema.String,
+  files: Schema.Number,
+  bytes: Schema.Number,
+});
+
+export type StoredCamera = typeof StoredCamera.Type;
+
+/** The disk the recordings folder is on, and what's in it. */
+export const DiskUsage = Schema.Struct({
+  folder: Schema.String,
+  /** In bytes. */
+  total: Schema.Number,
+  free: Schema.Number,
+  /** What recordings use, as of the last count. */
+  recordings: Schema.Number,
+  cameras: Schema.Array(StoredCamera),
+  /** When recordings were last counted, as an ISO time. */
+  counted: Schema.optional(Schema.String),
+});
+
+export type DiskUsage = typeof DiskUsage.Type;
+
+/**
+ * How much of the machine Kestrel uses now and over the last hour, against
+ * the limits background work keeps to.
+ */
+export const UsageReport = Schema.Struct({
+  limits: Limits,
+  /** Why background work is waiting now, if it is. */
+  holdUp: Schema.optional(Schema.String),
+  now: UsageSample,
+  processes: Schema.Array(ProcessUsage),
+  disk: Schema.optional(DiskUsage),
+  /** The last hour, oldest first. */
+  history: Schema.Array(UsageSample),
+});
+
+export type UsageReport = typeof UsageReport.Type;
+
+/** What a job does now: nothing until it's next due, working, waiting for room, or stopped by an error. */
+export const JobState = Schema.Literals([
+  "idle",
+  "running",
+  "waiting",
+  "failed",
+]);
+
+export type JobState = typeof JobState.Type;
+
+/** A recording a copy brought over from a source. */
+export const CopiedRecording = Schema.Struct({
+  camera: Schema.String,
+  /** When it starts, by the source's local time. */
+  begin: Schema.String,
+  bytes: Schema.Number,
+  /** When it was copied, as an ISO time. */
+  at: Schema.String,
+});
+
+export type CopiedRecording = typeof CopiedRecording.Type;
+
+/** How a copy is getting on with one source's recordings. */
+export const CopySource = Schema.Struct({
+  source: Schema.String,
+  copied: Schema.Number,
+  /** Still to copy in this pass. */
+  left: Schema.Number,
+  /** Copied in this pass, in bytes. */
+  bytes: Schema.Number,
+});
+
+export type CopySource = typeof CopySource.Type;
+
+/**
+ * Work the server does by itself: copying recordings from sources,
+ * recording a camera, or clearing out old recordings.
+ */
+export const Job = Schema.Struct({
+  /** Such as `copy`, `clear-out` or `record:swann/3`. */
+  id: Schema.String,
+  kind: Schema.Literals(["copy", "record", "clear-out"]),
+  name: Schema.String,
+  state: JobState,
+  /** What it's doing or waiting for, in a few words. */
+  detail: Schema.String,
+  /** When it went into its state, as an ISO time. */
+  since: Schema.String,
+  /** How far through this pass it is. */
+  progress: Schema.optional(
+    Schema.Struct({
+      done: Schema.Number,
+      total: Schema.Number,
+      bytes: Schema.Number,
+    }),
+  ),
+  /** A copy's sources, in this pass. */
+  sources: Schema.optional(Schema.Array(CopySource)),
+  /** A copy's newest recordings, newest first. */
+  recent: Schema.optional(Schema.Array(CopiedRecording)),
+  lastRun: Schema.optional(
+    Schema.Struct({ at: Schema.String, summary: Schema.String }),
+  ),
+  lastError: Schema.optional(
+    Schema.Struct({ at: Schema.String, message: Schema.String }),
+  ),
+});
+
+export type Job = typeof Job.Type;
+
+/** What the server does by itself, and how much of the machine it uses. */
+export class ActivityGroup extends HttpApiGroup.make("activity")
+  .add(
+    /** Each job, with what it's doing and how it's getting on. */
+    HttpApiEndpoint.get("jobs", "/jobs", { success: Schema.Array(Job) }),
+    /** Kestrel's use of memory, CPU and disk, now and over the last hour. */
+    HttpApiEndpoint.get("usage", "/usage", { success: UsageReport }),
+  )
+  .prefix("/api/activity") {}
+
 /** What a paired device is, which says how it signs in: a cookie for a browser, a token for the rest. */
 export const DeviceKind = Schema.Literals([
   "browser",
@@ -352,6 +514,7 @@ export class Api extends HttpApi.make("kestrel")
   .add(RecordingsGroup)
   .add(EventsGroup)
   .add(SystemGroup)
+  .add(ActivityGroup)
   .add(DevicesGroup) {}
 
 /** The cookie a paired browser signs in with. */

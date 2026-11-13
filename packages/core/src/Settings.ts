@@ -92,6 +92,61 @@ export const defaultClipHours = 30 * 24;
 /** The most of its disk recordings may use when you haven't said, as a percentage. */
 export const defaultDiskShare = 10;
 
+/** How fast a copy from a source may read when you haven't said, in MB a second. */
+export const defaultCopyRate = 2;
+
+/** The share of the machine's memory kept free when you haven't said, as a percentage. */
+export const defaultMemoryFree = 15;
+
+/** The most memory Kestrel may use when you haven't said, in MB. */
+export const defaultMemoryLimit = 512;
+
+/** The most of the machine's CPU Kestrel may use when you haven't said, as a percentage. */
+export const defaultCpuShare = 50;
+
+/** The lowest and highest each limit may be. */
+export const limitRanges = {
+  copyRate: { minimum: 0.1, maximum: 1000 },
+  memoryFree: { minimum: 0, maximum: 80 },
+  memoryLimit: { minimum: 64, maximum: 1_000_000 },
+  cpuShare: { minimum: 5, maximum: 100 },
+} as const;
+
+const limit = (
+  fallback: number,
+  range: { readonly minimum: number; readonly maximum: number },
+) =>
+  Schema.Number.check(Schema.isBetween(range)).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(fallback)),
+  );
+
+/**
+ * How much of the machine background work, such as copying recordings from
+ * sources and clearing out old ones, may take. It waits while Kestrel or the
+ * machine is past any of them, and carries on after. Live view and
+ * Kestrel's own recording never wait.
+ */
+export const Limits = Schema.Struct({
+  /** How fast a copy from a source may read, in MB a second. */
+  copyRate: limit(defaultCopyRate, limitRanges.copyRate),
+  /** The share of the machine's memory kept free, as a percentage. */
+  memoryFree: limit(defaultMemoryFree, limitRanges.memoryFree),
+  /** The most memory Kestrel, with go2rtc and ffmpeg, may use, in MB. */
+  memoryLimit: limit(defaultMemoryLimit, limitRanges.memoryLimit),
+  /** The most of the machine's CPU Kestrel may use, as a percentage. */
+  cpuShare: limit(defaultCpuShare, limitRanges.cpuShare),
+});
+
+export type Limits = typeof Limits.Type;
+
+/** The limits when you haven't set any. */
+export const defaultLimits: Limits = {
+  copyRate: defaultCopyRate,
+  memoryFree: defaultMemoryFree,
+  memoryLimit: defaultMemoryLimit,
+  cpuShare: defaultCpuShare,
+};
+
 const hours = (fallback: number) =>
   Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(fallback)),
@@ -127,6 +182,8 @@ export const RecordingSettings = Schema.Struct({
   diskShare: Schema.Number.check(
     Schema.isBetween({ minimum: 1, maximum: 90 }),
   ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultDiskShare))),
+  /** How much of the machine background work may take. */
+  limits: Limits.pipe(Schema.withDecodingDefaultKey(Effect.succeed({}))),
 });
 
 export interface RecordingSettings extends Schema.Schema.Type<

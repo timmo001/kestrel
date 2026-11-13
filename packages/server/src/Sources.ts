@@ -13,6 +13,7 @@ import {
   defaultClipHours,
   defaultContinuousHours,
   defaultDiskShare,
+  defaultLimits,
   InvalidSettings,
   NotSupported,
   SourceUnavailable,
@@ -76,6 +77,7 @@ const firstSettings: Settings = {
     continuousHours: defaultContinuousHours,
     clipHours: defaultClipHours,
     diskShare: defaultDiskShare,
+    limits: defaultLimits,
   },
 };
 
