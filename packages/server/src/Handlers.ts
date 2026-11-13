@@ -26,6 +26,7 @@ import {
   HttpApiSchema,
   HttpApiSecurity,
 } from "effect/http-api";
+import { ActivityLog } from "./ActivityLog.ts";
 import { Api, connectPath, PairingRefused, sessionCookie } from "./Api.ts";
 import { Attention } from "./Attention.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
@@ -296,11 +297,15 @@ const ActivityHandlers = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const jobs = yield* Jobs;
     const usage = yield* Usage;
+    const log = yield* ActivityLog;
 
     // Pages poll these, so they stay out of the log like the health check
     return handlers
       .handle("jobs", () => HttpMiddleware.withLoggerDisabled(jobs.list))
-      .handle("usage", () => HttpMiddleware.withLoggerDisabled(usage.report));
+      .handle("usage", () => HttpMiddleware.withLoggerDisabled(usage.report))
+      .handle("log", ({ query }) =>
+        HttpMiddleware.withLoggerDisabled(log.list(query)),
+      );
   }),
 );
 

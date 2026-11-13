@@ -28,6 +28,7 @@ import {
   Unpaired,
   VersionMismatch,
 } from "./Api.ts";
+import { ActivityLog } from "./ActivityLog.ts";
 import * as Announce from "./Announce.ts";
 import { Attention } from "./Attention.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
@@ -384,6 +385,7 @@ export const layer = (options: ServeOptions) =>
       Usage.layer,
     ]),
     Layer.provide(Push.layer),
+    Layer.provide(ActivityLog.layer),
     // One `Devices` for the routes and the sign-in check, so a code made by
     // one is known to the other
     Layer.provide(Devices.layer),

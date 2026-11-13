@@ -273,6 +273,13 @@ export const DiskUsage = Schema.Struct({
   free: Schema.Number,
   /** What recordings use, as of the last count. */
   recordings: Schema.Number,
+  /**
+   * What recordings may use in all, in bytes: the disk share from Settings,
+   * or less where that would leave the disk too full.
+   */
+  allowed: Schema.optional(Schema.Number),
+  /** The disk share recordings may use from Settings, as a percentage. */
+  diskShare: Schema.optional(Schema.Number),
   cameras: Schema.Array(StoredCamera),
   /** When recordings were last counted, as an ISO time. */
   counted: Schema.optional(Schema.String),
@@ -367,6 +374,28 @@ export const Job = Schema.Struct({
 
 export type Job = typeof Job.Type;
 
+/** How much an activity log entry matters. */
+export const LogLevel = Schema.Literals(["info", "error"]);
+
+export type LogLevel = typeof LogLevel.Type;
+
+/**
+ * One line of the activity log: a job's error or finished run. The server
+ * keeps the last 7 days, up to 5 MB.
+ */
+export const LogEntry = Schema.Struct({
+  /** When, as an ISO time. */
+  at: Schema.String,
+  /** The job's id, such as `copy` or `record:swann/3`. */
+  job: Schema.String,
+  /** The job's name, such as `Copy recordings from sources`. */
+  name: Schema.String,
+  level: LogLevel,
+  message: Schema.String,
+});
+
+export type LogEntry = typeof LogEntry.Type;
+
 /** What the server does by itself, and how much of the machine it uses. */
 export class ActivityGroup extends HttpApiGroup.make("activity")
   .add(
@@ -374,6 +403,24 @@ export class ActivityGroup extends HttpApiGroup.make("activity")
     HttpApiEndpoint.get("jobs", "/jobs", { success: Schema.Array(Job) }),
     /** Kestrel's use of memory, CPU and disk, now and over the last hour. */
     HttpApiEndpoint.get("usage", "/usage", { success: UsageReport }),
+    /**
+     * The activity log, newest first: the last `limit` entries, 200 by
+     * default, optionally of one job or level.
+     */
+    HttpApiEndpoint.get("log", "/log", {
+      query: {
+        job: Schema.optional(Schema.String),
+        level: Schema.optional(LogLevel),
+        limit: Schema.optional(
+          Schema.NumberFromString.check(
+            Schema.isInt(),
+            Schema.isGreaterThanOrEqualTo(1),
+            Schema.isLessThanOrEqualTo(5000),
+          ),
+        ),
+      },
+      success: Schema.Array(LogEntry),
+    }),
   )
   .prefix("/api/activity") {}
 

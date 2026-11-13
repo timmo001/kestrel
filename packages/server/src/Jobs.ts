@@ -7,10 +7,17 @@
  * @module
  */
 import { Clock, Context, Effect, Layer, Ref } from "effect";
+import { ActivityLog } from "./ActivityLog.ts";
 import type { Job } from "./Api.ts";
 
 /** A job's next report, from its last, or nothing to drop it. */
 export type JobChange = (job: Job | undefined) => Job | undefined;
+
+/** Whether `after` brings a different `at` from `before`. */
+const isNew = (
+  before: { readonly at: string } | undefined,
+  after: { readonly at: string } | undefined,
+) => after !== undefined && after.at !== before?.at;
 
 export class Jobs extends Context.Service<
   Jobs,
@@ -23,13 +30,14 @@ export class Jobs extends Context.Service<
   static readonly layer = Layer.effect(
     Jobs,
     Effect.gen(function* () {
+      const log = yield* ActivityLog;
       const jobs = yield* Ref.make(new Map<string, Job>());
 
       const update = (id: string, change: JobChange) =>
         Effect.gen(function* () {
           const now = new Date(yield* Clock.currentTimeMillis).toISOString();
 
-          yield* Ref.update(jobs, (current) => {
+          const [before, after] = yield* Ref.modify(jobs, (current) => {
             const before = current.get(id);
             const after = change(before);
             const next = new Map(current);
@@ -46,8 +54,29 @@ export class Jobs extends Context.Service<
               });
             }
 
-            return next;
+            return [[before, after] as const, next];
           });
+
+          // Each new error and finished run goes in the activity log
+          if (after === undefined) return;
+
+          if (isNew(before?.lastError, after.lastError)) {
+            yield* log.add({
+              job: id,
+              name: after.name,
+              level: "error",
+              message: after.lastError?.message ?? "",
+            });
+          }
+
+          if (isNew(before?.lastRun, after.lastRun)) {
+            yield* log.add({
+              job: id,
+              name: after.name,
+              level: "info",
+              message: after.lastRun?.summary ?? "",
+            });
+          }
         });
 
       return Jobs.of({

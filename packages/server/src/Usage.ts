@@ -357,7 +357,8 @@ export class Usage extends Context.Service<
       });
 
       const count = Effect.gen(function* () {
-        const folder = (yield* Ref.get(recording)).folder ?? own;
+        const settings = yield* Ref.get(recording);
+        const folder = settings.folder ?? own;
         const space = yield* Nvr.disk(folder);
         const files = yield* Nvr.stored(folder);
         const cameras = new Map<string, StoredCamera>();
@@ -377,13 +378,17 @@ export class Usage extends Context.Service<
           });
         }
 
+        const used = files.reduce((total, file) => total + file.bytes, 0);
+
         yield* Ref.set(
           counted,
           Option.some({
             folder,
             total: space.total,
             free: space.free,
-            recordings: files.reduce((total, file) => total + file.bytes, 0),
+            recordings: used,
+            allowed: Nvr.budget(settings, space, used),
+            diskShare: settings.diskShare,
             cameras: [...cameras.values()].toSorted((a, b) =>
               a.camera.localeCompare(b.camera),
             ),
