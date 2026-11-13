@@ -1280,9 +1280,20 @@ kbd {
   background: var(--gw-color-important);
 }
 
-/* Listed on its source, but it can't be played */
-.timeline-span[data-muted] {
-  opacity: 0.35;
+/* Listed on its source, but it can't be played: hatched, so it reads as
+   different before it's clicked */
+.timeline-span[data-muted],
+.timeline-legend span[data-muted]::before {
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0 2px,
+    var(--gw-color-surface-raised) 2px 4px
+  );
+}
+
+.timeline-legend span[data-muted]::before {
+  background-color: var(--gw-color-border-loud);
 }
 
 /* The clip Cut marks, over the recordings */
@@ -1374,6 +1385,10 @@ kbd {
   display: inline-flex;
   gap: var(--gw-space-1);
   align-items: center;
+}
+
+.timeline-legend span[hidden] {
+  display: none;
 }
 
 .timeline-legend span::before {

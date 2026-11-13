@@ -313,6 +313,10 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     problem.hidden = false;
   };
 
+  const hideNote = () => {
+    if (problem !== null) problem.hidden = true;
+  };
+
   const showProblem = (message: string) =>
     showNote(`Video stopped: ${message}`);
 
@@ -391,6 +395,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const timelineTicks = find("div", "timeline-ticks");
   const idleText = find("p", "player-idle");
   const pickText = idleText?.textContent.trim() ?? "";
+  const cameraOnlyKey = find("span", "timeline-legend-camera");
 
   const timeline =
     timelineTrack === null ||
@@ -410,16 +415,19 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
             ticks: timelineTicks,
           },
           // A click plays every camera from there, or from the next
-          // recording after a gap; in the recording already playing, it seeks
+          // recording after a gap; in the recording already playing, it seeks.
+          // Any click clears the last one's note
           (second) => {
             const at = (recording: Recording) =>
               secondOfDay(recording.begin) <= second &&
               secondOfDay(recording.end) > second;
 
+            hideNote();
+
             // A clip only on the camera doesn't skip on to a later recording
             if (!recordings.some(at) && listed.some(at)) {
               showNote(
-                "That clip is only on the camera, which can't hand it over",
+                "That clip is only on the camera's SD card, and this camera doesn't share those. Kestrel's own recordings of it play as usual",
               );
 
               return;
@@ -453,7 +461,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       start: secondOfDay(recording.begin),
       end: secondOfDay(recording.end),
       tone: reasonTones[reason],
-      title: `${clock(recording.begin)} to ${clock(recording.end)}, ${recording.reasons.join(", ")}${recording.playable === false ? ", on its source only, so it can't be played" : ""}`,
+      title: `${clock(recording.begin)} to ${clock(recording.end)}, ${recording.reasons.join(", ")}${recording.playable === false ? ", only on the camera's SD card, which it doesn't share" : ""}`,
       muted: recording.playable === false,
     };
   };
@@ -692,7 +700,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   playClip = (clip, from, autoplay = true) => {
     if (player === undefined) return;
 
-    if (problem !== null) problem.hidden = true;
+    hideNote();
 
     void player.play(clip, from, autoplay).then(() => keepPosition(true));
     showState();
@@ -1076,8 +1084,14 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (idleText !== null) {
       idleText.textContent =
         recordings.length === 0 && listed.length > 0
-          ? "These recordings are only on the camera, which can't hand them over"
+          ? "These recordings are only on the camera's SD card, and this camera doesn't share those"
           : pickText;
+    }
+
+    if (cameraOnlyKey !== null) {
+      cameraOnlyKey.hidden = !listed.some(
+        (recording) => recording.playable === false,
+      );
     }
 
     player?.setCameras(tracks, camera);
