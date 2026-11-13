@@ -8,6 +8,10 @@ runtime: org.gnome.Platform
 runtime-version: "51"
 sdk: org.gnome.Sdk
 command: kestrel
+build-options:
+  # Left to themselves, the tray's CMake modules install to /app/lib64,
+  # where neither pkg-config nor the loader looks
+  libdir: /app/lib
 finish-args:
   - --share=network
   - --share=ipc
