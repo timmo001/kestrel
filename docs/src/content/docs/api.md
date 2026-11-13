@@ -12,28 +12,36 @@ It serves **sources**, such as the recorder, and their **cameras**. A
 camera's id is its source's id and its own, such as `swann/3` for the
 recorder's channel 3, and its routes take the two as path segments.
 
-| Endpoint                                             | Returns                                                       |
-| ---------------------------------------------------- | ------------------------------------------------------------- |
-| `GET /api/sources`                                   | Each source: its kind, name and whether it's connected        |
-| `GET /api/sources/:source/details`                   | Its facts, clock, storage and each camera's state             |
-| `GET /api/sources/kinds`                             | Each kind of source the server runs and the settings it takes |
-| `GET /api/sources/settings`                          | Every source's settings and the camera labels, no secrets     |
-| `PUT /api/sources/settings`                          | Saves them and restarts the sources that changed              |
-| `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source |
-| `GET /api/cameras`                                   | Each camera: its id, name and what it can do                  |
-| `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`        |
-| `GET /api/cameras/:source/:camera/video?…`           | Recorded video as MP4; see below                              |
-| `GET /api/cameras/:source/:camera/still`             | A camera's still picture now, for one with `still`            |
-| `GET /api/recordings/days?month=…`                   | The days with recordings on any camera in a month             |
-| `GET /api/events/`                                   | The last 200 events from each source, newest first            |
-| `GET /api/events/live`                               | Events as server-sent events                                  |
-| `GET /api/health`                                    | 204 while the server is up                                    |
+| Endpoint                                             | Returns                                                                       |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `GET /api/sources`                                   | Each source: its kind, name and whether it's connected                        |
+| `GET /api/sources/:source/details`                   | Its facts, clock, storage and each camera's state                             |
+| `GET /api/sources/kinds`                             | Each kind of source the server runs and the settings it takes                 |
+| `GET /api/sources/settings`                          | Every source's settings and the camera labels, no secrets                     |
+| `PUT /api/sources/settings`                          | Saves them and restarts the sources that changed                              |
+| `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source                 |
+| `GET /api/cameras`                                   | Each camera: its id, name and what it can do                                  |
+| `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`                        |
+| `GET /api/cameras/:source/:camera/video?…`           | Recorded video as MP4; see below                                              |
+| `GET /api/cameras/:source/:camera/still`             | A camera's still picture now, for one with `still`                            |
+| `GET /api/cameras/:source/:camera/ptz`               | Where a camera that moves has its lens zoomed, its presets, home and tracking |
+| `POST /api/cameras/:source/:camera/ptz`              | Moves it, zooms it, or changes its presets, home or tracking; see below       |
+| `GET /api/recordings/days?month=…`                   | The days with recordings on any camera in a month                             |
+| `GET /api/events/`                                   | The last 200 events from each source, newest first                            |
+| `GET /api/events/live`                               | Events as server-sent events                                                  |
+| `GET /api/health`                                    | 204 while the server is up                                                    |
 
 A camera in `/api/cameras` says what it can do: `live` has its go2rtc stream
 names, or is `null` for a camera with no live view; `still` says whether it
 has a still picture, which the page shows in place of video for a camera with
 no live view; `recordings` and `events` say whether it has them; `signal` is whether it has a picture now, or `null`
-when its source can't tell. A source that isn't connected yet leaves its
+when its source can't tell. `views` lists its pictures where it has more
+than one, such as a TrackMix's `Wide` and `Telephoto` lenses, each with its
+`key`, `name`, `live` streams and whether the lens `zoom` changes it; it's
+empty for a camera with one. `controls.ptz` says whether it can `pan`,
+`tilt`, `zoom` its lens, has `presets`, has a `home` it goes back to and
+follows what it sees (`tracking`), or is `null` for a camera that
+can't move. A source that isn't connected yet leaves its
 cameras out until it knows them.
 
 The settings read back carry a `revision`. A save sends back the one it read,
@@ -119,10 +127,53 @@ height to draw the sub stream at when its frames squeeze the picture into
 another shape, as the DVR8-4575's 352×288 sub stream does with a 16:9
 picture, and `null` when it's drawn at its own shape.
 
+A camera's other views have streams named after them, such as
+`reolink-hub_1_telephoto` for a TrackMix's telephoto lens on a Reolink hub.
+It has no sub stream, so it plays its main stream in every layout.
+
 The DVR8-4575 offers an audio track on every stream but sends nothing on it,
 and an MSE player that asks for audio waits for it forever. The page plays
 video only, with go2rtc's own `video-rtc.js` player and `media` set to
 `video`, so do the same in other players.
+
+## Moving a camera
+
+A camera with `controls.ptz` takes a command as JSON at
+`POST /api/cameras/:source/:camera/ptz`, and answers 204:
+
+- `{"_tag": "Move", "pan": 0.5, "tilt": 0}` starts it moving, each from -1
+  to 1 with right and down positive, faster the further from 0. It only
+  moves eight ways, so a mostly sideways move goes straight sideways. It
+  stops by itself a second after the last `Move`, so send it again about
+  twice a second for as long as it should keep going.
+- `{"_tag": "Stop"}` stops it.
+- `{"_tag": "Zoom", "level": 0.5}` zooms its lens, from 0 widest to 1
+  furthest across its range. On a TrackMix it only changes the telephoto
+  picture.
+- `{"_tag": "Preset", "id": 0}` turns it to a preset.
+- `{"_tag": "SavePreset", "name": "Gate"}` saves where it points now as a
+  preset, in the first free slot. `RenamePreset` takes an `id` and a new
+  `name`, and `ClearPreset` an `id`. Names are 1 to 32 characters.
+- `{"_tag": "Home"}` sends it home, and `{"_tag": "SetHome"}` makes where it
+  points now its home. `KeepHome` sets whether it goes home once it's left
+  alone (`on`) and after how many seconds (`backAfter`).
+- `{"_tag": "Track", "on": true}` turns following what it sees on or off.
+  `Track` also takes what it `follows` (a list of `people`, `vehicles` and
+  `animals`), its `method` (`digital` zooms the picture only,
+  `digital-first` zooms then turns, `turn-first` turns first), and
+  `backAfterLeaving` and `backAfterStopping`, the seconds after its subject
+  leaves or stops before it goes home.
+
+`KeepHome` and `Track` change only the fields they're sent.
+
+`GET` on the same route gives its `zoom` now, from 0 to 1 or `null` for a
+lens that doesn't zoom, its `presets`, each with its `id` and `name`, its
+`home` (`on`, whether one's `set`, and `backAfter` in seconds) and its
+`tracking`: `on`, what it `follows` of the `targets` it can, its `method`
+of the `methods` it can, `backAfterLeaving` and `backAfterStopping`, and
+the `backChoices` it takes for those. `home` and `tracking` are `null` on a
+camera without them. A command a camera can't do, such as a preset on one
+with none, returns 404 with `NotSupported`.
 
 ## Push
 
