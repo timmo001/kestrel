@@ -1,20 +1,20 @@
-Reolink hub clips are no longer converted. They're kept in H.265 as the hub recorded them, which is what took a Home Assistant Green to the edge in 0.4.x. There's also an Activity page to see what Kestrel is doing and what it's allowed to use.
+Kestrel fits a phone now. Live, Recordings and Activity stay within the screen's width, and the players have controls laid out for a phone. In Home Assistant, Kestrel takes the whole screen.
 
-## H.265 kept as it is
+## The whole screen in Home Assistant
 
-The hub records in 4K H.265. Up to 0.4.1, Kestrel converted every clip to H.264 as it copied, and one 4K conversion could hold about 500 MB and a core and a half on a Green for twenty minutes.
+- Opened from Home Assistant's sidebar, Kestrel hides that sidebar and its header to take the whole screen.
+- The menu button at the start of the app bar shows the sidebar again; on a phone, it's in the app bar's menu.
+- To keep the sidebar, turn off the app's new **Hide the Home Assistant sidebar** option.
 
-- Hub clips go into an MP4 as they are, with no conversion, so copying is mostly disk work now.
-- The Recordings page plays H.265 where the browser can, which includes Chrome, Edge and Safari. Where it can't, it says so; download the clip to play it in another player.
-- Playing across a camera's older H.264 clips and newer H.265 ones switches between them as it goes.
-- Bambu Lab footage is MJPEG, so it's still converted, at the lowest priority.
+## Players on a phone
 
-## Activity
+- Live and Recordings share the same three rows: the transport with full screen, the layouts or speeds, then the zoom and capture.
+- On Recordings, Stop, Next frame, Cut and Download move into a More menu, with the recorder's clock where Live has mute.
+- The volume slider and the keyboard help are left out on phones and touch screens; the mute button stays.
+- The video keeps its shape with the timeline straight under it, rather than stretching to fill the window.
 
-- Memory, CPU, disk and copy rate each show what's used against what background work is allowed, with the allowance drawn on the graph. They turn amber past it.
-- Errors and job runs go to an activity log, kept for 7 days, with tables for errors, recent copies and jobs.
-- Every table has a quick search, filters and a date and time filter, all remembered.
+## Fixes
 
-## Agents
-
-- An OpenCode plugin for the `kestrel` Code Mode tools, and `kestrel agent call` to run them from the command line.
+- Live no longer shows "Page 1 of 1" when there's only one page.
+- The timeline's hour labels thin out to fit a narrow screen.
+- Activity's tables scroll sideways in their frame instead of widening the page.
