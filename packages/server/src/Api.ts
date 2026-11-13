@@ -20,6 +20,8 @@ import {
   LocalTime,
   NoRecordings,
   NotSupported,
+  PtzCommand,
+  PtzState,
   RecordedDay,
   Recording,
   Settings,
@@ -160,6 +162,26 @@ export class CamerasGroup extends HttpApiGroup.make("cameras")
       success: Schema.Uint8Array.pipe(
         HttpApiSchema.asUint8Array({ contentType: "image/jpeg" }),
       ),
+      error: cameraErrors,
+    }),
+    /**
+     * Where a camera that moves has its lens zoomed, its presets, its home
+     * and how it follows what it sees.
+     */
+    HttpApiEndpoint.get("ptz", "/:source/:camera/ptz", {
+      params: cameraParams,
+      success: PtzState,
+      error: cameraErrors,
+    }),
+    /**
+     * Tells a camera to move, stop, zoom or go to a preset; saves, renames
+     * or clears a preset; sends it home or makes where it points home; or
+     * changes how it goes home or follows what it sees. A camera that's
+     * moving stops by itself unless it's told to move again within a second.
+     */
+    HttpApiEndpoint.post("steer", "/:source/:camera/ptz", {
+      params: cameraParams,
+      payload: PtzCommand,
       error: cameraErrors,
     }),
   )

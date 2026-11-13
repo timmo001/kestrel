@@ -19,7 +19,7 @@ import { HttpMiddleware, HttpServerResponse } from "effect/http";
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api";
 import { Api } from "./Api.ts";
 import { Attention } from "./Attention.ts";
-import { streamNames } from "./go2rtc/Go2rtc.ts";
+import { streamNames, viewsOf } from "./go2rtc/Go2rtc.ts";
 import { Library } from "./Library.ts";
 import { capability, Sources } from "./Sources.ts";
 
@@ -98,6 +98,13 @@ const camerasOf = (
         channel: camera.channel,
         signal: camera.signal,
         live: camera.live && feed !== undefined ? streamNames(feed) : null,
+        views: camera.live && feed !== undefined ? viewsOf(feed) : [],
+        controls: {
+          ptz:
+            camera.ptz !== undefined && source.ptz !== undefined
+              ? camera.ptz
+              : null,
+        },
         still: camera.still && source.stills !== undefined,
         recordings: recorded.includes(camera.id),
         events: camera.events && source.events !== undefined,
@@ -185,6 +192,26 @@ const CamerasHandlers = HttpApiBuilder.group(
               contentType: picture.contentType,
               headers: { "cache-control": "no-store" },
             }),
+          ),
+        ),
+      )
+      .handle("ptz", ({ params }) =>
+        sources.find(params.source).pipe(
+          Effect.flatMap((found) =>
+            capability(found, found.ptz, "camera controls"),
+          ),
+          Effect.flatMap((ptz) =>
+            ptz.state(cameraId(params.source, params.camera)),
+          ),
+        ),
+      )
+      .handle("steer", ({ params, payload }) =>
+        sources.find(params.source).pipe(
+          Effect.flatMap((found) =>
+            capability(found, found.ptz, "camera controls"),
+          ),
+          Effect.flatMap((ptz) =>
+            ptz.send(cameraId(params.source, params.camera), payload),
           ),
         ),
       );

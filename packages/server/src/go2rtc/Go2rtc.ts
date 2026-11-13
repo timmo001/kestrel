@@ -1,7 +1,8 @@
 /**
  * The go2rtc process, which plays every camera live. Browsers can't play
  * RTSP, so the server runs go2rtc beside it with every source's live
- * streams, each camera's main and sub stream named from its id, and the
+ * streams, each camera's main and sub stream named from its id, and any
+ * other view's, such as a second lens, named after it, and the
  * proxy passes it through under `/go2rtc/`. go2rtc reads its config once, so
  * it starts again whenever the streams change, such as after a save on the
  * Settings page or when a recorder logs in. The config holds the sources'
@@ -13,6 +14,7 @@
  */
 import type {
   CameraId,
+  CameraView,
   LiveFeed,
   LiveStreams,
   Source,
@@ -53,6 +55,55 @@ export const streamNames = (feed: LiveFeed): LiveStreams => {
     sub: feed.sub === null ? null : `${main}_sub`,
     subRatio: feed.subRatio ?? null,
   };
+};
+
+/**
+ * A camera's views, for one with other pictures, with their go2rtc stream
+ * names, such as `reolink-hub_1_telephoto`; empty for a camera with one.
+ */
+export const viewsOf = (feed: LiveFeed): Array<CameraView> =>
+  feed.others === undefined || feed.others.length === 0
+    ? []
+    : [
+        {
+          key: "main",
+          name: feed.view?.name ?? "Main",
+          live: streamNames(feed),
+          zoom: feed.view?.zoom ?? false,
+        },
+        ...feed.others.map((other) => {
+          const main = `${mainStream(feed.camera)}_${other.key}`;
+
+          return {
+            key: other.key,
+            name: other.name,
+            live: {
+              main,
+              sub: other.sub === null ? null : `${main}_sub`,
+              subRatio: null,
+            },
+            zoom: other.zoom,
+          };
+        }),
+      ];
+
+/** Each of a camera's go2rtc streams, by name, with where it's read from. */
+const streamsOf = (feed: LiveFeed) => {
+  const names = streamNames(feed);
+
+  const others = (feed.others ?? []).flatMap((other) => {
+    const main = `${names.main}_${other.key}`;
+
+    return other.sub === null
+      ? [[main, other.main] as const]
+      : [[main, other.main] as const, [`${main}_sub`, other.sub] as const];
+  });
+
+  return [
+    [names.main, feed.main] as const,
+    ...(feed.sub === null ? [] : [[`${names.main}_sub`, feed.sub] as const]),
+    ...others,
+  ];
 };
 
 /**
@@ -115,16 +166,9 @@ export class Go2rtc extends Context.Service<
           // on, where only this machine reaches it
           rtsp: { listen: `127.0.0.1:${rtspPort}` },
           streams: Object.fromEntries(
-            feeds.flatMap((feed) => {
-              const names = streamNames(feed);
-
-              return names.sub === null || feed.sub === null
-                ? [[names.main, Redacted.value(feed.main)]]
-                : [
-                    [names.main, Redacted.value(feed.main)],
-                    [names.sub, Redacted.value(feed.sub)],
-                  ];
-            }),
+            feeds.flatMap((feed) =>
+              streamsOf(feed).map(([name, url]) => [name, Redacted.value(url)]),
+            ),
           ),
         });
 
