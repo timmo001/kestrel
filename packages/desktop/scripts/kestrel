@@ -11,6 +11,9 @@ bundle="$(cd "$app/../.." && pwd)"
 # The libraries the desktop app's window and tray load, and each
 # distribution's package for them
 missing() {
+  # A Flatpak's runtime brings them
+  [ -z "${FLATPAK_ID:-}" ] || return 0
+
   ldconfig="$(command -v ldconfig || echo /sbin/ldconfig)"
 
   # Without ldconfig, such as on NixOS, leave it to the launcher to say
