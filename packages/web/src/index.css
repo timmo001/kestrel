@@ -754,8 +754,8 @@ gw-table gw-sheet {
   cursor: pointer;
 }
 
-/* The last frame, over the picture while the next clip loads. It shows at
-   once and fades out once the next clip draws its first frame */
+/* A tile's last frame, over its picture while the next clip loads. It shows
+   at once and fades out once the next clip draws its first frame */
 .player-hold {
   position: absolute;
   inset: 0;

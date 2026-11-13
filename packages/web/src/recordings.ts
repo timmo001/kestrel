@@ -46,7 +46,6 @@ import { nextMoment, previousMoment, type Track } from "./moments.ts";
 import {
   clipUrl,
   fullView,
-  sameView,
   toSeconds,
   type Clip,
   type View,
@@ -262,7 +261,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const fullscreenButton = find("gw-button", "control-fullscreen");
   const helpButton = find("gw-button", "control-help");
   const moreMenu = find("gw-menu-button", "control-more");
-  const hold = find("canvas", "player-hold");
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
   const clipDownload = find("gw-button", "clip-download");
@@ -310,9 +308,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   const showProblem = (message: string) =>
     showNote(`Video stopped: ${message}`);
-
-  /** Set below: holds the picture showing before the video loads another clip. */
-  let beforeLoad: () => void = () => undefined;
 
   /** Set below: loads a recording from `from` seconds in, playing unless told not to. */
   let playClip: (clip: Clip, from?: number, autoplay?: boolean) => void = () =>
@@ -692,7 +687,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     if (problem !== null) problem.hidden = true;
 
-    beforeLoad();
     void player.play(clip, from, autoplay).then(() => keepPosition(true));
     showState();
   };
@@ -756,11 +750,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     // to the reload a change of view brings
     player?.rate(rate);
 
-    // Another view loads the clip again, from the other stream
-    if (!sameView(view, shownView)) {
-      beforeLoad();
-      shownView = view;
-    }
+    // The caption names the stream it plays from
+    shownView = view;
 
     player?.view(view);
     showState();
@@ -1447,43 +1438,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // The help button, or ?, opens the keys by the button and shuts them again
   setIcon(helpButton, phQuestion);
   helpToggle(find("gw-popover", "shortcuts"), helpButton);
-
-  // The last frame, held over the picture while the next clip loads, then
-  // faded out once the next one draws, rather than a flash of black. With
-  // several cameras, each tile loads on its own, so there's nothing to hold
-  const holdFrame = () => {
-    const video = player?.video();
-
-    if (
-      hold === null ||
-      video === undefined ||
-      video.readyState < 2 ||
-      ticked.length > 1
-    ) {
-      return;
-    }
-
-    hold.width = video.videoWidth;
-    hold.height = video.videoHeight;
-    hold.getContext("2d")?.drawImage(video, 0, 0);
-    hold.style.transform = video.style.transform;
-    hold.toggleAttribute("data-shown", true);
-
-    const release = () => hold.removeAttribute("data-shown");
-    const timer = setTimeout(release, 4000);
-
-    video.addEventListener(
-      "loadeddata",
-      () =>
-        video.requestVideoFrameCallback(() => {
-          clearTimeout(timer);
-          release();
-        }),
-      { once: true },
-    );
-  };
-
-  beforeLoad = holdFrame;
 
   showState();
 

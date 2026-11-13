@@ -6,7 +6,8 @@
  * camera's video keeps the time: the picked one when it recorded then, or
  * else the first that did. The others are put back on its time when they
  * drift. With nothing recorded on any of them, it runs on to the next
- * recording on any. It answers what the page asks of one player, so the page
+ * recording on any. Between clips, a tile holds its last frame and fades it
+ * out over the next. It answers what the page asks of one player, so the page
  * drives one camera or several the same way.
  */
 import type { CameraId } from "@timmo001/kestrel-core";
@@ -15,6 +16,7 @@ import { momentAt, nextMoment, type Track } from "./moments.ts";
 import {
   fullView,
   playerFor,
+  sameView,
   toSeconds,
   type Clip,
   type Player,
@@ -29,8 +31,9 @@ export interface GroupTile {
   readonly video: HTMLVideoElement;
 }
 
-/** One camera's tile: its figure, video and player. */
+/** One camera's tile: its figure, video, held frame and player. */
 interface Tile extends GroupTile {
+  readonly hold: HTMLCanvasElement;
   readonly player: Player;
 }
 
@@ -68,6 +71,36 @@ export const mostCameras = 4;
 
 const isPlaying = (video: HTMLVideoElement) =>
   !video.paused && video.readyState >= 3;
+
+/**
+ * Holds a tile's last frame over it while its video loads another clip, then
+ * fades it out once the new one draws, rather than a shimmer between clips.
+ */
+const holdFrame = ({ video, hold }: Tile) => {
+  if (video.readyState < 2 || video.videoWidth === 0) return;
+
+  hold.width = video.videoWidth;
+  hold.height = video.videoHeight;
+  hold.getContext("2d")?.drawImage(video, 0, 0);
+  hold.style.transform = video.style.transform;
+  hold.style.objectFit = getComputedStyle(video).objectFit;
+  hold.toggleAttribute("data-shown", true);
+
+  const release = () => hold.removeAttribute("data-shown");
+  const timer = setTimeout(release, 4000);
+
+  video.addEventListener(
+    "loadeddata",
+    () =>
+      video.requestVideoFrameCallback(() => {
+        clearTimeout(timer);
+        release();
+      }),
+    { once: true },
+  );
+};
+
+const releaseFrame = ({ hold }: Tile) => hold.removeAttribute("data-shown");
 
 /** Plays several cameras' recordings in `grid`, as one. */
 export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
@@ -132,6 +165,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       if (recording === undefined) {
         if (tile.player.clip() !== undefined) tile.player.stop();
 
+        releaseFrame(tile);
         tile.figure.dataset.empty = "";
         continue;
       }
@@ -149,6 +183,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
         at >= toSeconds(current.end);
 
       if (current?.begin !== recording.begin || grown) {
+        holdFrame(tile);
         started.push(tile.player.play(recording, into, playing));
         continue;
       }
@@ -175,6 +210,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   const makeTile = (camera: CameraId): Tile => {
     const figure = element("figure");
     const video = element("video");
+    const hold = element("canvas");
     const label = cameraLabel(camera);
 
     figure.className = "player-tile";
@@ -196,9 +232,11 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     video.playsInline = true;
     video.defaultPlaybackRate = playbackRate;
     video.playbackRate = playbackRate;
+    hold.className = "player-hold";
+    hold.ariaHidden = "true";
     // Each camera prints its own channel on the picture; an empty tile says
     // which it is
-    figure.append(video, element("p", `${label}: nothing recorded`));
+    figure.append(video, hold, element("p", `${label}: nothing recorded`));
 
     const player = playerFor(video, {
       onProblem: (message) =>
@@ -215,7 +253,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       },
     });
 
-    const tile = { camera, figure, video, player };
+    const tile = { camera, figure, video, hold, player };
 
     player.view(view);
 
@@ -245,6 +283,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   const stop = () => {
     for (const tile of tiles.values()) {
       tile.player.stop();
+      releaseFrame(tile);
       delete tile.figure.dataset.empty;
     }
 
@@ -313,6 +352,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       if (tile === undefined) return;
 
       driver = tile;
+      holdFrame(tile);
       await tile.player.play(clip, from, autoplay);
     },
     stop,
@@ -323,6 +363,13 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
         void Promise.all(align(toSeconds(clip.begin) + to, true));
     },
     view: (next) => {
+      // Another view loads each clip again, from the other stream
+      if (!sameView(next, view)) {
+        for (const tile of tiles.values()) {
+          if (tile.player.clip() !== undefined) holdFrame(tile);
+        }
+      }
+
       view = next;
       // The sub stream's pictures are squeezed, which the styles undo
       grid.dataset.stream = next.stream;
