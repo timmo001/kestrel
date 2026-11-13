@@ -834,32 +834,152 @@ gw-table gw-sheet {
   }
 }
 
-/* On a phone, each part takes its own row, centred: the transport, then the
-   speed or layout, then the rest. A segmented control wider than the screen,
-   such as the speeds, scrolls across in place */
+/* On a phone, the controls lay out as a phone player's do: seven even
+   columns, the transport in the middle of the first row with full screen at
+   its end, the layout or speeds across the next, then the zoom and the rest
+   a column each, so every row lines up with the one above. The groups give
+   their controls straight to the grid */
 @media (width < 40rem) {
   .player-controls {
-    grid-template-columns: minmax(0, 1fr);
-    padding: var(--gw-space-2);
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--gw-space-2) 0;
+    justify-items: center;
+    padding: var(--gw-space-3) var(--gw-space-2);
   }
 
   .controls-start,
+  .controls-transport,
   .controls-end {
-    justify-content: center;
+    display: contents;
   }
 
-  .player-controls gw-segmented {
+  /* Each row's own job says what's in it; the dividers and the keys' help
+     have no place, and the volume is the phone's own */
+  .player-controls .controls-divider,
+  .live-help,
+  .control-help,
+  .live-volume {
+    display: none;
+  }
+
+  .player-controls gw-popover {
+    position: absolute;
+  }
+
+  /* The first row: sound or stop, the transport, full screen */
+  .live-sound,
+  .control-stop {
+    grid-area: 1 / 1;
+  }
+
+  .live-previous,
+  .control-previous {
+    grid-area: 1 / 3;
+  }
+
+  .live-play,
+  .control-play {
+    grid-area: 1 / 4;
+  }
+
+  .live-next,
+  .control-next {
+    grid-area: 1 / 5;
+  }
+
+  .live-fullscreen,
+  .control-fullscreen {
+    grid-area: 1 / 7;
+  }
+
+  /* Then the layout or speeds across, scrolling in place where they're
+     wider than the screen */
+  .live-layout,
+  .control-speed {
+    grid-area: 2 / 1 / auto / -1;
     max-width: 100%;
     overflow-x: auto;
     scrollbar-width: none;
   }
 
-  /* The speeds take a row of their own, with the frame step and any other
-     speed under them */
+  /* Eight speeds only fit across a phone a little smaller */
   .control-speed {
-    flex-basis: 100%;
-    order: -1;
-    text-align: center;
+    --gw-segmented-scale: 0.8;
+  }
+
+  /* Live's page of cameras, when a layout pages them, goes last, so no empty
+     row is left when it's hidden */
+  .live-page {
+    grid-area: 4 / 1 / auto / -1;
+  }
+
+  /* Recordings' frame step and other speed, then the clip and the picture */
+  .control-frame {
+    grid-area: 3 / 1;
+  }
+
+  .player-controls .control-speed-other {
+    grid-area: 3 / 2 / auto / 5;
+    width: 100%;
+    padding-inline: var(--gw-space-1);
+  }
+
+  .control-cut {
+    grid-area: 3 / 5;
+  }
+
+  .control-download {
+    grid-area: 3 / 6;
+  }
+
+  .control-capture {
+    grid-area: 3 / 7;
+  }
+
+  /* Then the zoom, with camera moves and capture, or the clock */
+  .live-fit {
+    grid-area: 3 / 1 / auto / 3;
+  }
+
+  .live-zoom-out {
+    grid-area: 3 / 3;
+  }
+
+  .live-zoom-fit {
+    grid-area: 3 / 4;
+  }
+
+  .live-zoom-in {
+    grid-area: 3 / 5;
+  }
+
+  .live-move {
+    grid-area: 3 / 6;
+  }
+
+  .live-capture {
+    grid-area: 3 / 7;
+  }
+
+  .control-fit {
+    grid-area: 4 / 1 / auto / 3;
+  }
+
+  .control-zoom-out {
+    grid-area: 4 / 3;
+  }
+
+  .control-zoom-fit {
+    grid-area: 4 / 4;
+  }
+
+  .control-zoom-in {
+    grid-area: 4 / 5;
+  }
+
+  .player-clock {
+    grid-area: 4 / 6 / auto / -1;
+    justify-self: end;
   }
 
   /* The video at its own shape, with the timeline straight under it, rather
@@ -1048,6 +1168,11 @@ kbd {
 /* Which page of cameras Live shows, after Next, and a pick of the others */
 .live-page {
   min-width: 9rem;
+}
+
+/* Its own styles show it even when hidden, as with a single page */
+.live-page[hidden] {
+  display: none;
 }
 
 /* Full screen: the picture takes the screen, with the controls under it */
