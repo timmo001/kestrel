@@ -20,6 +20,7 @@ import {
   Unpaired,
   VersionMismatch,
 } from "./Api.ts";
+import * as Announce from "./Announce.ts";
 import { Attention } from "./Attention.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Go2rtc } from "./go2rtc/Go2rtc.ts";
@@ -245,6 +246,7 @@ export const layer = (options: ServeOptions) =>
     ),
     Layer.merge(Recording.layer),
     Layer.merge(Sync.layer),
+    Layer.merge(Announce.layer(options)),
     Layer.provide([Go2rtc.layer, Attention.layer, Library.layer]),
     Layer.provide(Push.layer),
     // One `Devices` for the routes and the sign-in check, so a code made by
