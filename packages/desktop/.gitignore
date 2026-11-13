@@ -1,0 +1,6 @@
+.hutch/
+.cottontail-tmp/
+build/
+artifacts/
+vendor/
+hutch.lock

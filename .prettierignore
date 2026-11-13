@@ -11,3 +11,9 @@ AGENTS.md
 .astro/
 .blume/
 .blume-verify/
+# The desktop app's build output and what Hutch prepares
+packages/desktop/.hutch/
+packages/desktop/.cottontail-tmp/
+packages/desktop/build/
+packages/desktop/artifacts/
+packages/desktop/vendor/

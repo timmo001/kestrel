@@ -127,3 +127,28 @@ run = "bun run --filter './packages/*' --if-present build"
 [tasks.check]
 description = "Lint, type-check, verify formatting and check the docs"
 depends = ["lint", "typecheck", "format:check", "docs:check"]
+
+# The desktop app runs the server itself, so stop serve:server while it runs:
+# both use ports 7380 and 1984 and the same recordings folder.
+[tasks."desktop:start"]
+description = "Build the desktop app for development and open it"
+depends = ["build"]
+dir = "packages/desktop"
+run = "bun run start"
+
+[tasks."desktop:build"]
+description = "Build the desktop app's release for this system"
+depends = ["build"]
+dir = "packages/desktop"
+run = "bun run package"
+
+[tasks."desktop:install"]
+description = "Build the desktop app's release and install it for this user"
+depends = ["desktop:build"]
+dir = "packages/desktop"
+run = '''
+setup="$(mktemp -d)"
+tar -xzf artifacts/linux-x64-Kestrel-Setup.tar.gz -C "$setup"
+"$setup/installer"
+rm -rf "$setup"
+'''

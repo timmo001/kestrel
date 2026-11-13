@@ -1,0 +1,31 @@
+{
+  "name": "@timmo001/kestrel-desktop",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "electrobun dev --watch",
+    "start": "electrobun dev",
+    "package": "electrobun build --env=stable",
+    "test": "bun test --pass-with-no-tests",
+    "lint": "electrobun prepare && oxlint .",
+    "typecheck": "electrobun prepare && tsc"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.1.4",
+    "@timmo001/groundwork-desktop": "0.27.0",
+    "@timmo001/kestrel-server": "workspace:*",
+    "effect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "0.68.0",
+    "@oxlint/plugins": "1.93.0",
+    "@timmo001/oxlint-rules": "0.6.5",
+    "@types/bun": "1.4.4",
+    "electrobun": "2.0.6",
+    "oxlint": "1.93.0",
+    "oxlint-tsgolint": "7.0.2006",
+    "typescript": "7.0.2"
+  }
+}
