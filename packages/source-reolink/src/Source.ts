@@ -5,7 +5,11 @@
  * in for a token, finds its channels and their RTSP streams, and reads each
  * camera's motion and detection state every couple of seconds, passing each
  * change on as an event. Stills come from its `Snap` command, and its
- * details from its device and disk info. Its recordings, on an SD card or
+ * details from its device and disk info. A camera that pans, tilts or zooms
+ * is steered with `PtzCtrl` and `StartZoomFocus`, as its `GetAbility` says
+ * it can, with its presets, its home (`PtzGuard`) and how it follows what it
+ * sees (`AiCfg`), and a TrackMix's telephoto lens on a hub or recorder plays as its
+ * second view. Its recordings, on an SD card or
  * a hub's disk, are listed from its `Search` command, one search per
  * request, as some firmware fails a batch. A hub or recorder hands its files
  * over by replaying them on its own protocol; a camera's are listed only, as
@@ -18,6 +22,8 @@ import {
   cameraParts,
   InvalidSettings,
   NoRecordings,
+  NotSupported,
+  PtzCommand,
   SourceUnavailable,
   UnknownCamera,
   type CameraEvent,
@@ -27,16 +33,24 @@ import {
   type EventKind,
   type Kind,
   type LiveFeed,
+  type PtzControls,
+  type PtzHome,
+  type PtzState,
   type Source,
+  type SourcePtz,
   type SourceRecordings,
   type SourceSettings,
   type StillPicture,
+  type TrackMethod,
+  type Tracking,
+  type TrackTarget,
 } from "@timmo001/kestrel-core";
 import {
   Clock,
   DateTime,
   Duration,
   Effect,
+  FiberMap,
   Option,
   PubSub,
   Redacted,
@@ -59,6 +73,30 @@ const keptEvents = 200;
 
 /** How long before its token runs out that a new one is asked for, in milliseconds. */
 const renewBefore = 60_000;
+
+/** How long a camera keeps moving after the last word to, so a page closed mid-drag doesn't leave it turning. */
+const stopAfter = Duration.seconds(1);
+
+/** The `ptzType` versions of a camera that turns side to side, as reolink_aio reads them. */
+const turns = [2, 3, 5, 6, 7];
+
+/** PtzCtrl's op for each way, by the signs of pan and tilt, with down positive. */
+const moves = new Map([
+  ["-1,0", "Left"],
+  ["1,0", "Right"],
+  ["0,-1", "Up"],
+  ["0,1", "Down"],
+  ["-1,-1", "LeftUp"],
+  ["-1,1", "LeftDown"],
+  ["1,-1", "RightUp"],
+  ["1,1", "RightDown"],
+]);
+
+/**
+ * How small one way can be, as a share of the other, before it's dropped,
+ * so a mostly sideways drag doesn't go off at 45°: it only moves eight ways.
+ */
+const offAxis = 0.4;
 
 const retry = Schedule.min([
   Schedule.exponential(Duration.seconds(1)),
@@ -88,6 +126,8 @@ const Reply = Schema.Struct({
   cmd: Schema.String,
   code: Schema.Number,
   value: Schema.optional(Schema.Unknown),
+  /** What each setting can be, for a command sent with action 1. */
+  range: Schema.optional(Schema.Unknown),
   error: Schema.optional(
     Schema.Struct({
       rspCode: Schema.Number,
@@ -136,6 +176,91 @@ const RtspUrl = Schema.Struct({
 });
 
 const MdState = Schema.Struct({ state: Schema.Number });
+
+/** What each channel can do, as each ability's version, 0 where it can't. */
+const Ability = Schema.Struct({
+  Ability: Schema.Struct({
+    abilityChn: Schema.optional(
+      Schema.Array(
+        Schema.Record(
+          Schema.String,
+          Schema.Struct({ ver: Schema.optional(Schema.Number) }),
+        ),
+      ),
+    ),
+  }),
+});
+
+/** Where its lens is zoomed now. */
+const ZoomFocus = Schema.Struct({
+  ZoomFocus: Schema.Struct({ zoom: Schema.Struct({ pos: Schema.Number }) }),
+});
+
+const Span = Schema.Struct({ min: Schema.Number, max: Schema.Number });
+
+/** How far its lens zooms each way. */
+const ZoomRange = Schema.Struct({
+  ZoomFocus: Schema.Struct({ zoom: Schema.Struct({ pos: Span }) }),
+});
+
+/** Every preset slot, set or not. */
+const PtzPresets = Schema.Struct({
+  PtzPreset: Schema.Array(
+    Schema.Struct({
+      id: Schema.Number,
+      enable: Schema.Number,
+      name: Schema.optional(Schema.String),
+    }),
+  ),
+});
+
+/** Its home, which it calls its guard point. */
+const PtzGuard = Schema.Struct({
+  PtzGuard: Schema.Struct({
+    benable: Schema.Number,
+    bexistPos: Schema.Number,
+    timeout: Schema.Number,
+  }),
+});
+
+/** What it follows, by its own names, 1 for each it does. */
+const TrackFlags = Schema.Struct({
+  people: Schema.optional(Schema.Number),
+  vehicle: Schema.optional(Schema.Number),
+  dog_cat: Schema.optional(Schema.Number),
+});
+
+/** How it follows what it sees. */
+const AiCfg = Schema.Struct({
+  bSmartTrack: Schema.optional(Schema.Number),
+  aiTrack: Schema.optional(Schema.Number),
+  aiDisappearBackTime: Schema.optional(Schema.Number),
+  aiStopBackTime: Schema.optional(Schema.Number),
+  trackType: Schema.optional(TrackFlags),
+});
+
+/** The choices it takes for each. */
+const AiCfgRange = Schema.Struct({
+  aiTrack: Schema.optional(Schema.Array(Schema.Number)),
+  aiDisappearBackTime: Schema.optional(Schema.Array(Schema.Number)),
+  trackType: Schema.optional(Schema.Record(Schema.String, Schema.Unknown)),
+});
+
+/** Its names for what it follows, by Kestrel's. */
+const trackNames = [
+  ["people", "people"],
+  ["vehicles", "vehicle"],
+  ["animals", "dog_cat"],
+] as const satisfies ReadonlyArray<
+  readonly [TrackTarget, keyof typeof TrackFlags.Type]
+>;
+
+/** Its `aiTrack` numbers for each way it follows, as reolink_aio has them. */
+const trackMethods = [
+  ["digital", 2],
+  ["digital-first", 3],
+  ["turn-first", 4],
+] as const satisfies ReadonlyArray<readonly [TrackMethod, number]>;
 
 /** Each detection's state: a number on older firmware, or whether it's supported and alarming. */
 const OldState = Schema.Number;
@@ -235,9 +360,9 @@ interface Command {
   readonly param: Param;
 }
 
-const command = (cmd: string, param: Param = {}): Command => ({
+const command = (cmd: string, param: Param = {}, action = 0): Command => ({
   cmd,
-  action: 0,
+  action,
   param,
 });
 
@@ -258,6 +383,14 @@ interface Channel {
   readonly online: boolean;
   readonly main: Redacted.Redacted;
   readonly sub: Redacted.Redacted;
+  /** How it moves and zooms; `null` where it does neither. */
+  readonly ptz: PtzControls | null;
+  /** Whether PtzCtrl takes a speed for it. */
+  readonly speed: boolean;
+  /** How far its lens zooms each way, where it zooms. */
+  readonly zoom: typeof Span.Type | null;
+  /** Its telephoto lens's stream, for a TrackMix on a hub or recorder. */
+  readonly telephoto: Redacted.Redacted | null;
 }
 
 interface Device {
@@ -407,11 +540,12 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       ),
     );
 
-  /** The value of the answer at `at`, decoded, or why there isn't one. */
+  /** The value of the answer at `at`, or its range, decoded, or why there isn't one. */
   const valueOf = <S extends Schema.ConstraintDecoder<unknown>>(
     list: ReadonlyArray<Reply>,
     at: number,
     schema: S,
+    field: "value" | "range" = "value",
   ): Effect.Effect<S["Type"], SourceUnavailable> => {
     const reply = list[at];
 
@@ -427,7 +561,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       );
     }
 
-    return Schema.decodeUnknownEffect(schema)(reply.value).pipe(
+    return Schema.decodeUnknownEffect(schema)(reply[field]).pipe(
       Effect.mapError(() =>
         unavailable(`answered ${reply.cmd} in a way Kestrel doesn't know`),
       ),
@@ -564,6 +698,81 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       found.map((each) => command("GetRtspUrl", { channel: each.channel })),
     ).pipe(Effect.option);
 
+    // reolink_aio sends its username with this; older firmware refuses it
+    const abilities = yield* call([
+      command("GetAbility", { User: { userName: Redacted.value(username) } }),
+    ]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, Ability)),
+      Effect.map((value) => value.Ability.abilityChn ?? []),
+      Effect.orElseSucceed(() => []),
+    );
+
+    /** A channel's version of an ability, or `missing` where it doesn't say. */
+    const versionOf = (channel: number, key: string, missing = 0) =>
+      abilities[channel]?.[key]?.ver ?? missing;
+
+    // These ptzType versions zoom optically, as reolink_aio reads them
+    const zooming = found.filter(
+      (each) =>
+        [1, 2, 5].includes(versionOf(each.channel, "ptzType")) ||
+        versionOf(each.channel, "supportDigitalZoom") > 0,
+    );
+
+    const zoomRanges = new Map<number, typeof Span.Type>();
+
+    if (zooming.length > 0) {
+      const ranges = yield* call(
+        zooming.map((each) =>
+          command("GetZoomFocus", { channel: each.channel }, 1),
+        ),
+      ).pipe(Effect.option);
+
+      if (Option.isSome(ranges)) {
+        yield* Effect.forEach(
+          zooming,
+          Effect.fnUntraced(function* (each, at) {
+            const range = yield* valueOf(
+              ranges.value,
+              at,
+              ZoomRange,
+              "range",
+            ).pipe(Effect.option);
+
+            if (
+              Option.isSome(range) &&
+              range.value.ZoomFocus.zoom.pos.max >
+                range.value.ZoomFocus.zoom.pos.min
+            ) {
+              zoomRanges.set(each.channel, range.value.ZoomFocus.zoom.pos);
+            }
+          }),
+        );
+      }
+    }
+
+    // Its home has no ability of its own, so a camera that turns is asked
+    // for it, as reolink_aio does
+    const turning = found.filter((each) =>
+      turns.includes(versionOf(each.channel, "ptzType")),
+    );
+
+    const guards =
+      turning.length === 0
+        ? Option.none()
+        : yield* call(
+            turning.map((each) =>
+              command("GetPtzGuard", { channel: each.channel }),
+            ),
+          ).pipe(Effect.option);
+
+    const homes = Option.match(guards, {
+      onNone: (): ReadonlyArray<number> => [],
+      onSome: (list) =>
+        turning
+          .filter((_, at) => list[at]?.code === 0)
+          .map((each) => each.channel),
+    });
+
     const channels = yield* Effect.forEach(
       found,
       Effect.fnUntraced(function* (each, at) {
@@ -572,6 +781,10 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           : Option.none();
 
         const own = ownName(each.name);
+        const ptzType = versionOf(each.channel, "ptzType");
+        const zoom = zoomRanges.get(each.channel) ?? null;
+        const pan = turns.includes(ptzType);
+        const tilt = [2, 3, 5, 6].includes(ptzType);
 
         return {
           channel: each.channel,
@@ -587,7 +800,29 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
             onNone: () => fallback(each.channel, "sub"),
             onSome: (value) => withLogin(value.rtspUrl.subStream),
           }),
-        };
+          ptz:
+            pan || tilt || zoom !== null
+              ? {
+                  pan,
+                  tilt,
+                  zoom: zoom !== null,
+                  presets: pan && versionOf(each.channel, "ptzPreset") > 0,
+                  home: homes.includes(each.channel),
+                  tracking: versionOf(each.channel, "aiTrack") > 0,
+                }
+              : null,
+          speed:
+            [2, 3].includes(ptzType) &&
+            versionOf(each.channel, "supportPtzSpeed", 1) > 0,
+          zoom,
+          // reolink_aio only finds a TrackMix's second lens like this on a hub or recorder
+          telephoto:
+            recorder && versionOf(each.channel, "supportAutoTrackStream") > 0
+              ? withLogin(
+                  `rtsp://${base.hostname}:554/Preview_${two(each.channel + 1)}_autotrack`,
+                )
+              : null,
+        } satisfies Channel;
       }),
     );
 
@@ -927,6 +1162,307 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     },
   );
 
+  /** Each camera's watch that stops it moving once the page stops saying so, by channel. */
+  const moving = yield* FiberMap.make<number>();
+
+  /** A camera that moves or zooms. */
+  const steerable = Effect.fnUntraced(function* (camera: CameraId) {
+    const device = yield* opened;
+    const channel = yield* channelOf(device, camera);
+
+    if (channel.ptz === null) {
+      return yield* new NotSupported({
+        message: `${camera} doesn't move or zoom`,
+      });
+    }
+
+    return { channel, ptz: channel.ptz };
+  });
+
+  /** One command that changes something, failing where the camera refuses it. */
+  const setting = (cmd: string, param: Param) =>
+    call([command(cmd, param)]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, Schema.Unknown)),
+      Effect.asVoid,
+    );
+
+  /**
+   * One PtzCtrl, such as `{ op: "Left" }`, at `speed` (1 to 64) where the
+   * camera takes one.
+   */
+  const ptzCtrl = (channel: Channel, param: Param, speed?: number) => {
+    const plain = { channel: channel.channel, ...param };
+
+    const sent: Param =
+      speed !== undefined && channel.speed ? { ...plain, speed } : plain;
+
+    return setting("PtzCtrl", sent);
+  };
+
+  const stop = (channel: Channel) =>
+    FiberMap.remove(moving, channel.channel).pipe(
+      Effect.andThen(ptzCtrl(channel, { op: "Stop" })),
+    );
+
+  /** Every preset slot, set or not. */
+  const slotsOf = (channel: Channel) =>
+    call([command("GetPtzPreset", { channel: channel.channel })]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, PtzPresets)),
+      Effect.map((value) => value.PtzPreset),
+    );
+
+  const homeOf = (channel: Channel) =>
+    call([command("GetPtzGuard", { channel: channel.channel })]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, PtzGuard)),
+      Effect.map(({ PtzGuard: guard }): PtzHome => ({
+        on: guard.benable === 1,
+        set: guard.bexistPos === 1,
+        backAfter: guard.timeout,
+      })),
+    );
+
+  const trackingOf = Effect.fnUntraced(function* (channel: Channel) {
+    const list = yield* call([
+      command("GetAiCfg", { channel: channel.channel }, 1),
+    ]);
+
+    const value = yield* valueOf(list, 0, AiCfg);
+
+    const range = yield* valueOf(list, 0, AiCfgRange, "range").pipe(
+      Effect.orElseSucceed((): typeof AiCfgRange.Type => ({})),
+    );
+
+    const offered = range.trackType ?? value.trackType ?? {};
+
+    return {
+      // Older firmware has no switch of its own, and turns it on as a way
+      on: (value.bSmartTrack ?? (value.aiTrack === 1 ? 1 : 0)) === 1,
+      follows: trackNames.flatMap(([name, own]) =>
+        value.trackType?.[own] === 1 ? [name] : [],
+      ),
+      targets: trackNames.flatMap(([name, own]) =>
+        own in offered ? [name] : [],
+      ),
+      method:
+        trackMethods.find(([, number]) => number === value.aiTrack)?.[0] ??
+        null,
+      methods: trackMethods.flatMap(([name, number]) =>
+        range.aiTrack?.includes(number) === true ? [name] : [],
+      ),
+      backAfterLeaving: value.aiDisappearBackTime ?? null,
+      backAfterStopping: value.aiStopBackTime ?? null,
+      backChoices: range.aiDisappearBackTime ?? [],
+    } satisfies Tracking;
+  });
+
+  /** A command's parameters, leaving out those not given. */
+  const given = (
+    entries: ReadonlyArray<
+      readonly [string, string | number | Param | undefined]
+    >,
+  ): Param =>
+    Object.fromEntries(
+      entries.filter(
+        (entry): entry is readonly [string, string | number | Param] =>
+          entry[1] !== undefined,
+      ),
+    );
+
+  const flag = (on: boolean | undefined) =>
+    on === undefined ? undefined : Number(on);
+
+  const ptz: SourcePtz = {
+    state: Effect.fnUntraced(function* (camera) {
+      const { channel, ptz: controls } = yield* steerable(camera);
+
+      const zoom =
+        channel.zoom === null
+          ? null
+          : yield* call([
+              command("GetZoomFocus", { channel: channel.channel }),
+            ]).pipe(
+              Effect.flatMap((list) => valueOf(list, 0, ZoomFocus)),
+              Effect.map(({ ZoomFocus: { zoom: now } }) => {
+                const { min, max } = channel.zoom ?? { min: 0, max: 1 };
+
+                return Math.min(1, Math.max(0, (now.pos - min) / (max - min)));
+              }),
+            );
+
+      const presets = controls.presets
+        ? yield* slotsOf(channel).pipe(
+            Effect.map((slots) =>
+              slots
+                .filter((each) => each.enable === 1)
+                .map((each) => ({
+                  id: each.id,
+                  name:
+                    each.name === undefined || each.name === ""
+                      ? `Preset ${each.id + 1}`
+                      : each.name,
+                })),
+            ),
+          )
+        : [];
+
+      const home = controls.home ? yield* homeOf(channel) : null;
+      const tracking = controls.tracking ? yield* trackingOf(channel) : null;
+
+      return { zoom, presets, home, tracking } satisfies PtzState;
+    }),
+    send: Effect.fnUntraced(function* (camera, order) {
+      const { channel, ptz: controls } = yield* steerable(camera);
+
+      /** The command, where the camera can do it. */
+      const where = <A, E, R>(
+        can: boolean,
+        what: string,
+        effect: Effect.Effect<A, E, R>,
+      ) =>
+        can
+          ? effect
+          : Effect.fail(new NotSupported({ message: `${camera} ${what}` }));
+
+      const preset = (id: number, name: string) =>
+        setting("SetPtzPreset", {
+          PtzPreset: { channel: channel.channel, enable: 1, id, name },
+        });
+
+      const guard = (param: Param) =>
+        where(
+          controls.home,
+          "has no home",
+          setting("SetPtzGuard", {
+            PtzGuard: { channel: channel.channel, ...param },
+          }),
+        );
+
+      yield* PtzCommand.match(order, {
+        Move: (move) => {
+          const pan = controls.pan ? move.pan : 0;
+          const tilt = controls.tilt ? move.tilt : 0;
+          const size = Math.max(Math.abs(pan), Math.abs(tilt));
+
+          const way = (value: number) =>
+            Math.abs(value) < size * offAxis ? 0 : Math.sign(value);
+
+          const op = moves.get(`${way(pan)},${way(tilt)}`);
+
+          if (size === 0 || op === undefined) return stop(channel);
+
+          return ptzCtrl(channel, { op }, Math.round(1 + 63 * size)).pipe(
+            Effect.andThen(
+              FiberMap.run(
+                moving,
+                channel.channel,
+                Effect.sleep(stopAfter).pipe(
+                  Effect.andThen(ptzCtrl(channel, { op: "Stop" })),
+                  Effect.ignore,
+                ),
+              ),
+            ),
+          );
+        },
+        Stop: () => stop(channel),
+        Zoom: ({ level }) => {
+          if (channel.zoom === null) {
+            return Effect.fail(
+              new NotSupported({ message: `${camera} doesn't zoom` }),
+            );
+          }
+
+          const { min, max } = channel.zoom;
+
+          return call([
+            command("StartZoomFocus", {
+              ZoomFocus: {
+                channel: channel.channel,
+                op: "ZoomPos",
+                pos: Math.round(min + level * (max - min)),
+              },
+            }),
+          ]).pipe(
+            Effect.flatMap((list) => valueOf(list, 0, Schema.Unknown)),
+            Effect.asVoid,
+          );
+        },
+        Preset: ({ id: preset }) =>
+          where(
+            controls.presets,
+            "has no presets",
+            ptzCtrl(channel, { op: "ToPos", id: preset }, 32),
+          ),
+        // Into the first slot not in use
+        SavePreset: ({ name }) =>
+          where(
+            controls.presets,
+            "has no presets",
+            Effect.gen(function* () {
+              const slots = yield* slotsOf(channel);
+              const free = slots.find((slot) => slot.enable !== 1);
+
+              if (free === undefined) {
+                return yield* new NotSupported({
+                  message: `${camera} has no preset slots left`,
+                });
+              }
+
+              yield* preset(free.id, name);
+            }),
+          ),
+        RenamePreset: ({ id: slot, name }) =>
+          where(controls.presets, "has no presets", preset(slot, name)),
+        ClearPreset: ({ id: slot }) =>
+          where(
+            controls.presets,
+            "has no presets",
+            setting("SetPtzPreset", {
+              PtzPreset: { channel: channel.channel, enable: 0, id: slot },
+            }),
+          ),
+        Home: () => guard({ cmdStr: "toPos" }),
+        SetHome: () => guard({ cmdStr: "setPos", bSaveCurrentPos: 1 }),
+        KeepHome: ({ on, backAfter }) =>
+          guard(
+            given([
+              ["cmdStr", "setPos"],
+              ["benable", flag(on)],
+              ["timeout", backAfter],
+            ]),
+          ),
+        Track: (change) =>
+          where(
+            controls.tracking,
+            "doesn't follow what it sees",
+            setting(
+              "SetAiCfg",
+              given([
+                ["channel", channel.channel],
+                ["bSmartTrack", flag(change.on)],
+                [
+                  "trackType",
+                  change.follows === undefined
+                    ? undefined
+                    : Object.fromEntries(
+                        trackNames.map(([name, own]) => [
+                          own,
+                          Number(change.follows?.includes(name)),
+                        ]),
+                      ),
+                ],
+                [
+                  "aiTrack",
+                  trackMethods.find(([name]) => name === change.method)?.[1],
+                ],
+                ["aiDisappearBackTime", change.backAfterLeaving],
+                ["aiStopBackTime", change.backAfterStopping],
+              ]),
+            ),
+          ),
+      });
+    }),
+  };
+
   const source: Source = {
     id,
     kind: "reolink",
@@ -948,16 +1484,20 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     ),
     cameras: opened.pipe(
       Effect.map((device) =>
-        device.channels.map((channel): CameraInfo => ({
-          id: cameraOf(channel),
-          name: channel.name,
-          channel: device.recorder ? channel.channel + 1 : null,
-          signal: channel.online,
-          live: true,
-          still: true,
-          recordings: true,
-          events: true,
-        })),
+        device.channels.map((channel): CameraInfo => {
+          const info: CameraInfo = {
+            id: cameraOf(channel),
+            name: channel.name,
+            channel: device.recorder ? channel.channel + 1 : null,
+            signal: channel.online,
+            live: true,
+            still: true,
+            recordings: true,
+            events: true,
+          };
+
+          return channel.ptz === null ? info : { ...info, ptz: channel.ptz };
+        }),
       ),
     ),
     get recordings(): SourceRecordings {
@@ -965,13 +1505,33 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     },
     live: opened.pipe(
       Effect.map((device) =>
-        device.channels.map((channel): LiveFeed => ({
-          camera: cameraOf(channel),
-          main: channel.main,
-          sub: channel.sub,
-        })),
+        device.channels.map((channel): LiveFeed => {
+          const feed = {
+            camera: cameraOf(channel),
+            main: channel.main,
+            sub: channel.sub,
+          };
+
+          // Its lens zoom only changes the telephoto picture
+          return channel.telephoto === null
+            ? feed
+            : {
+                ...feed,
+                view: { name: "Wide", zoom: false },
+                others: [
+                  {
+                    key: "telephoto",
+                    name: "Telephoto",
+                    main: channel.telephoto,
+                    sub: null,
+                    zoom: channel.zoom !== null,
+                  },
+                ],
+              };
+        }),
       ),
     ),
+    ptz,
     stills: {
       still: Effect.fnUntraced(function* (camera) {
         const device = yield* opened;
