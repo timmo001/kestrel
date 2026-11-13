@@ -3,7 +3,8 @@
  * whole, fills its tile, or is zoomed on from either, 25% at a time: the
  * picked camera's from the buttons and keys, or the one under the pointer
  * with Ctrl and the wheel or a pinch. A picture bigger than its tile, filled
- * or zoomed, moves around by dragging. The page holds each camera's zoom, so
+ * or zoomed, moves around by dragging, unless its camera is being steered,
+ * which takes the drag. The page holds each camera's zoom, so
  * it decides whether it's kept: Live keeps it, Recordings doesn't.
  */
 import { on } from "@timmo001/groundwork-ui";
@@ -51,6 +52,8 @@ export interface ZoomOptions {
   readonly fit: HTMLElementTagNameMap["gw-segmented"] | null;
   /** The wheel or a drag on a tile, which can pick it. */
   readonly onPick?: (tile: ZoomTile) => void;
+  /** Whether a gesture on a tile steers its camera instead, so the zoom steps aside. */
+  readonly steers?: (tile: ZoomTile, gesture: "drag" | "wheel") => boolean;
   /** A zoom changed, for the page to keep. */
   readonly onChange?: () => void;
 }
@@ -292,7 +295,13 @@ export const pictureZoom = (options: ZoomOptions): PictureZoom => {
     (event) => {
       const tile = tileAt(event);
 
-      if (!event.ctrlKey || tile === undefined) return;
+      if (
+        !event.ctrlKey ||
+        tile === undefined ||
+        options.steers?.(tile, "wheel") === true
+      ) {
+        return;
+      }
 
       event.preventDefault();
       options.onPick?.(tile);
@@ -311,10 +320,20 @@ export const pictureZoom = (options: ZoomOptions): PictureZoom => {
     | { tile: ZoomTile; x: number; y: number; pan: { x: number; y: number } }
     | undefined;
 
+  /** Controls over a picture, where a press never moves it. */
+  const controls = "gw-button, gw-range, gw-switch, gw-input, gw-select";
+
   area?.addEventListener("pointerdown", (event) => {
     const tile = tileAt(event);
 
-    if (tile === undefined || !tile.figure.hasAttribute("data-movable")) {
+    if (
+      tile === undefined ||
+      !tile.figure.hasAttribute("data-movable") ||
+      options.steers?.(tile, "drag") === true ||
+      event
+        .composedPath()
+        .some((target) => target instanceof Element && target.matches(controls))
+    ) {
       return;
     }
 

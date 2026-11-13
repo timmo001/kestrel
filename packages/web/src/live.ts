@@ -4,14 +4,17 @@
  * Previous and Next or picked from the page list, under one set of controls:
  * pause, zoom (fit, fill or a step at a time, each camera its own), a still
  * of the picked camera, full screen and keys. The arrow keys move the pick,
- * on to the next page past the edge. The layout, page, picked camera, each
- * camera's zoom and how many cameras there were are kept in this
+ * on to the next page past the edge. A camera that moves is steered in Move
+ * mode, and one with a second view, such as a telephoto lens, plays both,
+ * the other small in a corner, and swaps them without reloading either. The
+ * layout, page, picked camera, each
+ * camera's view and zoom and how many cameras there were are kept in this
  * browser, so the placeholders take the cameras' places before they're
  * known. A camera whose source can't be reached says why over its tile.
  * The players only run while the page shows, so a hidden page
  * streams nothing.
  */
-import type { Camera, LiveStreams } from "@timmo001/kestrel-core";
+import type { Camera, CameraView, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
 import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
@@ -24,12 +27,14 @@ import {
   phCaretRight,
   phCornersIn,
   phCornersOut,
+  phJoystick,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phPause,
   phPlay,
   phQuestion,
 } from "./icons.ts";
+import { steering, type SteerTile } from "./ptz.ts";
 import {
   controlKey,
   element,
@@ -76,6 +81,20 @@ const definePlayer = async (path: string) => {
   if (customElements.get("dvr-live") === undefined) {
     customElements.define("dvr-live", VideoRTC);
   }
+};
+
+/** A player for one of a camera's views, or its only one. */
+const livePlayer = (view: CameraView | undefined) => {
+  const player = document.createElement("dvr-live");
+
+  player.mode = "mse,hls";
+  // Video only: the recorder offers an audio track but sends nothing on it,
+  // and a player waiting for that audio never starts
+  player.media = "video";
+
+  if (view !== undefined) player.dataset["view"] = view.key;
+
+  return player;
 };
 
 /** The counts with a grid of their own in the styles, such as three's one large and two beside it. */
@@ -175,6 +194,11 @@ const KeptViews = Schema.Record(
 
 const decodeKeptViews = Schema.decodeUnknownOption(KeptViews);
 
+/** Each camera's view picked, such as `telephoto`, by its id. */
+const decodeKeptLenses = Schema.decodeUnknownOption(
+  Schema.Record(Schema.String, Schema.String),
+);
+
 /** What's kept, each part checked, since anyone can edit it. */
 const kept = () => {
   const values = keptAt(storageKey);
@@ -200,20 +224,26 @@ const kept = () => {
       decodeKeptViews(values?.["singleViews"]),
       () => ({}),
     ),
+    /** Each camera's view picked, for a camera with more than one. */
+    lenses: Option.getOrElse(decodeKeptLenses(values?.["lenses"]), () => ({})),
   };
 };
 
-/** A camera on the page: its tile, its player or still picture, and held frame. */
+/**
+ * A camera on the page: its tile, its player or still picture, and held
+ * frame. A camera with two views, such as a TrackMix's lenses, plays both
+ * at once, the other small in a corner, and they swap places.
+ */
 interface Tile {
   readonly stream: Camera;
   readonly figure: HTMLElement;
-  /** Its player, for a camera that plays live. */
-  readonly player: LivePlayer | null;
+  /** Its player for the view it shows, for a camera that plays live. */
+  player: LivePlayer | null;
+  /** Its other view's player, small in a corner. */
+  inset: LivePlayer | null;
   /** Its picture, for a camera with only a still one. */
   readonly picture: HTMLImageElement | null;
   readonly hold: HTMLCanvasElement;
-  /** The shape to draw its video at, for a squeezed sub stream; else `null`. */
-  readonly ratio: number | null;
 }
 
 /** The local time as a file name's part, such as `2026-11-12T10-30-05`. */
@@ -252,6 +282,7 @@ export const livePage = (): LivePage => {
   const zoomInButton = find("gw-button", "live-zoom-in");
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
+  const moveButton = find("gw-button", "live-move");
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");
   const shortcutsPopover = find("gw-popover", "live-shortcuts");
@@ -312,6 +343,34 @@ export const livePage = (): LivePage => {
       views: keptOf(views.tiles),
       singleViews: keptOf(views.single),
     });
+
+  /** Each camera's view picked, by camera id, kept from last time. */
+  const lenses = new Map<string, string>(Object.entries(saved.lenses));
+
+  /** The view a camera shows, for one with more than one: the one picked, else its main one. */
+  const viewOf = (camera: Camera): CameraView | undefined =>
+    camera.views.find((view) => view.key === lenses.get(camera.id)) ??
+    camera.views[0];
+
+  /** The streams a camera plays now, from the view it shows. */
+  const liveOf = (camera: Camera) => viewOf(camera)?.live ?? camera.live;
+
+  /** The shape to draw a tile's video at, for a squeezed sub stream; else `null`. */
+  const ratioOf = (tile: Tile) => {
+    const live = liveOf(tile.stream);
+
+    return live === null ? null : streamFor(live, size()).ratio;
+  };
+
+  /** A squeezed stream's player takes the picture's own shape. */
+  const squeezeTile = (tile: Tile) => {
+    const ratio = ratioOf(tile);
+
+    tile.figure.toggleAttribute("data-squeezed", ratio !== null);
+
+    if (ratio === null) tile.figure.style.removeProperty("--tile-ratio");
+    else tile.figure.style.setProperty("--tile-ratio", String(ratio));
+  };
 
   const shown = () => section?.hidden === false;
 
@@ -396,6 +455,7 @@ export const livePage = (): LivePage => {
   setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
+  setIcon(moveButton, phJoystick, "Move the camera (M)");
   setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   previousButton?.setAttribute("aria-keyshortcuts", "PageUp");
@@ -404,12 +464,54 @@ export const livePage = (): LivePage => {
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
+  moveButton?.setAttribute("aria-keyshortcuts", "m");
+  moveButton?.toggleAttribute("toggle", true);
   helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
   const keepPlace = () =>
     keep(storageKey, { layout, page, picked: picked ?? null });
+
+  /** The picked camera's tile, as steering sees it, for a camera that moves. */
+  const steerTile = (): SteerTile | undefined => {
+    const tile = tiles.find((shownTile) => shownTile.stream.id === picked);
+    const controls = tile?.stream.controls.ptz ?? null;
+
+    if (tile === undefined || controls === null) return undefined;
+
+    return {
+      id: tile.stream.id,
+      figure: tile.figure,
+      controls,
+      lensZoom: viewOf(tile.stream)?.zoom ?? true,
+    };
+  };
+
+  /** Move, shown where any camera moves and pressed while it's on. */
+  const showMove = () => {
+    if (moveButton === null) return;
+
+    moveButton.hidden = !streams.some((stream) => stream.controls.ptz !== null);
+    moveButton.disabled = steerTile() === undefined;
+    moveButton.pressed = steer.on();
+  };
+
+  const steer = steering({
+    area: grid,
+    picked: steerTile,
+    onChange: () => {
+      showMove();
+      showZoom();
+    },
+  });
+
+  /** Move mode on the picked camera, where it moves, or off. */
+  const toggleMove = () => {
+    if (steer.on() || steerTile() !== undefined) steer.toggle();
+  };
+
+  moveButton?.addEventListener("click", toggleMove);
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
@@ -475,6 +577,9 @@ export const livePage = (): LivePage => {
       else tile.figure.removeAttribute("aria-current");
     }
 
+    // Move mode follows the camera, and ends once another's picked
+    steer.show();
+    showMove();
     showZoom();
   };
 
@@ -501,23 +606,158 @@ export const livePage = (): LivePage => {
       return;
     }
 
-    if (tile.player === null || tile.stream.live === null) return;
+    for (const player of [tile.player, tile.inset]) {
+      if (player !== null) connectPlayer(tile, player);
+    }
+  };
 
-    // Its first frames end the shimmer, or the held frame after a pause.
-    // Media events don't bubble, so the tile listens as they pass down
-    tile.figure.addEventListener(
+  /** The streams one of a tile's players plays, from its view. */
+  const liveOfPlayer = (tile: Tile, player: LivePlayer) =>
+    tile.stream.views.find((view) => view.key === player.dataset["view"])
+      ?.live ?? tile.stream.live;
+
+  const connectPlayer = (tile: Tile, player: LivePlayer) => {
+    const live = liveOfPlayer(tile, player);
+
+    if (live === null) return;
+
+    player.toggleAttribute("data-loading", true);
+
+    // Its first frames end its shimmer, and the tile's, or the held frame
+    // after a pause, while it's the one shown. Media events don't bubble, so
+    // the player listens as they pass down
+    player.addEventListener(
       "playing",
       () => {
-        delete tile.figure.dataset.loading;
-        tile.hold.removeAttribute("data-shown");
+        player.removeAttribute("data-loading");
+        held.delete(player);
+
+        if (player === tile.player) {
+          delete tile.figure.dataset.loading;
+          tile.hold.removeAttribute("data-shown");
+        }
       },
       { capture: true, once: true },
     );
 
-    tile.player.src = new URL(
-      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(tile.stream.live, size()).name)}`,
+    player.src = new URL(
+      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(live, size()).name)}`,
       location.origin,
     ).href;
+  };
+
+  /** Each player's last frame from before a pause, by player. */
+  const held = new WeakMap<LivePlayer, HTMLCanvasElement>();
+
+  /** A player's frame now, at its picture's own shape, or `undefined` before it has one. */
+  const frameOf = (tile: Tile, player: LivePlayer) => {
+    const video = player.querySelector("video");
+    const live = liveOfPlayer(tile, player);
+
+    if (video === null || video.readyState < 2) return undefined;
+
+    const canvas = element("canvas");
+
+    const { width, height } = drawnSize(
+      video.videoWidth,
+      video.videoHeight,
+      live === null ? null : streamFor(live, size()).ratio,
+    );
+
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
+
+    return canvas;
+  };
+
+  /** Shows the frame held for the view the tile shows, while paused. */
+  const showHeld = (tile: Tile) => {
+    const frame = tile.player === null ? undefined : held.get(tile.player);
+
+    if (frame === undefined) {
+      tile.hold.removeAttribute("data-shown");
+
+      return;
+    }
+
+    tile.hold.width = frame.width;
+    tile.hold.height = frame.height;
+    tile.hold.getContext("2d")?.drawImage(frame, 0, 0);
+    tile.hold.toggleAttribute("data-shown", true);
+  };
+
+  /**
+   * The view shown big, and the other small in the corner, named for what
+   * a click on it does. The zoom only moves the big one.
+   */
+  const placeViews = (tile: Tile) => {
+    if (tile.player !== null) {
+      tile.player.classList.remove("live-inset");
+      tile.player.removeAttribute("role");
+      tile.player.removeAttribute("tabindex");
+      tile.player.removeAttribute("aria-label");
+      tile.player.removeAttribute("title");
+      tile.figure.prepend(tile.player);
+    }
+
+    if (tile.inset !== null) {
+      const view = tile.stream.views.find(
+        (each) => each.key === tile.inset?.dataset["view"],
+      );
+
+      const name = view?.name ?? "the other view";
+
+      tile.inset.classList.add("live-inset");
+      tile.inset.dataset["name"] = name;
+      tile.inset.setAttribute("role", "button");
+      tile.inset.setAttribute("tabindex", "0");
+      tile.inset.setAttribute("aria-label", `Show ${name}`);
+      tile.inset.title = `Show ${name} (L)`;
+      tile.inset.style.transform = "";
+      tile.hold.after(tile.inset);
+    }
+
+    squeezeTile(tile);
+  };
+
+  /** Shows one of a camera's views, such as its telephoto lens, kept for next time. */
+  const setLens = (camera: Camera, key: string) => {
+    if (key === camera.views[0]?.key) lenses.delete(camera.id);
+    else lenses.set(camera.id, key);
+
+    keep(storageKey, { lenses: Object.fromEntries(lenses) });
+
+    const tile = tiles.find((shownTile) => shownTile.stream.id === camera.id);
+
+    // Both play already, so they only swap places
+    if (tile?.inset?.dataset["view"] === key) {
+      [tile.player, tile.inset] = [tile.inset, tile.player];
+      placeViews(tile);
+      tile.figure.toggleAttribute(
+        "data-loading",
+        tile.player?.hasAttribute("data-loading") === true,
+      );
+
+      if (paused) showHeld(tile);
+    }
+
+    showPicked();
+  };
+
+  /** The picked camera's next view, round to its first. */
+  const nextLens = () => {
+    const camera = streams.find((stream) => stream.id === picked);
+
+    if (camera === undefined || camera.views.length < 2) return;
+
+    const at = camera.views.findIndex(
+      (view) => view.key === viewOf(camera)?.key,
+    );
+
+    const next = camera.views[(at + 1) % camera.views.length];
+
+    if (next !== undefined) setLens(camera, next.key);
   };
 
   // A camera with only a still picture shows a new one every few seconds,
@@ -561,33 +801,27 @@ export const livePage = (): LivePage => {
       .map((stream) => {
         const figure = element("figure");
         const hold = element("canvas");
+        const shownView = viewOf(stream);
 
-        const player =
-          stream.live === null ? null : document.createElement("dvr-live");
+        const otherView = stream.views.find(
+          (view) => view.key !== shownView?.key,
+        );
+
+        const player = stream.live === null ? null : livePlayer(shownView);
+
+        const inset =
+          player !== null && otherView !== undefined
+            ? livePlayer(otherView)
+            : null;
 
         const picture = player === null ? element("img") : null;
-
-        const ratio =
-          stream.live === null ? null : streamFor(stream.live, size()).ratio;
 
         figure.className = "live-tile";
         figure.dataset.loading = "";
         hold.className = "live-hold";
         hold.setAttribute("aria-hidden", "true");
 
-        // A squeezed stream's player takes the picture's own shape
-        if (ratio !== null) {
-          figure.dataset.squeezed = "";
-          figure.style.setProperty("--tile-ratio", String(ratio));
-        }
-
-        if (player !== null) {
-          player.mode = "mse,hls";
-          // Video only: the recorder offers an audio track but sends nothing
-          // on it, and a player waiting for that audio never starts
-          player.media = "video";
-          figure.append(player);
-        }
+        if (player !== null) figure.append(player);
 
         if (picture !== null) {
           picture.className = "live-still";
@@ -610,7 +844,36 @@ export const livePage = (): LivePage => {
           toggleSolo();
         });
 
-        return { stream, figure, player, picture, hold, ratio };
+        const tile: Tile = { stream, figure, player, picture, hold, inset };
+
+        // Whichever of its players is small swaps with the big one, by a
+        // click or Enter, and a double click on it doesn't go to one camera
+        // alone
+        for (const each of [player, inset]) {
+          each?.addEventListener("click", () => {
+            const key = each.dataset["view"];
+
+            if (each === tile.inset && key !== undefined) setLens(stream, key);
+          });
+
+          each?.addEventListener("dblclick", (event) => {
+            if (each === tile.inset) event.stopPropagation();
+          });
+
+          each?.addEventListener("keydown", (event) => {
+            if (each !== tile.inset || !["Enter", " "].includes(event.key)) {
+              return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+            each.click();
+          });
+        }
+
+        placeViews(tile);
+
+        return tile;
       });
 
     // The pick stays on the page: one camera alone is always picked, and
@@ -630,9 +893,11 @@ export const livePage = (): LivePage => {
     // On the page each player makes its video: the page's controls stand in
     // for the video's own
     for (const tile of tiles) {
-      const video = tile.player?.querySelector("video") ?? null;
+      for (const player of [tile.player, tile.inset]) {
+        const video = player?.querySelector("video") ?? null;
 
-      if (video !== null) video.controls = false;
+        if (video !== null) video.controls = false;
+      }
 
       if (!paused) connect(tile);
     }
@@ -776,27 +1041,21 @@ export const livePage = (): LivePage => {
     paused = !paused;
 
     for (const tile of tiles) {
-      const video = tile.player?.querySelector("video") ?? null;
-
       // A still picture stays as it is while paused
       if (tile.player === null) {
         if (!paused) connect(tile);
       } else if (paused) {
-        // The last frame stays up while the stream is closed
-        if (video !== null && video.readyState >= 2) {
-          const { width, height } = drawnSize(
-            video.videoWidth,
-            video.videoHeight,
-            tile.ratio,
-          );
+        // The last frame stays up while the stream is closed, each view's
+        // its own, for a swap while paused
+        for (const player of [tile.player, tile.inset]) {
+          const frame = player === null ? undefined : frameOf(tile, player);
 
-          tile.hold.width = width;
-          tile.hold.height = height;
-          tile.hold.getContext("2d")?.drawImage(video, 0, 0, width, height);
-          tile.hold.toggleAttribute("data-shown", true);
+          if (player !== null && frame !== undefined) held.set(player, frame);
+
+          player?.ondisconnect();
         }
 
-        tile.player.ondisconnect();
+        showHeld(tile);
       } else {
         connect(tile);
       }
@@ -827,7 +1086,7 @@ export const livePage = (): LivePage => {
     // A squeezed stream's frame is saved at the picture's own shape
     const { width, height } =
       source instanceof HTMLVideoElement
-        ? drawnSize(size.width, size.height, tile.ratio)
+        ? drawnSize(size.width, size.height, ratioOf(tile))
         : size;
 
     if (width === 0) return;
@@ -895,25 +1154,33 @@ export const livePage = (): LivePage => {
   }
 
   // Zoom, each camera's its own and kept, once in tiles and once alone, as
-  // on the Recordings page. A drag or the wheel on a camera picks it
-  const zoomTileOf = (tile: Tile): ZoomTile => ({
-    id: tile.stream.id,
-    figure: tile.figure,
-    parts: [tile.player, tile.picture, tile.hold].flatMap((part) =>
-      part === null ? [] : [part],
-    ),
-    size: () => {
-      const source =
-        tile.picture ?? tile.player?.querySelector("video") ?? null;
+  // on the Recordings page, and each of a camera's views its own, since
+  // their pictures differ. A drag or the wheel on a camera picks it
+  const zoomTileOf = (tile: Tile): ZoomTile => {
+    const view = viewOf(tile.stream);
 
-      const size = source === null ? { width: 0, height: 0 } : sizeOf(source);
+    return {
+      id:
+        view === undefined || view.key === tile.stream.views[0]?.key
+          ? tile.stream.id
+          : `${tile.stream.id}#${view.key}`,
+      figure: tile.figure,
+      parts: [tile.player, tile.picture, tile.hold].flatMap((part) =>
+        part === null ? [] : [part],
+      ),
+      size: () => {
+        const source =
+          tile.picture ?? tile.player?.querySelector("video") ?? null;
 
-      // A squeezed stream's frame is drawn at the picture's own shape
-      return source instanceof HTMLVideoElement
-        ? drawnSize(size.width, size.height, tile.ratio)
-        : size;
-    },
-  });
+        const size = source === null ? { width: 0, height: 0 } : sizeOf(source);
+
+        // A squeezed stream's frame is drawn at the picture's own shape
+        return source instanceof HTMLVideoElement
+          ? drawnSize(size.width, size.height, ratioOf(tile))
+          : size;
+      },
+    };
+  };
 
   const zoom = pictureZoom({
     area: grid,
@@ -928,7 +1195,12 @@ export const livePage = (): LivePage => {
     zoomFit: zoomFitButton,
     zoomIn: zoomInButton,
     fit: fitToggle,
-    onPick: (tile) => pick(tile.id),
+    onPick: (zoomed) => {
+      const tile = tiles.find((shown) => shown.figure === zoomed.figure);
+
+      if (tile !== undefined) pick(tile.stream.id);
+    },
+    steers: (tile, gesture) => steer.steers(tile.figure, gesture),
     onChange: keepViews,
   });
 
@@ -944,13 +1216,23 @@ export const livePage = (): LivePage => {
     ["PageUp", () => step(-1)],
     ["PageDown", () => step(1)],
     ["Enter", toggleSolo],
-    ["Escape", () => (solo === undefined ? unpick() : leaveSolo())],
+    [
+      "Escape",
+      () => {
+        if (steer.on()) steer.leave();
+        else if (solo === undefined) unpick();
+        else leaveSolo();
+      },
+    ],
     ["Backspace", leaveSolo],
-    ["+", () => zoom.step(1)],
-    ["=", () => zoom.step(1)],
-    ["-", () => zoom.step(-1)],
+    // In Move mode, the lens zooms where it changes the picture shown
+    ["+", () => steer.zoomStep(1) || zoom.step(1)],
+    ["=", () => steer.zoomStep(1) || zoom.step(1)],
+    ["-", () => steer.zoomStep(-1) || zoom.step(-1)],
     ["0", zoom.whole],
     ["s", capture],
+    ["m", toggleMove],
+    ["l", nextLens],
     ["z", zoom.toggleFill],
     ["f", () => fullscreenButton?.click()],
     ["?", () => helpButton?.click()],
@@ -965,10 +1247,28 @@ export const livePage = (): LivePage => {
     ["a", () => setLayout("all")],
   ]);
 
+  /** The arrow keys, which steer the camera in Move mode while they're held. */
+  const isArrow = (
+    key: string | undefined,
+  ): key is "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" =>
+    key === "ArrowLeft" ||
+    key === "ArrowRight" ||
+    key === "ArrowUp" ||
+    key === "ArrowDown";
+
   document.addEventListener("keydown", (event) => {
     if (!shown()) return;
 
     const key = controlKey(event);
+
+    if (steer.on() && isArrow(key)) {
+      event.preventDefault();
+
+      if (!event.repeat) steer.key(key, true);
+
+      return;
+    }
+
     const action = keys.get(key ?? "");
 
     // Enter on a control presses it, as it should
@@ -978,6 +1278,11 @@ export const livePage = (): LivePage => {
 
     event.preventDefault();
     action();
+  });
+
+  // Whatever has the focus by then, a key let go stops it
+  document.addEventListener("keyup", (event) => {
+    if (isArrow(event.key)) steer.key(event.key, false);
   });
 
   // A click on a control hands the focus back to the cameras, so the keys
@@ -1044,6 +1349,7 @@ export const livePage = (): LivePage => {
       showTileProblems();
     },
     stop: () => {
+      steer.leave();
       tiles = [];
       // Back to placeholders, so the page comes back without a jump
       placeholders();

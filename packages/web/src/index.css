@@ -281,7 +281,7 @@ gw-page {
   margin: auto;
 }
 
-.live-tile[data-squeezed] video {
+.live-tile[data-squeezed] dvr-live:not(.live-inset) video {
   object-fit: fill;
 }
 
@@ -324,7 +324,7 @@ gw-page {
   animation: live-shimmer 1.4s linear infinite;
 }
 
-.live-tile[data-loading] dvr-live,
+.live-tile[data-loading] dvr-live:not(.live-inset),
 .player-tile[data-loading] > video {
   opacity: 0;
 }
@@ -381,6 +381,213 @@ gw-page {
   /* The same size as the fields and controls around the player */
   font-size: 1rem;
   pointer-events: none;
+}
+
+/* A camera's other view, such as its telephoto lens, small at the bottom
+   right of its tile. It plays all along, so a click swaps the two at once */
+.live-tile dvr-live.live-inset {
+  position: absolute;
+  inset: auto var(--gw-space-2) var(--gw-space-2) auto;
+  z-index: 1;
+  width: clamp(6rem, 28%, 16rem);
+  height: auto;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: var(--gw-radius-sm, 4px);
+  background: #000;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 50%);
+  cursor: pointer;
+}
+
+.live-inset:hover,
+.live-inset:focus-visible {
+  border-color: var(--gw-color-accent, #4c8dff);
+  outline: none;
+}
+
+.live-inset video {
+  width: 100%;
+  height: 100%;
+  transition: opacity 200ms ease-out;
+}
+
+.live-inset[data-loading] video {
+  opacity: 0;
+}
+
+/* Its name, so it's clear what a click shows */
+.live-inset::after {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  padding: 0 var(--gw-space-1);
+  border-start-end-radius: var(--gw-radius-sm, 4px);
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 0.75rem;
+  pointer-events: none;
+  content: attr(data-name);
+}
+
+/* In Move mode, a drag on the picture steers the camera, from a crosshair
+   in its middle */
+.live-tile[data-steering] {
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.live-tile[data-steering]::before {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 1;
+  width: 2rem;
+  height: 2rem;
+  translate: -50% -50%;
+  background:
+    linear-gradient(rgb(255 255 255 / 70%), rgb(255 255 255 / 70%)) center /
+      100% 1px no-repeat,
+    linear-gradient(rgb(255 255 255 / 70%), rgb(255 255 255 / 70%)) center / 1px
+      100% no-repeat;
+  filter: drop-shadow(0 0 1px rgb(0 0 0 / 80%));
+  pointer-events: none;
+  content: "";
+}
+
+/* The way it's being steered, from where the drag began */
+.live-steer-line {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.live-steer-line:not([data-shown]) {
+  display: none;
+}
+
+.live-steer-line line {
+  stroke: var(--gw-color-accent, #4c8dff);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* The camera's controls at the bottom left of the tile: the arrow pad and
+   lens zoom in Move mode, over the presets, Home, Tracking and setup */
+.live-steer-dock {
+  position: absolute;
+  inset-block-end: var(--gw-space-2);
+  inset-inline-start: var(--gw-space-2);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: var(--gw-space-2);
+  max-width: calc(100% - var(--gw-space-2) * 2);
+  max-height: calc(100% - var(--gw-space-2) * 2);
+  color: #fff;
+  cursor: default;
+}
+
+/* Clear of the other view, where there's one */
+.live-tile:has(.live-inset) .live-steer-dock {
+  max-width: calc(72% - var(--gw-space-2) * 3);
+}
+
+/* The arrows, and the lens zoom under them, in a square */
+.live-steer-pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gw-space-2);
+  box-sizing: border-box;
+  width: 16rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+  padding: var(--gw-space-2);
+  border-radius: var(--gw-radius-md, 8px);
+  background: rgb(0 0 0 / 55%);
+}
+
+.live-steer-pad[hidden] {
+  display: none;
+}
+
+.live-arrow-pad {
+  flex: 1;
+  display: grid;
+  grid-template:
+    ". up ." 1fr
+    "left . right" 1fr
+    ". down ." 1fr / 1fr 1fr 1fr;
+  place-items: center;
+  min-height: 0;
+}
+
+.live-arrow-pad [data-arrow="ArrowUp"] {
+  grid-area: up;
+}
+
+.live-arrow-pad [data-arrow="ArrowLeft"] {
+  grid-area: left;
+}
+
+.live-arrow-pad [data-arrow="ArrowRight"] {
+  grid-area: right;
+}
+
+.live-arrow-pad [data-arrow="ArrowDown"] {
+  grid-area: down;
+}
+
+.live-arrow-pad gw-button {
+  touch-action: none;
+}
+
+.live-steer-pad gw-range {
+  flex: 1;
+  min-width: 0;
+}
+
+/* − and + either side of the slider */
+.live-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gw-space-1);
+}
+
+.live-zoom-row[hidden] {
+  display: none;
+}
+
+.live-steer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gw-space-2);
+  max-width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--gw-space-2);
+  border-radius: var(--gw-radius-md, 8px);
+  background: rgb(0 0 0 / 55%);
+}
+
+.live-presets {
+  display: contents;
+}
+
+.live-steer-note:empty {
+  display: none;
+}
+
+/* The setup, opened from the gear */
+.ptz-panel {
+  --gw-popover-width: 22rem;
 }
 
 .recording-filters {

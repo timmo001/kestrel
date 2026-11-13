@@ -14,7 +14,8 @@ export const typingTargets =
   "input:not([type=radio], [type=checkbox], [type=button], [type=range]), textarea, select, [contenteditable], gw-input, gw-select";
 
 /** Controls that move between their own parts with the arrow keys. */
-const ownsArrows = "gw-segmented, gw-table, gw-menu-button, [role=menu]";
+const ownsArrows =
+  "gw-segmented, gw-table, gw-menu-button, gw-range, [role=menu]";
 
 /**
  * Wires a page's keys popover to its button, both opening it when it's shut
