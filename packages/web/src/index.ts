@@ -389,7 +389,14 @@ const notifyItems: Record<Exclude<PushState, "unsupported">, MenuItem> = {
 };
 
 const clientKey = "kestrel:push-client";
-const clientId = localStorage.getItem(clientKey) ?? crypto.randomUUID();
+
+// From getRandomValues, as randomUUID is only there over HTTPS or on
+// localhost, and the page is also served over plain HTTP on the network
+const clientId =
+  localStorage.getItem(clientKey) ??
+  Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
 
 localStorage.setItem(clientKey, clientId);
 

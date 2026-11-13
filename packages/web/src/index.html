@@ -18,23 +18,24 @@
       <p class="offline-message">Can't reach the recorder. Trying again…</p>
     </gw-banner>
     <gw-app-bar size="wide">
-      <a slot="brand" class="brand" href="/">
+      <a slot="brand" class="brand" href="./">
         <img src="icons/icon-192.png" alt="" width="24" height="24" />
         Kestrel
       </a>
       <!-- The pages, followed by the router. The script folds them into the
-           bar's menu when they don't fit beside the actions -->
-      <a class="nav-link" href="/" data-page="live"><span>Live</span></a>
-      <a class="nav-link" href="/recordings" data-page="recordings"
+           bar's menu when they don't fit beside the actions. Their links are
+           relative, so they follow <base> under Home Assistant's ingress -->
+      <a class="nav-link" href="./" data-page="live"><span>Live</span></a>
+      <a class="nav-link" href="recordings" data-page="recordings"
         ><span>Recordings</span></a
       >
-      <a class="nav-link" href="/events" data-page="events"
+      <a class="nav-link" href="events" data-page="events"
         ><span>Events</span></a
       >
-      <a class="nav-link" href="/sources" data-page="sources"
+      <a class="nav-link" href="sources" data-page="sources"
         ><span>Sources</span></a
       >
-      <a class="nav-link" href="/settings" data-page="settings"
+      <a class="nav-link" href="settings" data-page="settings"
         ><span>Settings</span></a
       >
       <!-- Reset is left out: Base and Auto are picked like any other -->
@@ -542,7 +543,7 @@
             description="There's no page at this address."
             level="2"
           ></gw-page-header>
-          <p><a href="/">Go to Live</a></p>
+          <p><a href="./">Go to Live</a></p>
         </section>
       </gw-stack>
     </gw-page>

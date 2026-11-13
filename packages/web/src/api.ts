@@ -8,9 +8,18 @@ import { Effect, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { HttpApiClient } from "effect/http-api";
 
-const client = HttpApiClient.make(Api, { baseUrl: location.origin }).pipe(
-  Effect.provide(FetchHttpClient.layer),
-);
+/**
+ * An address on the server, under the path the page is served from: the
+ * root, or Home Assistant's ingress path, which the page's `<base>` holds.
+ * `path` is relative, such as `api/cameras`.
+ */
+export const serverUrl = (path: string) => new URL(path, document.baseURI);
+
+// Made on each call rather than when the module loads, so modules that only
+// need `serverUrl` load without a page, such as in tests
+const client = Effect.suspend(() =>
+  HttpApiClient.make(Api, { baseUrl: serverUrl("./") }),
+).pipe(Effect.provide(FetchHttpClient.layer));
 
 type Client = Effect.Success<typeof client>;
 
@@ -27,7 +36,7 @@ const decodeEvent = Schema.decodeUnknownSync(
  * drops the stream. Returns a function that stops listening.
  */
 export const listenForEvents = (onEvent: (event: CameraEvent) => void) => {
-  const source = new EventSource(new URL("api/events/live", location.origin));
+  const source = new EventSource(serverUrl("api/events/live"));
 
   source.addEventListener("message", (message) => {
     try {

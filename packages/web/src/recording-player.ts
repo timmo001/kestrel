@@ -5,6 +5,7 @@
  * from there, and only a few minutes around the playhead stay in memory, as
  * the recorder sends far faster than it plays.
  */
+import { serverUrl } from "./api.ts";
 
 /** A stretch of one camera's recording, in recorder times. */
 export interface Clip {
@@ -44,7 +45,7 @@ export const sameView = (a: View, b: View) =>
 /** The server's MP4 of a clip, to play or, with `download`, to save as a file. */
 export const clipUrl = (clip: Clip, download = false, view = fullView) => {
   // The camera's id is its route's two path segments, such as `swann/3`
-  const url = new URL(`api/cameras/${clip.camera}/video`, location.origin);
+  const url = serverUrl(`api/cameras/${clip.camera}/video`);
 
   url.searchParams.set("begin", clip.begin);
   url.searchParams.set("end", clip.end);

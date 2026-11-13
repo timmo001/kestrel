@@ -20,6 +20,7 @@ import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
 import { SavedCamera } from "./addresses.ts";
+import { serverUrl } from "./api.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
   phCamera,
@@ -71,13 +72,19 @@ interface VideoRtcModule {
 }
 
 /**
+ * An address under go2rtc, from its root-relative `path`, such as
+ * `/go2rtc/api/ws`, kept under the path the page is served from.
+ */
+const go2rtcUrl = (path: string) => serverUrl(path.replace(/^\//, ""));
+
+/**
  * Defines `dvr-live` from go2rtc's own `video-rtc.js`, served beside it, so
  * the player always matches the go2rtc that sends the stream.
  */
 const definePlayer = async (path: string) => {
   if (customElements.get("dvr-live") !== undefined) return;
 
-  const url = new URL(`${path}video-rtc.js`, location.origin).href;
+  const url = go2rtcUrl(`${path}video-rtc.js`).href;
 
   const { VideoRTC }: VideoRtcModule = await import(url);
 
@@ -165,8 +172,7 @@ const stillEvery = 5000;
 
 /** A camera's still picture now; the time makes each one new to the browser. */
 const stillAddress = (camera: Camera) =>
-  new URL(`api/cameras/${camera.id}/still?at=${Date.now()}`, location.origin)
-    .href;
+  serverUrl(`api/cameras/${camera.id}/still?at=${Date.now()}`).href;
 
 /** The size of what a still is saved from. */
 const sizeOf = (
@@ -795,9 +801,8 @@ export const livePage = (): LivePage => {
       { capture: true, once: true },
     );
 
-    player.src = new URL(
+    player.src = go2rtcUrl(
       `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(live, size()).name)}`,
-      location.origin,
     ).href;
   };
 

@@ -396,9 +396,16 @@ const makeRouter = <const R extends AnyRoutes>(
   };
 
   const read = (): LocationIn<R> => {
-    const target = options.redirect?.(new URL(location.href));
+    // `redirect` reads and gives addresses within the app, without the base path
+    const url = new URL(location.href);
 
-    if (target !== undefined) history.replaceState(null, "", target);
+    const target = options.redirect?.(
+      new URL(`${pathOf(url)}${url.search}${url.hash}`, url.origin),
+    );
+
+    if (target !== undefined) {
+      history.replaceState(null, "", `${basePath}${target}`);
+    }
 
     shown = location.href;
 
@@ -505,6 +512,8 @@ const makeRouter = <const R extends AnyRoutes>(
 const pageNames = new Set(Object.keys(routes));
 
 export const { href, navigate, currentLocation } = makeRouter(routes, {
+  // The page's `<base>`: the root, or Home Assistant's ingress path
+  basePath: new URL(document.baseURI).pathname,
   // Old addresses, such as `/#recordings`, `/recorder` or `channel=3`, still land
   redirect: (url) => newAddress(url, pageNames),
   // Events grow as they arrive, so where it was left is somewhere else now
