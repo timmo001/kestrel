@@ -174,11 +174,20 @@ address and login out there, it reads the file `mise run auth:save` keeps;
 it doesn't read `.env.local`, since that needs 1Password.
 
 Each [release](https://github.com/timmo001/kestrel/releases) has it for
-Linux and Windows (x64): unpack the Setup file and run the installer in it.
-Neither is signed, so Windows asks before running it. Recording needs
+Linux and Windows (x64): unpack the Setup file and run the installer in it,
+or install it with mise and start it with `kestrel`:
+
+```sh
+mise use -g github:timmo001/kestrel
+```
+
+Neither is signed, so Windows asks before running it, but each release's
+files have a GitHub attestation, which mise checks, or check one yourself
+with `gh attestation verify <file> -R timmo001/kestrel`. Recording needs
 `ffmpeg` on the path, or `KESTREL_FFMPEG`; the app doesn't bring its own.
 The Windows build hasn't been tried on a real machine yet, and Start at
-login is Linux only.
+login is Linux only. With mise, Start at login points at that version, so
+tick it again after upgrading.
 
 Closing the window leaves it running in the tray. The tray menu opens the
 window again, shows whether the server is running, how many sources are
