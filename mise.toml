@@ -24,6 +24,14 @@ description = "Install dependencies"
 run = "bun install --frozen-lockfile"
 sources = ["package.json", "packages/*/package.json", "docs/package.json", "bun.lock"]
 
+# The OpenCode plugin sits outside the workspace, so it keeps the Effect
+# version OpenCode runs rather than the workspace's override.
+[tasks."install:plugin"]
+description = "Install the OpenCode plugin's dependencies"
+dir = "opencode-plugin"
+run = "bun install --frozen-lockfile"
+sources = ["package.json", "bun.lock"]
+
 [tasks."docs:dev"]
 description = "Run the docs dev server in the foreground; agents use serve:docs"
 depends = ["install"]
@@ -100,14 +108,20 @@ depends = ["install"]
 run = "bun run --filter './packages/*' test"
 
 [tasks.lint]
-description = "Lint every package with the shared Oxlint rules"
-depends = ["install"]
-run = "bun run --filter './packages/*' lint"
+description = "Lint every package and the OpenCode plugin with the shared Oxlint rules"
+depends = ["install", "install:plugin"]
+run = [
+  "bun run --filter './packages/*' lint",
+  "bun run --cwd opencode-plugin lint",
+]
 
 [tasks.typecheck]
-description = "Type-check every package"
-depends = ["install"]
-run = "bun run --filter './packages/*' typecheck"
+description = "Type-check every package and the OpenCode plugin"
+depends = ["install", "install:plugin"]
+run = [
+  "bun run --filter './packages/*' typecheck",
+  "bun run --cwd opencode-plugin typecheck",
+]
 
 [tasks.format]
 description = "Format source and configuration"

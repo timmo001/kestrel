@@ -52,12 +52,28 @@ Run it from the repository with `bun packages/cli/src/cli.ts`.
 
 ## Code Mode and MCP
 
-`kestrel agent tools --json` prints the Code Mode manifest: every
-operation, its access and the command behind it. `download`, `pair` and
-`config copy` are the `write`s, since they save a file, a token or another
+`kestrel agent tools --json` prints the Code Mode manifest: every tool, its
+input as JSON Schema and whether it reads or writes, and
+`kestrel agent call <tool>` runs one with its input as JSON on stdin,
+printing what the command prints with `--json`. `download`, `pair` and
+`config_copy` are the writes, since they save a file, a token or another
 server's settings. `kestrel mcp` serves the other operations over MCP on
 stdio, as read-only tools; a video file means nothing in an MCP reply, and
-pairing and copying are for a person to do, so those stay in the CLI.
+pairing and copying are for a person to do, so those stay out of it.
+
+## OpenCode
+
+The plugin in `opencode-plugin/` turns the manifest into the `kestrel` Code
+Mode namespace, running each tool through the `kestrel` command on the
+`PATH`, so its tools always match the installed version. Writes ask first:
+`download` once for each camera, unless you always allow it, and `pair` and
+`config_copy` every time. Add it to OpenCode's config:
+
+```json
+{
+  "plugins": ["github:timmo001/kestrel#main::path:opencode-plugin"]
+}
+```
 
 ## The skill
 

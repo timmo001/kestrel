@@ -35,6 +35,9 @@ and work that depends on one waits for it.
   tray, on `@timmo001/groundwork-desktop`, and `cli` is the
   `kestrel` CLI with its Code Mode and MCP surface. Its skill is
   `skills/kestrel/SKILL.md`; keep it in step with the CLI's operations.
+  `opencode-plugin/` is the OpenCode plugin for that Code Mode surface. It
+  sits outside the workspace, with its own `bun.lock`, so it keeps the
+  Effect version `@opencode/plugin` uses.
 - Name packages type first, then thing: `source-<kind>` for a source,
   `protocol-<kind>` for a protocol library.
 - Anything only one kind of source has belongs in its own packages, never in
