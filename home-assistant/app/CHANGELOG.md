@@ -1,8 +1,9 @@
-Live fills the window: the cameras tile to the space they have, rather than keeping one fixed shape for each count.
+Recordings gets a Custom speed, and clips fade into each other again as they play on.
 
-## Live
+## Recordings
 
-- Smart tiling is the new default. It sizes the tiles to the window and fills as much of it as it can, in rows or columns with no empty cells, the larger tiles first where the count doesn't split evenly. In a wide window it matches the old shapes (three is one large and two stacked, five is two over three); in a tall or narrow one the cameras stack rather than leaving space empty.
-- It follows the window as it changes size and when Live goes full screen.
-- The new View menu beside the layout picker, or T, switches back to the fixed layouts. The choice is kept in this browser.
-- On a phone, smart tiling fits the cameras to the screen too; with fixed layouts they're listed one under another as before.
+- Custom is the last option on the speed toggle. It opens a small popover with the field focused, ready to type any speed from 0.1× to 32×, and once it's set the option shows that speed, such as 5×. Enter or a click outside closes it; closed with nothing typed, the toggle goes back to the speed playing. This replaces the field that sat beside the toggle, so it now works on a phone too.
+
+## Fixes
+
+- When one recording ran on into the next, the picture went to the loading shimmer instead of holding the last frame and fading into the next clip. Each camera's tile now holds its own last frame while the next clip loads, with one camera or several, and when a speed change switches stream.
