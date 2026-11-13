@@ -33,6 +33,8 @@ body, is scrambled with a fixed bit permutation that needs no key.
 | 124  | step    | Key frames only, one per `step` seconds of recording    |
 | 896  | 196     | Subscribe to alarm reports                              |
 | 891  | various | Alarm reports, sent by the recorder once subscribed     |
+| 211  | 508     | Each channel's colour: hue, brightness and the rest     |
+| 216  | 508     | Save a channel's colour, or put back its defaults       |
 
 ## Differences on SRV7.1.0
 
@@ -40,6 +42,9 @@ body, is scrambled with a fixed bit permutation that needs no key.
   the same layout. Both reply with ack 1 even when they hold good data.
 - The day outline's time of day is junk; only the date is reliable.
 - Model and serial come back empty in the login reply.
+- A parameter page request without its size in front gets an empty page.
+- 217, which should read a page's defaults, replies with every value 0, so
+  the client puts the colour back by saving with its defaults byte set.
 
 ## Downloads
 
@@ -107,3 +112,21 @@ Motion (191), PIR (187), video loss (189) and alarm input (192) reports start
 with the channel from 0, a status (1 on, 0 off) and the time. Recording status
 (212) and disk (202, 213) reports put those fields elsewhere. These layouts
 come from the SDK header and are checked in real use.
+
+## Picture colour
+
+The recorder keeps settings on parameter pages, read with 211 and saved with
+216, the subtype naming the page. Each message is an element: its size, not
+counting the size itself, then a struct starting with its own size. A read
+asks with a 36-byte struct, its size then a 256-bit mask of the channels
+wanted. A reply, and a save, follow the struct with a list: its size, then
+each channel's entry with its size in front.
+
+The colour page is 508. Its 96-byte entries give the channel's mask, then a
+byte each for hue, brightness, contrast and saturation, a byte that asks for
+the defaults back, sharpness, and a byte of bits: the range in the lowest two
+(0 for 0 to 63, 1 for 0 to 255) and whether to offer the defaults in bit 6.
+Gamma, a second set of values and two times follow, which a save sends back
+as they were. A save takes effect at once, and replies with an empty ack.
+These layouts come from the SDK's sources and are checked against a
+DVR8-4575.

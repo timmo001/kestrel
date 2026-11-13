@@ -97,6 +97,34 @@ export interface ChannelRecording {
   readonly bytes: number | null;
 }
 
+/**
+ * A channel's colour, from the colour parameter page. Hue, brightness,
+ * contrast and saturation run from 0 to `range`; sharpness always runs to
+ * 255.
+ */
+export interface ChannelColour {
+  readonly channel: number;
+  readonly hue: number;
+  readonly brightness: number;
+  readonly contrast: number;
+  readonly saturation: number;
+  readonly sharpness: number;
+  readonly range: 63 | 255;
+  /** Whether the recorder offers to put it back to its defaults. */
+  readonly resettable: boolean;
+  /** The page's whole 96-byte entry, so a save sends back what it doesn't change. */
+  readonly entry: Uint8Array;
+}
+
+/** Colour values to save, each in the channel's own range. */
+export interface ColourChange {
+  readonly hue?: number | undefined;
+  readonly brightness?: number | undefined;
+  readonly contrast?: number | undefined;
+  readonly saturation?: number | undefined;
+  readonly sharpness?: number | undefined;
+}
+
 /** The kinds of alarm report the recorder sends once subscribed. */
 export const AlarmKind = Schema.Literals([
   "motion",

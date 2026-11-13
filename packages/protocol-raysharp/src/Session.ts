@@ -18,6 +18,7 @@ import {
   Redacted,
   Schedule,
   Schema,
+  Semaphore,
   Stream,
 } from "effect";
 import * as Socket from "effect/socket/Socket";
@@ -27,10 +28,13 @@ import {
   MessageType,
   Subtype,
   ackReasons,
+  channelParamRequest,
+  colourSave,
   downloadRequest,
   isRaysharpLogin,
   loginRequest,
   parseAlarm,
+  parseColourPage,
   parseLogin,
   parseRecordedDays,
   parseRecordings,
@@ -45,7 +49,9 @@ import {
 } from "./Messages.ts";
 import type {
   AlarmEvent,
+  ChannelColour,
   ChannelRecording,
+  ColourChange,
   DeviceInfo,
   RecorderStatus,
 } from "./Reports.ts";
@@ -115,13 +121,31 @@ export class RecorderBusy extends Schema.TaggedError<RecorderBusy>()(
   }
 }
 
+/**
+ * The recorder turned a request down, such as a save it won't take from
+ * this user.
+ */
+export class RequestRefused extends Schema.TaggedError<RequestRefused>()(
+  "RequestRefused",
+  {
+    type: Schema.Number,
+    subtype: Schema.Number,
+    reason: Schema.String,
+  },
+) {
+  override get message() {
+    return `The recorder refused message ${this.type}/${this.subtype}: ${this.reason}`;
+  }
+}
+
 export type SessionError =
   | LoginRefused
   | NotRaysharp
   | ProtocolError
   | RequestTimedOut
   | ConnectionClosed
-  | RecorderBusy;
+  | RecorderBusy
+  | RequestRefused;
 
 /** A reply to a request. Some replies carry ack 1 and still hold good data, so the ack is left to the caller. */
 export type Reply = Frame;
@@ -184,6 +208,18 @@ export interface Session {
   }) => Stream.Stream<RecordedFrame, SessionError>;
   /** Alarm reports, when the session asked for them. Ends when the connection closes. */
   readonly alarms: Stream.Stream<AlarmEvent>;
+  /** Some channels' colour (from 1), from the colour parameter page. */
+  readonly colours: (
+    channels: ReadonlyArray<number>,
+  ) => Effect.Effect<Array<ChannelColour>, SessionError>;
+  /**
+   * Saves some of a channel's colour, or puts it back to its defaults, and
+   * reads it again. Saves wait for each other, so none undoes another.
+   */
+  readonly saveColour: (
+    channel: number,
+    change: ColourChange | "defaults",
+  ) => Effect.Effect<ChannelColour, SessionError>;
   /** Waits until the connection closes, failing with why. */
   readonly closed: Effect.Effect<never, SessionError>;
 }
@@ -493,6 +529,59 @@ export const make = Effect.fnUntraced(function* (
     yield* request(MessageType.alarmSubscribe, Subtype.alarmDesired);
   }
 
+  /** A reply, or why the recorder turned its request down. */
+  const accepted = (type: number, subtype: number, body: Uint8Array) =>
+    request(type, subtype, body).pipe(
+      Effect.flatMap((reply) =>
+        reply.ack === 0
+          ? Effect.succeed(reply)
+          : Effect.fail(
+              new RequestRefused({
+                type,
+                subtype,
+                reason: ackReasons.get(reply.ack) ?? `ack ${reply.ack}`,
+              }),
+            ),
+      ),
+    );
+
+  const colours: Session["colours"] = (channels) =>
+    accepted(
+      MessageType.queryParam,
+      Subtype.colourParam,
+      channelParamRequest(channels),
+    ).pipe(Effect.map((reply) => parseColourPage(reply.body)));
+
+  const colour = (channel: number) =>
+    colours([channel]).pipe(
+      Effect.flatMap((found) => {
+        const entry = found.find((each) => each.channel === channel);
+
+        return entry === undefined
+          ? Effect.fail(
+              new ProtocolError({
+                message: `The colour page has no channel ${channel}`,
+              }),
+            )
+          : Effect.succeed(entry);
+      }),
+    );
+
+  const saving = yield* Semaphore.make(1);
+
+  const saveColour: Session["saveColour"] = (channel, change) =>
+    colour(channel).pipe(
+      Effect.flatMap((current) =>
+        accepted(
+          MessageType.setParam,
+          Subtype.colourParam,
+          colourSave(current, change),
+        ),
+      ),
+      Effect.andThen(colour(channel)),
+      Semaphore.withPermit(saving),
+    );
+
   return {
     device,
     request,
@@ -525,6 +614,8 @@ export const make = Effect.fnUntraced(function* (
     download,
     keyFrames,
     alarms: Stream.fromPubSub(alarms),
+    colours,
+    saveColour,
     closed: Deferred.await(closed),
   } satisfies Session;
 });

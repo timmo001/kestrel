@@ -13,7 +13,9 @@ import { reader, writer, type Reader, type Writer } from "./Codec.ts";
 import type {
   AlarmEvent,
   AlarmKind,
+  ChannelColour,
   ChannelRecording,
+  ColourChange,
   DeviceInfo,
   DiskState,
   RecorderStatus,
@@ -29,6 +31,10 @@ export const MessageType = {
   recordPlayFeedback: 122,
   recordPlayControl: 124,
   downloadRecordFile: 131,
+  /** Reads a parameter page, named by the subtype. */
+  queryParam: 211,
+  /** Saves a parameter page, named by the subtype. */
+  setParam: 216,
   status: 890,
   alarmReport: 891,
   alarmSubscribe: 896,
@@ -51,6 +57,8 @@ export const Subtype = {
   diskAlarm: 202,
   recordStatus: 212,
   diskStatus: 213,
+  /** The parameter page of each channel's colour: hue, brightness and the rest. */
+  colourParam: 508,
 } as const;
 
 /** What the recorder's ack codes mean. */
@@ -401,6 +409,153 @@ export const parseRecordedDays = (bytes: Uint8Array): Array<RecordedDay> => {
   });
 
   return days;
+};
+
+/**
+ * A parameter page message: an element of its size, not counting the size
+ * itself, then its struct, which starts with its own size, then for a save
+ * the list of entries, each with its size first. The SDK keeps this
+ * envelope in its library; firmware SRV7.1.0 answers a request without it
+ * with an empty page.
+ */
+const paramElement = (
+  struct: Uint8Array,
+  entries?: ReadonlyArray<Uint8Array>,
+) => {
+  const listSize = entries?.reduce((sum, entry) => sum + 4 + entry.length, 0);
+  const size = struct.length + (listSize === undefined ? 0 : 4 + listSize);
+  const body = writer(4 + size);
+  body.u32(0, size);
+  body.bytes.set(struct, 4);
+
+  if (entries !== undefined && listSize !== undefined) {
+    let offset = 4 + struct.length;
+    body.u32(offset, listSize);
+    offset += 4;
+
+    for (const entry of entries) {
+      body.u32(offset, entry.length);
+      body.bytes.set(entry, offset + 4);
+      offset += 4 + entry.length;
+    }
+  }
+
+  return body.bytes;
+};
+
+/** The entries of a parameter page reply, each without its size. */
+const paramEntries = (bytes: Uint8Array): Array<Uint8Array> => {
+  const body = reader(bytes);
+  const end = Math.min(bytes.length, 4 + body.u32(0));
+  const listAt = 4 + body.u32(4);
+
+  if (listAt + 4 > end) return [];
+
+  const listEnd = Math.min(end, listAt + 4 + body.u32(listAt));
+  const entries: Array<Uint8Array> = [];
+
+  for (let offset = listAt + 4; offset + 4 <= listEnd;) {
+    const size = body.u32(offset);
+
+    if (size === 0 || offset + 4 + size > listEnd) break;
+    entries.push(bytes.slice(offset + 4, offset + 4 + size));
+    offset += 4 + size;
+  }
+
+  return entries;
+};
+
+/**
+ * Asks for some channels' entries on a parameter page (ChannelParamReq):
+ * its size, then a 256-channel mask with each channel (from 1) set.
+ */
+export const channelParamRequest = (
+  channels: ReadonlyArray<number>,
+): Uint8Array => {
+  const masks = new Uint32Array(8);
+
+  for (const channel of channels) {
+    const word = (channel - 1) >> 5;
+    masks[word] = (masks[word] ?? 0) | (1 << ((channel - 1) & 31));
+  }
+
+  const struct = writer(36);
+  struct.u32(0, 36);
+  masks.forEach((mask, index) => struct.u32(4 + index * 4, mask));
+
+  return paramElement(struct.bytes);
+};
+
+/** The smallest colour entry this parser reads: up to the bits after sharpness. */
+const colourEntryMinimum = 15;
+
+/** The channel (from 1) an entry's channel mask names: one bit up to 32, past that its number in the low half. */
+const maskChannel = (mask: number) =>
+  mask >>> 16 === 0xffff ? (mask & 0xffff) + 1 : 32 - Math.clz32(mask & -mask);
+
+const maskOf = (channel: number) =>
+  channel <= 32 ? (1 << (channel - 1)) >>> 0 : (0xffff0000 + channel - 1) >>> 0;
+
+/**
+ * The colour page's entries (RSNet_SoleColorSet_t, 96 bytes): size, channel
+ * mask, then hue (`Chroma`), brightness, contrast and saturation, a byte
+ * that asks for the defaults back, sharpness, and a byte of bits: the range
+ * in bits 0 and 1 (0 for 0 to 63, 1 for 0 to 255) and whether to offer the
+ * defaults in bit 6. Gamma, a second set of values and two times follow,
+ * which a save sends back as they were.
+ */
+export const parseColourPage = (bytes: Uint8Array): Array<ChannelColour> =>
+  paramEntries(bytes).flatMap((entry) => {
+    if (entry.length < colourEntryMinimum) return [];
+
+    const body = reader(entry);
+    const bits = body.u8(14);
+
+    return [
+      {
+        channel: maskChannel(body.u32(4)),
+        hue: body.u8(8),
+        brightness: body.u8(9),
+        contrast: body.u8(10),
+        saturation: body.u8(11),
+        sharpness: body.u8(13),
+        range: (bits & 0b11) === 1 ? 255 : 63,
+        resettable: (bits & 0b0100_0000) !== 0,
+        entry,
+      },
+    ];
+  });
+
+/**
+ * Saves a channel's colour: the entry it was read with, with `change` in
+ * place, or asking for the defaults back. Values are rounded and held to
+ * the channel's range.
+ */
+export const colourSave = (
+  colour: ChannelColour,
+  change: ColourChange | "defaults",
+): Uint8Array => {
+  const body = writer(colour.entry.length);
+  body.bytes.set(colour.entry);
+  body.u32(4, maskOf(colour.channel));
+
+  const put = (offset: number, value: number | undefined, top: number) => {
+    if (value !== undefined)
+      body.u8(offset, Math.min(top, Math.max(0, Math.round(value))));
+  };
+
+  if (change === "defaults") {
+    body.u8(12, 1);
+  } else {
+    body.u8(12, 0);
+    put(8, change.hue, colour.range);
+    put(9, change.brightness, colour.range);
+    put(10, change.contrast, colour.range);
+    put(11, change.saturation, colour.range);
+    put(13, change.sharpness, 255);
+  }
+
+  return paramElement(Uint8Array.of(4, 0, 0, 0), [body.bytes]);
 };
 
 const channelAlarms: ReadonlyMap<number, AlarmKind> = new Map([
