@@ -84,7 +84,11 @@ const push = Layer.unwrap(
   }),
 );
 
-/** Serves the API and the web client over plain HTTP, with the sources behind it. */
+/**
+ * Serves the API and the web client over plain HTTP, with the sources behind
+ * it. The sources stay in what it provides, for a host in the same process,
+ * such as the desktop app, to read without going through HTTP.
+ */
 export const layer = (options: ServeOptions) =>
   HttpRouter.serve(
     Layer.mergeAll(routes, go2rtc, push, webClient(options.web)),
@@ -97,5 +101,5 @@ export const layer = (options: ServeOptions) =>
     Layer.provide([Go2rtc.layer, Attention.layer, Library.layer]),
     Layer.provide(Push.layer),
     // Last, so the routes and go2rtc share one connection to each source.
-    Layer.provide(Sources.layer),
+    Layer.provideMerge(Sources.layer),
   );

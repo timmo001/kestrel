@@ -5,13 +5,15 @@
  * time up to 30 seconds.
  */
 import { BunServices } from "@effect/platform-bun";
-import { Server } from "@timmo001/kestrel-server";
+import { Server, Sources } from "@timmo001/kestrel-server";
 import { Api } from "@timmo001/kestrel-server/api";
 import {
   Cause,
   Context,
   Effect,
   Layer,
+  Option,
+  Ref,
   Schedule,
   SubscriptionRef,
 } from "effect";
@@ -56,16 +58,30 @@ export class DesktopServer extends Context.Service<
           baseUrl: `http://127.0.0.1:${options.port}`,
         });
 
+        // The running server's sources, read in this process rather than
+        // over HTTP, so checking them doesn't fill its request log
+        const running = yield* Ref.make(Option.none<Sources["Service"]>());
+
         const check = Effect.gen(function* () {
           yield* client.system.health();
-          const sources = yield* client.sources.list();
-          const settings = yield* client.sources.settings();
+
+          const sources = yield* Ref.get(running).pipe(
+            Effect.flatMap(Effect.fromOption),
+          );
+
+          const all = yield* sources.all;
+
+          const connections = yield* Effect.forEach(
+            all,
+            (source) => source.connection,
+          );
+
+          const settings = yield* sources.settings;
 
           return {
             state: "up",
-            connected: sources.filter(({ connection }) => connection.connected)
-              .length,
-            sources: sources.length,
+            connected: connections.filter(({ connected }) => connected).length,
+            sources: all.length,
             recording: settings.recording.cameras.length,
           } satisfies Status;
         });
@@ -81,13 +97,19 @@ export class DesktopServer extends Context.Service<
           ),
         );
 
-        yield* Layer.launch(
+        yield* Layer.build(
           Server.layer({
             hostname: "127.0.0.1",
             port: options.port,
             web: options.web,
           }),
         ).pipe(
+          Effect.flatMap((context) =>
+            Ref.set(running, Option.some(Context.get(context, Sources))),
+          ),
+          Effect.andThen(Effect.never),
+          Effect.ensuring(Ref.set(running, Option.none())),
+          Effect.scoped,
           Effect.sandbox,
           Effect.tapError((cause) =>
             Effect.logError("The server stopped", Cause.pretty(cause)).pipe(
