@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@effect/platform-bun": "4.1.4",
-    "@timmo001/groundwork-pwa": "0.27.0",
+    "@timmo001/groundwork-pwa": "0.28.0",
     "@timmo001/kestrel-core": "workspace:*",
     "@timmo001/kestrel-format-mp4": "workspace:*",
     "@timmo001/kestrel-nvr": "workspace:*",
