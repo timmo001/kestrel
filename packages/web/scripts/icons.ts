@@ -30,6 +30,7 @@ const names = [
   "dots-three-vertical",
   "download-simple",
   "floppy-disk",
+  "funnel-simple",
   "gauge",
   "gear",
   "house",
@@ -47,6 +48,7 @@ const names = [
   "speaker-low",
   "speaker-slash",
   "stop",
+  "x",
 ];
 
 /** Icons also wanted in the bold weight, exported with a `Bold` suffix. */
