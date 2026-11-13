@@ -83,6 +83,16 @@ from it.
 Everything travels over plain HTTP, so keep the server on your own network.
 To reach it from outside, put it behind a reverse proxy with HTTPS.
 
+## Installing the app
+
+Over HTTPS, or on `localhost`, the page installs as an app: it opens in its
+own window, starts without a connection, and its icon's menu goes straight to
+Recordings, Events or Sources. A browser that offers installs to the page,
+such as Chrome or Edge, gets a banner offering it once. Not now puts the
+banner away for good in that browser, and Install stays in Settings for as
+long as the browser can install it. Other browsers install from their own
+menu, such as Safari's Add to Home Screen.
+
 ## Your sources
 
 The server's sources, such as a recorder, and the names you give cameras are

@@ -27,6 +27,22 @@
         >Reload</gw-button
       >
     </gw-banner>
+    <!-- The offer to install Kestrel as an app, until it's turned down once;
+         then only Settings offers it -->
+    <gw-banner class="install">
+      <p>Install Kestrel to open it in its own window, like any other app.</p>
+      <gw-button slot="actions" class="install-accept" size="small"
+        >Install</gw-button
+      >
+      <gw-button
+        slot="actions"
+        class="install-dismiss"
+        size="small"
+        appearance="plain"
+        variant="neutral"
+        >Not now</gw-button
+      >
+    </gw-banner>
     <gw-app-bar size="wide">
       <a slot="brand" class="brand" href="./">
         <img src="icons/icon-192.png" alt="" width="24" height="24" />
@@ -599,6 +615,20 @@
               <gw-table class="devices-list"></gw-table>
             </gw-stack>
           </gw-expansion>
+          <!-- Installing Kestrel as an app, while this browser can -->
+          <gw-card class="settings-install" hidden>
+            <gw-setting-row
+              heading="Install Kestrel"
+              description="Open it in its own window, from your home screen or app list"
+            >
+              <gw-button
+                class="settings-install-button"
+                appearance="outlined"
+                variant="neutral"
+                >Install</gw-button
+              >
+            </gw-setting-row>
+          </gw-card>
         </section>
 
         <!-- Pairing: a browser the server doesn't know yet lands here, with a

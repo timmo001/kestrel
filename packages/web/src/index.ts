@@ -38,6 +38,7 @@ import { loadCameras } from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
 import { homeAssistantSidebar } from "./home-assistant.ts";
+import { installOffer } from "./install.ts";
 import {
   phBell,
   phBellRinging,
@@ -101,6 +102,8 @@ if (themePicker !== null) {
 }
 
 const pwa = connectPwa(config);
+
+const install = installOffer(pwa);
 
 // Connection: a banner while the server can't be reached. A source it can't
 // reach is in the attention list instead, from the source itself
@@ -357,6 +360,9 @@ const showPage = (location: Location) => {
   if (page === "live" && cameras !== undefined) void live.show(cameras);
 
   if (page === "pair") pair.open();
+
+  // A browser being paired gets on with that before it's offered the app
+  install.hold(page === "pair");
 };
 
 AtomRegistry.make().subscribe(currentLocation, showPage, { immediate: true });
