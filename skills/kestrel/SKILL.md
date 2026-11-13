@@ -18,7 +18,9 @@ pairing, tell the person: they get a code from Settings, Devices on a
 paired browser (or `kestrel pair` on the server), then run
 `kestrel pair <code> --server <address>`. Never ask for or print a token.
 `devices` lists what's paired, and `servers` lists the servers on the
-network.
+network. The CLI and the server must run the same version: when a call says
+they differ, pass on which side to update and how, as it says, and don't
+work around it.
 
 Cameras are named by id: their source's id and their own, such as `swann/3`
 for the recorder's channel 3.
