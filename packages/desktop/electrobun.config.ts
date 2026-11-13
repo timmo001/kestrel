@@ -11,7 +11,7 @@ export default {
   app: {
     name: "Kestrel",
     identifier: "dev.timmo.kestrel",
-    version: "0.1.2",
+    version: "0.1.3",
   },
   runtime: {
     // It keeps running in the tray
