@@ -8,4 +8,3 @@ One Kestrel server now serves every device, and Kestrel installs almost anywhere
 - New ways to install: `kestrel-nvr-bin` in the timmo pacman repository and the AUR, `.deb` and `.rpm` for x86_64 and aarch64, a Flatpak, the `ghcr.io/timmo001/kestrel` container, and a Home Assistant app in timmo001/home-assistant-apps. Each package has a user service and a system service for `kestrel serve`.
 - The release archives are now `kestrel-nvr-<version>-<platform>`, and the Setup files `Kestrel-Setup-<version>-<platform>`.
 - The docs have a new Install page, and Running it covers the ways to run a server and pairing.
-

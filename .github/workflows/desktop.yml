@@ -420,7 +420,9 @@ jobs:
       - name: Write the changelog
         env:
           RELEASE_NOTES: ${{ github.event.release.body }}
-        run: printf '%s\n' "$RELEASE_NOTES" | tr -d '\r' > home-assistant/app/CHANGELOG.md
+        run: |
+          notes=$(printf '%s' "$RELEASE_NOTES" | tr -d '\r')
+          printf '%s\n' "$notes" > home-assistant/app/CHANGELOG.md
 
       - name: Commit the changelog
         env:
