@@ -36,6 +36,7 @@ export type {
   RecordedFrame,
   Source,
   SourceEvents,
+  SourcePicture,
   SourcePtz,
   SourceRecordings,
   SourceStills,

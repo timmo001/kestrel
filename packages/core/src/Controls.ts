@@ -1,7 +1,8 @@
 /**
- * What a camera can be told to do, such as pan, tilt and zoom, what's sent
- * to it and what it reports back. Directions and zoom are shares of the
- * camera's own range, so the page needs none of its numbers.
+ * What a camera can be told to do, such as pan, tilt and zoom or change its
+ * picture's colour, what's sent to it and what it reports back. Directions,
+ * zoom and picture settings are shares of the camera's own range, so the
+ * page needs none of its numbers.
  *
  * @module
  */
@@ -22,9 +23,27 @@ export const PtzControls = Schema.Struct({
 
 export interface PtzControls extends Schema.Schema.Type<typeof PtzControls> {}
 
+/**
+ * Which of its picture settings a camera lets you change, and whether it
+ * can put them back to its defaults.
+ */
+export const PictureControls = Schema.Struct({
+  hue: Schema.Boolean,
+  brightness: Schema.Boolean,
+  contrast: Schema.Boolean,
+  saturation: Schema.Boolean,
+  sharpness: Schema.Boolean,
+  reset: Schema.Boolean,
+});
+
+export interface PictureControls extends Schema.Schema.Type<
+  typeof PictureControls
+> {}
+
 /** Each control a camera has; `null` for one it doesn't. */
 export const CameraControls = Schema.Struct({
   ptz: Schema.NullOr(PtzControls),
+  picture: Schema.NullOr(PictureControls),
 });
 
 export interface CameraControls extends Schema.Schema.Type<
@@ -145,3 +164,34 @@ export const PtzState = Schema.Struct({
 });
 
 export interface PtzState extends Schema.Schema.Type<typeof PtzState> {}
+
+/** A picture setting's share of the camera's own range, from 0 to 1. */
+const Share = Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 }));
+
+/** A camera's picture settings now, each `null` where it has none. */
+export const PictureState = Schema.Struct({
+  hue: Schema.NullOr(Share),
+  brightness: Schema.NullOr(Share),
+  contrast: Schema.NullOr(Share),
+  saturation: Schema.NullOr(Share),
+  sharpness: Schema.NullOr(Share),
+});
+
+export interface PictureState extends Schema.Schema.Type<typeof PictureState> {}
+
+/**
+ * What a camera's picture is told: change some of its settings, leaving
+ * the rest, or put them all back to its defaults.
+ */
+export const PictureCommand = Schema.TaggedUnion({
+  Set: {
+    hue: Schema.optionalKey(Share),
+    brightness: Schema.optionalKey(Share),
+    contrast: Schema.optionalKey(Share),
+    saturation: Schema.optionalKey(Share),
+    sharpness: Schema.optionalKey(Share),
+  },
+  Reset: {},
+});
+
+export type PictureCommand = typeof PictureCommand.Type;

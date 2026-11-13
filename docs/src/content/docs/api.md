@@ -26,6 +26,8 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/cameras/:source/:camera/still`             | A camera's still picture now, for one with `still`                            |
 | `GET /api/cameras/:source/:camera/ptz`               | Where a camera that moves has its lens zoomed, its presets, home and tracking |
 | `POST /api/cameras/:source/:camera/ptz`              | Moves it, zooms it, or changes its presets, home or tracking; see below       |
+| `GET /api/cameras/:source/:camera/picture`           | Its hue, brightness, contrast, saturation and sharpness, each from 0 to 1     |
+| `POST /api/cameras/:source/:camera/picture`          | Changes them, or puts back its defaults; see below                            |
 | `GET /api/recordings/days?month=…`                   | The days with recordings on any camera in a month                             |
 | `GET /api/events/`                                   | The last 200 events from each source, newest first                            |
 | `GET /api/events/live`                               | Events as server-sent events                                                  |
@@ -49,7 +51,10 @@ than one, such as a TrackMix's `Wide` and `Telephoto` lenses, each with its
 empty for a camera with one. `controls.ptz` says whether it can `pan`,
 `tilt`, `zoom` its lens, has `presets`, has a `home` it goes back to and
 follows what it sees (`tracking`), or is `null` for a camera that
-can't move. A source that isn't connected yet leaves its
+can't move. `controls.picture` says which of `hue`, `brightness`,
+`contrast`, `saturation` and `sharpness` it lets you change and whether it
+can `reset` them to its defaults, or is `null` for a camera without picture
+settings. A source that isn't connected yet leaves its
 cameras out until it knows them.
 
 The settings read back carry a `revision`. A save sends back the one it read,
@@ -233,6 +238,22 @@ of the `methods` it can, `backAfterLeaving` and `backAfterStopping`, and
 the `backChoices` it takes for those. `home` and `tracking` are `null` on a
 camera without them. A command a camera can't do, such as a preset on one
 with none, returns 404 with `NotSupported`.
+
+## Picture settings
+
+A camera with `controls.picture` takes a change as JSON at
+`POST /api/cameras/:source/:camera/picture`, and answers with its settings
+now, as `GET` on the same route does: `hue`, `brightness`, `contrast`,
+`saturation` and `sharpness`, each a share of its own range from 0 to 1, or
+`null` for one it doesn't have.
+
+- `{"_tag": "Set", "brightness": 0.6}` changes the settings it's sent and
+  leaves the rest. The camera rounds each to the nearest step it has.
+- `{"_tag": "Reset"}` puts them all back to the camera's defaults, for one
+  with `reset`.
+
+A change takes effect on the live picture at once and stays, as one made on
+the recorder itself would.
 
 ## Push
 

@@ -21,6 +21,8 @@ import {
   LocalTime,
   NoRecordings,
   NotSupported,
+  PictureCommand,
+  PictureState,
   PtzCommand,
   PtzState,
   RecordedDay,
@@ -183,6 +185,22 @@ export class CamerasGroup extends HttpApiGroup.make("cameras")
     HttpApiEndpoint.post("steer", "/:source/:camera/ptz", {
       params: cameraParams,
       payload: PtzCommand,
+      error: cameraErrors,
+    }),
+    /** A camera's picture settings now, such as its hue and brightness. */
+    HttpApiEndpoint.get("picture", "/:source/:camera/picture", {
+      params: cameraParams,
+      success: PictureState,
+      error: cameraErrors,
+    }),
+    /**
+     * Changes some of a camera's picture settings, or puts them back to its
+     * defaults, and says what they are now.
+     */
+    HttpApiEndpoint.post("adjust", "/:source/:camera/picture", {
+      params: cameraParams,
+      payload: PictureCommand,
+      success: PictureState,
       error: cameraErrors,
     }),
   )

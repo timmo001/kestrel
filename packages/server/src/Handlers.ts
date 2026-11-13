@@ -118,6 +118,10 @@ const camerasOf = (
             camera.ptz !== undefined && source.ptz !== undefined
               ? camera.ptz
               : null,
+          picture:
+            camera.picture !== undefined && source.picture !== undefined
+              ? camera.picture
+              : null,
         },
         still: camera.still && source.stills !== undefined,
         recordings: recorded.includes(camera.id),
@@ -226,6 +230,26 @@ const CamerasHandlers = HttpApiBuilder.group(
           ),
           Effect.flatMap((ptz) =>
             ptz.send(cameraId(params.source, params.camera), payload),
+          ),
+        ),
+      )
+      .handle("picture", ({ params }) =>
+        sources.find(params.source).pipe(
+          Effect.flatMap((found) =>
+            capability(found, found.picture, "picture settings"),
+          ),
+          Effect.flatMap((picture) =>
+            picture.state(cameraId(params.source, params.camera)),
+          ),
+        ),
+      )
+      .handle("adjust", ({ params, payload }) =>
+        sources.find(params.source).pipe(
+          Effect.flatMap((found) =>
+            capability(found, found.picture, "picture settings"),
+          ),
+          Effect.flatMap((picture) =>
+            picture.send(cameraId(params.source, params.camera), payload),
           ),
         ),
       );

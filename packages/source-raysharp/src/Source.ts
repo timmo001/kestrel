@@ -2,7 +2,8 @@
  * A Raysharp recorder as a source: one logged-in session, opened when the
  * server starts and reopened with backoff whenever it drops, with the alarm
  * reports it sends kept and passed on. Each channel is a camera, such as
- * `swann/3`, with its RTSP streams for live view and its recordings. Its
+ * `swann/3`, with its RTSP streams for live view, its recordings and its
+ * picture's colour. Its
  * address and login come from its settings, and any it leaves out from the
  * environment: `KESTREL_RAYSHARP_HOST`, `_USERNAME` and `_PASSWORD`, with
  * `_PORT` and `_RTSP_PORT` when they aren't the defaults, and
@@ -15,6 +16,8 @@ import {
   cameraParts,
   InvalidSettings,
   NoRecordings,
+  NotSupported,
+  PictureCommand,
   SourceUnavailable,
   UnknownCamera,
   type CameraEvent,
@@ -24,6 +27,8 @@ import {
   type Details,
   type Kind,
   type LiveFeed,
+  type PictureControls,
+  type PictureState,
   type RecordedFrame,
   type Recording,
   type Source,
@@ -33,6 +38,8 @@ import {
 import {
   Session,
   type AlarmEvent,
+  type ChannelColour,
+  type ColourChange,
   type RecorderStatus,
 } from "@timmo001/kestrel-protocol-raysharp";
 import {
@@ -41,6 +48,7 @@ import {
   Duration,
   Effect,
   Option,
+  Predicate,
   PubSub,
   Redacted,
   Ref,
@@ -126,6 +134,25 @@ const detailsOf = (
     recording: channel.recordingMode,
     motion: channel.motion,
   })),
+});
+
+/** A channel's colour as shares of its range; sharpness always runs to 255. */
+const pictureOf = (colour: ChannelColour): PictureState => ({
+  hue: colour.hue / colour.range,
+  brightness: colour.brightness / colour.range,
+  contrast: colour.contrast / colour.range,
+  saturation: colour.saturation / colour.range,
+  sharpness: colour.sharpness / 255,
+});
+
+/** What a channel with a colour page lets you change. */
+const pictureControls = (colour: ChannelColour): PictureControls => ({
+  hue: true,
+  brightness: true,
+  contrast: true,
+  saturation: true,
+  sharpness: true,
+  reset: colour.resettable,
 });
 
 /** The settings a recorder takes, each left out falling back to its environment variable. */
@@ -392,6 +419,57 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         );
   };
 
+  /** A recorder that turns its colour page down has no picture settings. */
+  const fromColour =
+    (camera: CameraId) =>
+    (error: Session.SessionError): NotSupported | SourceUnavailable =>
+      Predicate.isTagged(error, "RequestRefused")
+        ? new NotSupported({
+            message: `${camera} has no picture settings: ${error.reason}`,
+          })
+        : unavailable(error);
+
+  // Each channel's colour page as first read, for its range and whether it
+  // can go back to its defaults, which don't change. Kept once a read works
+  const firstColours = yield* Ref.make(
+    Option.none<ReadonlyArray<ChannelColour>>(),
+  );
+
+  const coloursOf = (open: Session.Session) =>
+    Ref.get(firstColours).pipe(
+      Effect.flatMap(
+        Option.match({
+          onSome: Effect.succeed,
+          onNone: () =>
+            open
+              .colours(channelsOf(open))
+              .pipe(
+                Effect.tap((found) =>
+                  Ref.set(firstColours, Option.some(found)),
+                ),
+              ),
+        }),
+      ),
+    );
+
+  /** A camera's channel and its colour page as first read. */
+  const colourOf = Effect.fnUntraced(function* (camera: CameraId) {
+    const open = yield* opened;
+    const channel = yield* channelOf(open, camera);
+
+    const page = (yield* coloursOf(open).pipe(
+      Effect.mapError(fromColour(camera)),
+    )).find((each) => each.channel === channel);
+
+    if (page === undefined) {
+      return yield* new NotSupported({
+        message: `${camera} has no picture settings`,
+      });
+    }
+
+    return { open, channel, page };
+  });
+
   // The latest status, read every minute for what needs you, and the
   // channels that have had a signal since the server started
   const latest = yield* Ref.make<RecorderStatus | null>(null);
@@ -439,12 +517,18 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       const open = yield* opened;
       const status = yield* open.status.pipe(Effect.option);
 
+      const colours = yield* coloursOf(open).pipe(
+        Effect.orElseSucceed((): ReadonlyArray<ChannelColour> => []),
+      );
+
       return channelsOf(open).map((channel): CameraInfo => {
         const state = Option.getOrUndefined(status)?.channels.find(
           (each) => each.channel === channel,
         );
 
-        return {
+        const colour = colours.find((each) => each.channel === channel);
+
+        const info: CameraInfo = {
           id: cameraId(id, String(channel)),
           name: `Channel ${channel}`,
           channel,
@@ -454,6 +538,10 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           recordings: true,
           events: true,
         };
+
+        if (colour === undefined) return info;
+
+        return { ...info, picture: pictureControls(colour) };
       });
     }),
     // The channel count comes from the login
@@ -553,6 +641,56 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     events: {
       recent: Ref.get(recent),
       live: Stream.fromPubSub(events),
+    },
+    picture: {
+      state: Effect.fnUntraced(function* (camera) {
+        const { open, channel } = yield* colourOf(camera);
+
+        const now = (yield* open
+          .colours([channel])
+          .pipe(Effect.mapError(fromColour(camera)))).find(
+          (each) => each.channel === channel,
+        );
+
+        if (now === undefined) {
+          return yield* new NotSupported({
+            message: `${camera} has no picture settings`,
+          });
+        }
+
+        return pictureOf(now);
+      }),
+      send: Effect.fnUntraced(function* (camera, command) {
+        const { open, channel, page } = yield* colourOf(camera);
+
+        const scaled = (share: number | undefined, top: number) =>
+          share === undefined ? undefined : share * top;
+
+        const change = yield* PictureCommand.match(command, {
+          Set: (set): Effect.Effect<ColourChange | "defaults", NotSupported> =>
+            Effect.succeed({
+              hue: scaled(set.hue, page.range),
+              brightness: scaled(set.brightness, page.range),
+              contrast: scaled(set.contrast, page.range),
+              saturation: scaled(set.saturation, page.range),
+              sharpness: scaled(set.sharpness, 255),
+            }),
+          Reset: () =>
+            page.resettable
+              ? Effect.succeed("defaults" as const)
+              : Effect.fail(
+                  new NotSupported({
+                    message: `${camera} can't go back to its defaults`,
+                  }),
+                ),
+        });
+
+        const saved = yield* open
+          .saveColour(channel, change)
+          .pipe(Effect.mapError(fromColour(camera)));
+
+        return pictureOf(saved);
+      }),
     },
     details: Effect.gen(function* () {
       const open = yield* opened;

@@ -3,13 +3,20 @@
  * connection and what needs you about it, its cameras and where go2rtc
  * reads their live streams, and the capabilities only some sources have,
  * each optional: recordings, events, still pictures, moving and zooming,
- * and details. Cameras are named by their
+ * picture settings and details. Cameras are named by their
  * full id, such as `swann/3`.
  *
  * @module
  */
 import type { Effect, Redacted, Stream } from "effect";
-import type { PtzCommand, PtzControls, PtzState } from "./Controls.ts";
+import type {
+  PictureCommand,
+  PictureControls,
+  PictureState,
+  PtzCommand,
+  PtzControls,
+  PtzState,
+} from "./Controls.ts";
 import type { Attention, Details } from "./Details.ts";
 import type {
   NoRecordings,
@@ -57,6 +64,8 @@ export interface CameraInfo {
   readonly events: boolean;
   /** How it moves and zooms, for a camera that does; left out for one that doesn't. */
   readonly ptz?: PtzControls;
+  /** Which picture settings it lets you change, for a camera that does. */
+  readonly picture?: PictureControls;
 }
 
 /** A camera's still picture, as its source sent it. */
@@ -133,6 +142,27 @@ export interface SourcePtz {
   ) => Effect.Effect<void, SourceUnavailable | UnknownCamera | NotSupported>;
 }
 
+/**
+ * Picture settings, such as hue and brightness, for a source with cameras
+ * that have them; a camera that doesn't is `NotSupported`.
+ */
+export interface SourcePicture {
+  readonly state: (
+    camera: CameraId,
+  ) => Effect.Effect<
+    PictureState,
+    SourceUnavailable | UnknownCamera | NotSupported
+  >;
+  /** Changes a camera's picture, then says what it's set to now. */
+  readonly send: (
+    camera: CameraId,
+    command: PictureCommand,
+  ) => Effect.Effect<
+    PictureState,
+    SourceUnavailable | UnknownCamera | NotSupported
+  >;
+}
+
 /** How background work, such as copying, keeps to the limits. */
 export interface Pace {
   /** The most bytes a second to read. */
@@ -200,6 +230,7 @@ export interface Source {
   readonly events?: SourceEvents;
   readonly stills?: SourceStills;
   readonly ptz?: SourcePtz;
+  readonly picture?: SourcePicture;
   /** What it shows about itself, such as a recorder's device, disks and channels. */
   readonly details?: Effect.Effect<Details, SourceUnavailable>;
 }
