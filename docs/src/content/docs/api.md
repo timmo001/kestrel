@@ -3,8 +3,8 @@ title: API
 description: The server's HTTP API, which the web client reads.
 ---
 
-The server's API is plain JSON over HTTP, with no login of its own. Its
-OpenAPI document is at `/api/openapi.json`. Recorder times have no time zone:
+The server's API is plain JSON over HTTP, for paired devices only (see
+[Pairing](#pairing)). Its OpenAPI document is at `/api/openapi.json`. Recorder times have no time zone:
 they're the recorder's own clock, as it keeps them, such as
 `2026-11-11T22:24:31`.
 
@@ -30,6 +30,12 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/events/`                                   | The last 200 events from each source, newest first                            |
 | `GET /api/events/live`                               | Events as server-sent events                                                  |
 | `GET /api/health`                                    | 204 while the server is up                                                    |
+| `GET /api/devices/server`                            | The server's lasting `id` and its `name`                                      |
+| `POST /api/devices/pair`                             | Pairs a device with a one-time code; see below                                |
+| `POST /api/devices/code`                             | A new one-time code, and the link a QR code carries                           |
+| `POST /api/devices/link`                             | A one-time sign-in path for a window, as the device asking                    |
+| `GET /api/devices/`                                  | The paired devices, each with its kind and when it was last used              |
+| `DELETE /api/devices/:id`                            | Unpairs a device; 204                                                         |
 
 A camera in `/api/cameras` says what it can do: `live` has its go2rtc stream
 names, or is `null` for a camera with no live view; `still` says whether it
@@ -78,6 +84,37 @@ An event in `/api/events` has its source, its camera where it's about one,
 its kind (such as `motion`, `PIR`, or a camera's own `person`, `vehicle` or
 `animal` detection), whether it started or ended, the
 source's own time for it, and when the server received it.
+
+## Pairing
+
+Everything under `/api/`, `/go2rtc/` and `/push/` needs a paired device,
+apart from `/api/health`, `/api/devices/server` and `/api/devices/pair`.
+Without one it returns 401 with `Unpaired`. The page's own files stay open,
+so a browser that isn't paired can load the pairing page. A server that
+only listens on this machine (`KESTREL_HOST=127.0.0.1`) lets this machine
+in without pairing; once it listens on the network, this machine needs a
+token too.
+
+A device pairs once with a code from `POST /api/devices/code`, such as
+`ABCD-EFGH`, which works once, for five minutes. Ten wrong codes in five
+minutes cancel every open one. `POST /api/devices/pair` takes
+`{ code, name, kind }`, where `kind` is `browser`, `desktop`, `cli` or
+`android`. A browser gets an `HttpOnly` cookie, `kestrel_session`; every
+other kind gets its `token` in the reply, once, and sends it as
+`Authorization: Bearer <token>`. A wrong, used or late code returns 403
+with `PairingRefused`. The code's `link` is the page that pairs with it,
+`<server>/pair#code=…&server=<id>`, for a QR code; it's missing when the
+server has no address other devices can reach (set `KESTREL_URL` to name
+one).
+
+The server keeps only a SHA-256 hash of each token, in `devices.json` in
+the state folder, and an owner token in `owner.token` beside it: whoever can
+read that folder owns the server. `POST /api/devices/link` returns a path,
+`auth/connect/<code>`, that signs a window in as the device asking, once,
+such as the desktop app's window: opening it sets the cookie and goes to the
+page.
+
+## Errors
 
 Every endpoint that needs a source returns 503 with a `SourceUnavailable`
 error while it isn't connected. An id that names no source or camera returns

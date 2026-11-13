@@ -7,9 +7,16 @@ description: Read your cameras' status, recordings and motion or PIR events thro
 
 Prefer the `kestrel` Code Mode namespace, then the MCP server
 (`kestrel mcp`); fall back to the CLI with `--json`. They talk to the
-server at `KESTREL_SERVER` (`http://127.0.0.1:7380` by default). Every
-operation only reads from the sources; `download` also writes a file here,
-so it's the one write, and it's in the CLI only.
+server at `KESTREL_SERVER`, else the one `kestrel pair` saved, else
+`http://127.0.0.1:7380`. Every operation only reads from the sources;
+`download` writes a file here and `pair` saves a token, so they're the
+writes, and they're in the CLI only.
+
+A server only answers paired devices. When a call says this CLI needs
+pairing, tell the person: they get a code from Settings, Devices on a
+paired browser (or `kestrel pair` on the server), then run
+`kestrel pair <code> --server <address>`. Never ask for or print a token.
+`devices` lists what's paired.
 
 Cameras are named by id: their source's id and their own, such as `swann/3`
 for the recorder's channel 3.
