@@ -7,7 +7,8 @@
 # too, longer than the archives so mise picks an archive.
 #
 # Usage: release-archives.sh <artifacts folder> <version> <output folder>
-# where the artifacts folder holds kestrel-desktop-<os>-<arch> folders.
+# where the artifacts folder holds kestrel-desktop-<os>-<arch> folders. It
+# packages each build it finds, so a build job can package its own.
 set -euo pipefail
 # Stop inside $( … ) too, so a build that won't unpack stops the release
 shopt -s inherit_errexit
@@ -26,6 +27,9 @@ unpack() {
   mkdir -p "$folder/bin" "$folder/lib"
   tar --zstd -xf "$2" -C "$folder/lib"
   mv "$folder/lib/Kestrel" "$folder/lib/kestrel-nvr"
+  # Electrobun's uninstaller is for its own per-user install; a package
+  # manager or mise removes these
+  rm -f "$folder/lib/kestrel-nvr/Resources/uninstall"
   printf '%s\n' "$folder"
 }
 
@@ -46,9 +50,13 @@ for build in "Linux-X64 x64 x86_64" "Linux-ARM64 arm64 aarch64"; do
     "$out/Kestrel-Setup-$version-$platform.tar.gz"
 done
 
-windows="$(unpack windows-x86_64 "$artifacts/kestrel-desktop-Windows-X64/stable-win-x64-Kestrel.tar.zst")"
-printf '@echo off\r\n"%%~dp0..\\lib\\kestrel-nvr\\Resources\\app\\kestrel.cmd" %%*\r\n' >"$windows/bin/kestrel.cmd"
-(cd "$work" && zip -qr "$out/kestrel-nvr-$version-windows-x86_64.zip" "kestrel-nvr-$version-windows-x86_64")
+bundle="$artifacts/kestrel-desktop-Windows-X64/stable-win-x64-Kestrel.tar.zst"
 
-cp "$artifacts/kestrel-desktop-Windows-X64/win-x64-Kestrel-Setup.zip" \
-  "$out/Kestrel-Setup-$version-windows-x86_64.zip"
+if [ -f "$bundle" ]; then
+  windows="$(unpack windows-x86_64 "$bundle")"
+  printf '@echo off\r\n"%%~dp0..\\lib\\kestrel-nvr\\Resources\\app\\kestrel.cmd" %%*\r\n' >"$windows/bin/kestrel.cmd"
+  (cd "$work" && zip -qr "$out/kestrel-nvr-$version-windows-x86_64.zip" "kestrel-nvr-$version-windows-x86_64")
+
+  cp "$artifacts/kestrel-desktop-Windows-X64/win-x64-Kestrel-Setup.zip" \
+    "$out/Kestrel-Setup-$version-windows-x86_64.zip"
+fi

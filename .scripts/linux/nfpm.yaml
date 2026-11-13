@@ -1,0 +1,60 @@
+---
+# The .deb and .rpm, made by package.sh from a release's kestrel-nvr archive.
+# It stages everything below in one folder and runs nFPM there, so the paths
+# are the staged ones: the app's bundle under /opt/kestrel-nvr, the `kestrel`
+# command, a menu entry and icons, the services and the licences. The desktop
+# libraries are only recommended, so a headless box can take the package
+# without a desktop and run `kestrel serve`.
+name: kestrel-nvr
+arch: ${ARCH}
+platform: linux
+version: ${VERSION}
+version_schema: none
+release: "1"
+section: video
+priority: optional
+maintainer: Aidan Timson <aidan@timmo.dev>
+description: Your cameras, recordings and events in one place, with a server for every device
+homepage: https://github.com/timmo001/kestrel
+license: Apache-2.0
+overrides:
+  deb:
+    depends:
+      - libc6
+    recommends:
+      - ffmpeg
+      - libwebkit2gtk-4.1-0
+      - libgtk-3-0
+      - libayatana-appindicator3-1
+  rpm:
+    depends:
+      - glibc
+    suggests:
+      - ffmpeg
+      - webkit2gtk4.1
+      - gtk3
+      - libayatana-appindicator-gtk3
+contents:
+  - src: opt/kestrel-nvr
+    dst: /opt/kestrel-nvr
+    type: tree
+  - src: /opt/kestrel-nvr/Resources/app/kestrel
+    dst: /usr/bin/kestrel
+    type: symlink
+  - src: kestrel-nvr.desktop
+    dst: /usr/share/applications/kestrel-nvr.desktop
+  - src: icons
+    dst: /usr/share/icons/hicolor
+    type: tree
+  - src: kestrel-nvr.user.service
+    dst: /usr/lib/systemd/user/kestrel-nvr.service
+  - src: kestrel-nvr.system.service
+    dst: /usr/lib/systemd/system/kestrel-nvr.service
+  - src: kestrel-nvr.sysusers
+    dst: /usr/lib/sysusers.d/kestrel-nvr.conf
+  - src: LICENSE
+    dst: /usr/share/licenses/kestrel-nvr/LICENSE
+  - src: go2rtc.LICENSE
+    dst: /usr/share/licenses/kestrel-nvr/go2rtc.LICENSE
+scripts:
+  postinstall: postinstall.sh
