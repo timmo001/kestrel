@@ -350,6 +350,24 @@ gw-page {
   }
 }
 
+/* Why the camera can't be seen, over its tile in place of the shimmer */
+.live-tile[data-problem] {
+  animation: none;
+}
+
+.live-problem {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: var(--gw-space-4);
+  background: rgb(0 0 0 / 55%);
+  color: rgb(255 255 255 / 85%);
+  text-align: center;
+  pointer-events: none;
+}
+
 .live-tile figcaption,
 .player-caption {
   position: absolute;

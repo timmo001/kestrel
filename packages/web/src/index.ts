@@ -91,28 +91,20 @@ if (themePicker !== null) {
 
 const pwa = connectPwa(config);
 
-// Connection: a banner while the server can't reach a source, and nothing
-// while it reaches them all
+// Connection: a banner while the server can't be reached. A source it can't
+// reach is in the attention list instead, from the source itself
 const offline = find("gw-banner", "offline");
 
 const offlineMessage = document.querySelector("p.offline-message");
 
-/** Why a source can't be reached, as the banner says it. */
-const unreachable = (source: SourceInfo) =>
-  `Can't reach ${source.name}${source.connection.error === null ? "" : `: ${source.connection.error}`}.`;
-
 /** The sources, or null when the server itself can't be reached. */
 const showConnection = async () => {
   const sources = await call((api) => api.sources.list()).catch(() => null);
-  const down = sources?.filter((source) => !source.connection.connected) ?? [];
 
-  if (offline !== null) offline.open = sources === null || down.length > 0;
+  if (offline !== null) offline.open = sources === null;
 
-  if (offlineMessage !== null) {
-    offlineMessage.textContent =
-      sources === null
-        ? "Can't reach the server. Trying again…"
-        : `${down.map(unreachable).join(" ")} Trying again…`;
+  if (offlineMessage !== null && sources === null) {
+    offlineMessage.textContent = "Can't reach the server. Trying again…";
   }
 
   return sources;
@@ -120,14 +112,28 @@ const showConnection = async () => {
 
 // What needs you, from the server's attention list: alerts first, then
 // passive notes, above every page. A passive storage note, such as a full
-// disk, shows in its source's Storage card instead.
+// disk, shows in its source's Storage card instead, and a source that can't
+// be reached says so over its cameras on the Live page where it has any.
 const attentionStack = find("gw-stack", "attention");
 
 const fetchAttention = (): Promise<ReadonlyArray<Attention>> =>
   call((api) => api.attention.list()).catch(() => []);
 
+/** Whether a problem shows over its source's cameras rather than above the page. */
+const onTiles = (item: Attention) =>
+  item.kind === "connection" &&
+  (cameras ?? []).some((camera) => camera.source === item.source);
+
 const showAttention = (all: ReadonlyArray<Attention>) => {
-  const items = all.filter((item) => !isStorageNote(item));
+  const items = all.filter((item) => !isStorageNote(item) && !onTiles(item));
+
+  live.showProblems(
+    new Map(
+      all.flatMap((item) =>
+        onTiles(item) ? [[item.source, item.message] as const] : [],
+      ),
+    ),
+  );
 
   if (attentionStack === null) return;
 
@@ -444,13 +450,15 @@ const start = async () => {
     return;
   }
 
-  // The cameras first, so every page labels them, such as "Ch 3"
+  // The cameras first, so every page labels them, such as "Ch 3", and a
+  // source's problem can go over its cameras
   const known = await loadCameras();
   const recorded = known.filter((camera) => camera.recordings);
 
+  cameras = known;
+
   await showSources(list);
 
-  cameras = known;
   recordings.start(today, recorded);
 
   await Promise.all([

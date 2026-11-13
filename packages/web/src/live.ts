@@ -7,7 +7,8 @@
  * on to the next page past the edge. The layout, page, picked camera, each
  * camera's zoom and how many cameras there were are kept in this
  * browser, so the placeholders take the cameras' places before they're
- * known. The players only run while the page shows, so a hidden page
+ * known. A camera whose source can't be reached says why over its tile.
+ * The players only run while the page shows, so a hidden page
  * streams nothing.
  */
 import type { Camera, LiveStreams } from "@timmo001/kestrel-core";
@@ -227,6 +228,10 @@ const fileTime = () => {
 export interface LivePage {
   /** Shows the cameras that play live and have a signal, once the page is the one shown. */
   readonly show: (cameras: ReadonlyArray<Camera>) => Promise<void>;
+  /** Shows why a source's cameras can't be seen over their tiles, by source id; those left out are cleared. */
+  readonly showProblems: (
+    problems: ReadonlyMap<Camera["source"], string>,
+  ) => void;
   /** Takes the players off the page, which closes their streams. */
   readonly stop: () => void;
   /** Gives the cameras the focus, so the keyboard controls work at once. */
@@ -262,6 +267,8 @@ export const livePage = (): LivePage => {
   let paused = false;
   let streams: ReadonlyArray<Camera> = [];
   let tiles: ReadonlyArray<Tile> = [];
+  /** Why each source's cameras can't be seen, by source id. */
+  let problems: ReadonlyMap<Camera["source"], string> = new Map();
   /** Whether the cameras are known, rather than guessed from last time. */
   let loaded = false;
 
@@ -523,6 +530,24 @@ export const livePage = (): LivePage => {
     }
   }, stillEvery);
 
+  /** Puts each source's problem over its cameras' tiles, and takes it off once it's gone. */
+  const showTileProblems = () => {
+    for (const tile of tiles) {
+      const problem = problems.get(tile.stream.source);
+
+      tile.figure.querySelector(".live-problem")?.remove();
+      tile.figure.toggleAttribute("data-problem", problem !== undefined);
+
+      if (problem !== undefined) {
+        const note = element("p", problem);
+
+        note.className = "live-problem";
+        // Under the caption, so the camera's name still shows
+        tile.figure.querySelector("figcaption")?.before(note);
+      }
+    }
+  };
+
   /** Puts the page's worth of cameras in the grid, and starts them unless paused. */
   const render = () => {
     if (grid === null || !shown()) return;
@@ -612,6 +637,7 @@ export const livePage = (): LivePage => {
       if (!paused) connect(tile);
     }
 
+    showTileProblems();
     showPicked();
     showControls();
   };
@@ -1012,6 +1038,10 @@ export const livePage = (): LivePage => {
 
       paused = false;
       render();
+    },
+    showProblems: (next) => {
+      problems = next;
+      showTileProblems();
     },
     stop: () => {
       tiles = [];
