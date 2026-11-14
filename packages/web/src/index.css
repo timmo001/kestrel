@@ -297,6 +297,7 @@ gw-table gw-sheet {
   [data-tiling="fixed"] .live-area {
     display: block;
     container-type: normal;
+    touch-action: pan-y pinch-zoom;
   }
 
   [data-tiling="fixed"] .live-grid,
@@ -1105,12 +1106,34 @@ gw-table gw-sheet {
   }
 }
 
-/* A touch screen has no keyboard to show the keys for */
-@media (hover: none) and (pointer: coarse) {
-  .live-help,
-  .control-help {
+/* The help lists the gestures where there's a touch screen, and the keys
+   where there's likely a keyboard: a device with only a finger to point
+   with leaves them out */
+@media not (any-pointer: coarse) {
+  .touch-only {
     display: none;
   }
+}
+
+@media (any-pointer: coarse) and (any-hover: none) {
+  .keys-only {
+    display: none;
+  }
+}
+
+.key-list-heading {
+  grid-column: 1 / -1;
+  margin: var(--gw-space-2) 0 0;
+  color: var(--gw-color-text-strong);
+  font-size: var(--gw-font-size-s);
+  font-weight: 600;
+}
+
+/* Live's cameras take a finger's swipes and pinches themselves, rather than
+   the page scrolling under them, except where fixed layouts stack them on a
+   phone and the page scrolls through them */
+.live-area {
+  touch-action: none;
 }
 
 /* The cameras playing, above them */
@@ -1583,13 +1606,6 @@ kbd {
   --safe-bottom: max(var(--gw-space-2), env(safe-area-inset-bottom, 0px));
 
   position: relative;
-}
-
-/* Full screen there's no page to scroll, so a swipe up or down is the
-   player's, to show or hide its controls; otherwise it scrolls the page */
-[data-overlay]:fullscreen,
-:fullscreen [data-overlay] {
-  touch-action: pinch-zoom;
 }
 
 [data-overlay] > .live-area,

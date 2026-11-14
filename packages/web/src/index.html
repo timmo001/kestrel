@@ -211,11 +211,11 @@
                   label="Capture"
                   data-overflow
                 ></gw-button>
-                <!-- Optional, as ? opens it too -->
+                <!-- In More when the bar is tight, as ? opens it too -->
                 <gw-button
                   class="live-help"
-                  label="Keyboard controls"
-                  data-optional
+                  label="Help"
+                  data-overflow
                 ></gw-button>
                 <gw-menu-button
                   class="controls-more"
@@ -227,9 +227,24 @@
                   class="live-fullscreen"
                   label="Full screen"
                 ></gw-button>
-                <!-- The keys, opened from the help button -->
-                <gw-popover class="live-shortcuts" heading="Keyboard controls">
-                  <dl class="key-list">
+                <!-- The gestures and keys, opened from the help button, ? or
+                     a three finger swipe up -->
+                <gw-popover class="live-shortcuts" heading="Controls">
+                  <dl class="key-list touch-only">
+                    <dt class="key-list-heading">Gestures</dt>
+                    <dt>Swipe left or right</dt>
+                    <dd>Next or previous cameras</dd>
+                    <dt>Swipe up or down</dt>
+                    <dd>Show or hide the controls, full screen</dd>
+                    <dt>Pinch, then drag</dt>
+                    <dd>Zoom the camera, and move around it</dd>
+                    <dt>Double tap</dt>
+                    <dd>The camera alone, and back</dd>
+                    <dt>Three fingers up or down</dt>
+                    <dd>Open or close this help</dd>
+                  </dl>
+                  <dl class="key-list keys-only">
+                    <dt class="key-list-heading">Keys</dt>
                     <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
                     <dd>Pause or play</dd>
                     <dt><kbd>1</kbd> to <kbd>9</kbd></dt>
@@ -448,11 +463,11 @@
                     appearance="plain"
                     hidden
                   ></gw-menu-button>
-                  <!-- Optional, as ? opens it too -->
+                  <!-- In More when the bar is tight, as ? opens it too -->
                   <gw-button
                     class="control-help"
-                    label="Keyboard controls"
-                    data-optional
+                    label="Help"
+                    data-overflow
                   ></gw-button>
                   <gw-menu-button
                     class="controls-more"
@@ -464,9 +479,24 @@
                     class="control-fullscreen"
                     label="Full screen"
                   ></gw-button>
-                  <!-- The keys, opened from the help button -->
-                  <gw-popover class="shortcuts" heading="Keyboard controls">
-                    <dl class="key-list">
+                  <!-- The gestures and keys, opened from the help button, ?
+                       or a three finger swipe up -->
+                  <gw-popover class="shortcuts" heading="Controls">
+                    <dl class="key-list touch-only">
+                      <dt class="key-list-heading">Gestures</dt>
+                      <dt>Swipe left or right</dt>
+                      <dd>On or back 10 seconds</dd>
+                      <dt>Two fingers left or right</dt>
+                      <dd>Next or previous recording</dd>
+                      <dt>Swipe up or down</dt>
+                      <dd>Show or hide the controls, full screen</dd>
+                      <dt>Pinch, then drag</dt>
+                      <dd>Zoom the picture, and move around it</dd>
+                      <dt>Three fingers up or down</dt>
+                      <dd>Open or close this help</dd>
+                    </dl>
+                    <dl class="key-list keys-only">
+                      <dt class="key-list-heading">Keys</dt>
                       <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
                       <dd>Play or pause</dd>
                       <dt><kbd>←</kbd> <kbd>→</kbd></dt>

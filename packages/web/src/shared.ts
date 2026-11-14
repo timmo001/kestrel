@@ -11,6 +11,7 @@ import {
 } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
+import { onSwipe } from "./gestures.ts";
 import {
   phCaretDown,
   phCaretUp,
@@ -29,8 +30,9 @@ const ownsArrows =
   "gw-segmented, gw-table, gw-menu-button, gw-range, [role=menu]";
 
 /**
- * Wires a page's keys popover to its button, both opening it when it's shut
- * and shutting it when it's open. Returns the toggle, for the `?` key.
+ * Wires a page's help popover to its button, both opening it when it's shut
+ * and shutting it when it's open. Returns its toggle, for the `?` key, and
+ * a way to open or close it, for a three finger swipe.
  */
 export const helpToggle = (
   popover: HTMLElementTagNameMap["gw-popover"] | null,
@@ -77,7 +79,16 @@ export const helpToggle = (
     toggle();
   });
 
-  return toggle;
+  return {
+    toggle,
+    /** Opens it, such as for a three finger swipe up. */
+    show: () => {
+      if (!open) toggle();
+    },
+    close: () => {
+      if (open) toggle();
+    },
+  };
 };
 
 /**
@@ -430,12 +441,6 @@ const pressable = [
   ".player-video",
 ].join(", ");
 
-/** What a drag already moves: a zoomed picture, or a camera being steered. */
-const draggable = "[data-movable], [data-steering], .player-controls";
-
-/** How far a finger moves, in pixels, before a press is a swipe. */
-const swipeDistance = 40;
-
 /**
  * On a phone on its side, or full screen, a player's control bar goes over
  * its picture and acts as a video player's: it fades out once it's been left
@@ -457,8 +462,8 @@ export const overlayControls = (bar: HTMLElement) => {
   const tab = element("gw-button");
   const handle = element("gw-button");
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Where a press that could toggle the bar began, or undefined. */
-  let press: { x: number; y: number; empty: boolean } | undefined;
+  /** Where a press on nothing to press began, which a tap there toggles the bar from. */
+  let press: { x: number; y: number } | undefined;
   /** Whether the press under way toggled the bar, so its click does nothing else. */
   let toggled = false;
   /** Whether turning the phone on its side put the player full screen. */
@@ -539,27 +544,22 @@ export const overlayControls = (bar: HTMLElement) => {
   handle.setAttribute("size", "medium");
   handle.addEventListener("click", wake);
 
-  const targets = (event: Event) =>
-    event.composedPath().filter((target) => target instanceof Element);
-
-  // Where a press begins says whether it can toggle the bar: on nothing to
-  // press, a tap can; anywhere a drag doesn't already move something, a
-  // swipe can
+  // A press on nothing to press can toggle the bar, if it's a tap
   stage?.addEventListener(
     "pointerdown",
     (event) => {
       toggled = false;
 
-      const path = targets(event);
+      const pressed = event
+        .composedPath()
+        .some(
+          (target) => target instanceof Element && target.matches(pressable),
+        );
 
       press =
-        !isOver() || path.some((target) => target.matches(draggable))
+        !isOver() || pressed
           ? undefined
-          : {
-              x: event.clientX,
-              y: event.clientY,
-              empty: !path.some((target) => target.matches(pressable)),
-            };
+          : { x: event.clientX, y: event.clientY };
     },
     true,
   );
@@ -569,30 +569,30 @@ export const overlayControls = (bar: HTMLElement) => {
     (event) => {
       if (press === undefined) return;
 
-      const dx = event.clientX - press.x;
-      const dy = event.clientY - press.y;
-
-      const swipe =
-        Math.abs(dy) >= swipeDistance && Math.abs(dy) > 2 * Math.abs(dx);
-
-      const tap = Math.hypot(dx, dy) < 10 && press.empty;
+      const tap =
+        Math.hypot(event.clientX - press.x, event.clientY - press.y) < 10;
 
       press = undefined;
 
-      if (swipe) {
-        toggled = true;
+      if (!tap) return;
 
-        if (dy < 0) wake();
-        else hide();
-      } else if (tap) {
-        toggled = true;
+      toggled = true;
 
-        if (bar.hasAttribute("data-hidden")) wake();
-        else hide();
-      }
+      if (bar.hasAttribute("data-hidden")) wake();
+      else hide();
     },
     true,
   );
+
+  // A swipe of one finger up shows it, and down hides it
+  if (stage !== null) {
+    onSwipe(stage, (swipe) => {
+      if (!isOver() || swipe.fingers !== 1) return;
+
+      if (swipe.direction === "up") wake();
+      else if (swipe.direction === "down") hide();
+    });
+  }
 
   // One the browser takes over, such as to scroll, toggles nothing
   stage?.addEventListener("pointercancel", () => {

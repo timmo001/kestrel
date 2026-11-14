@@ -81,6 +81,7 @@ import {
   timeFormat,
   typingTargets,
 } from "./shared.ts";
+import { onSwipe, type Direction } from "./gestures.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
 import { tilingItems, tilingOf, type TilingMode } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
@@ -1657,6 +1658,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (next !== undefined) setSpeed(next);
   };
 
+  /** The help's toggle, set once it's wired below. */
+  let help: ReturnType<typeof helpToggle> | undefined;
+
   const keys = new Map<string, () => void>([
     [" ", togglePlay],
     ["k", togglePlay],
@@ -1679,7 +1683,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["f", () => fullscreenButton?.click()],
     ["c", () => cutButton?.click()],
     ["s", () => captureButton?.click()],
-    ["?", () => helpButton?.click()],
+    ["?", () => help?.toggle()],
     // Several cameras, as on Live: the picked one alone and back, and the
     // previous or next one picked
     ["Enter", () => setAlone(!alone)],
@@ -1784,9 +1788,36 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     requestAnimationFrame(focusPlayer);
   });
 
-  // The help button, or ?, opens the keys by the button and shuts them again
+  // The help button, or ?, opens the keys and gestures by the button and
+  // shuts them again
   setIcon(helpButton, phQuestionMark);
-  helpToggle(find("gw-popover", "shortcuts"), helpButton);
+  const helpWired = helpToggle(find("gw-popover", "shortcuts"), helpButton);
+
+  help = helpWired;
+
+  // On a touch screen: one finger across the picture goes back or on 10
+  // seconds, two the previous or next recording, and three up or down open
+  // or close the help
+  if (stage !== null) {
+    onSwipe(stage, (swipe) => {
+      const ways: Record<Direction, -1 | 0 | 1> = {
+        left: 1,
+        right: -1,
+        up: 0,
+        down: 0,
+      };
+
+      const across = ways[swipe.direction];
+
+      if (swipe.fingers === 1 && across !== 0) seekBy(10 * across);
+      else if (swipe.fingers === 2 && across !== 0) skip(across);
+      else if (swipe.fingers === 3 && swipe.direction === "up") {
+        helpWired.show();
+      } else if (swipe.fingers === 3 && swipe.direction === "down") {
+        helpWired.close();
+      }
+    });
+  }
 
   showState();
 

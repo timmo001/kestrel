@@ -40,6 +40,7 @@ import {
   phSpeakerLow,
   phSpeakerSlash,
 } from "./icons.ts";
+import { onSwipe } from "./gestures.ts";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
@@ -526,7 +527,7 @@ export const livePage = (): LivePage => {
   setIcon(moveButton, phJoystick, "Move the camera (M)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
-  setIcon(helpButton, phQuestionMark, "Keyboard controls (?)");
+  setIcon(helpButton, phQuestionMark, "Help (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
@@ -1433,7 +1434,18 @@ export const livePage = (): LivePage => {
     );
   });
 
-  helpToggle(shortcutsPopover, helpButton);
+  const help = helpToggle(shortcutsPopover, helpButton);
+
+  // On a touch screen: one finger across the cameras moves on or back a
+  // page, and three up or down open or close the help
+  if (stage !== null) {
+    onSwipe(stage, (swipe) => {
+      if (swipe.fingers === 1 && swipe.direction === "left") step(1);
+      else if (swipe.fingers === 1 && swipe.direction === "right") step(-1);
+      else if (swipe.fingers === 3 && swipe.direction === "up") help.show();
+      else if (swipe.fingers === 3 && swipe.direction === "down") help.close();
+    });
+  }
 
   // Zoom, each camera's its own and kept, once in tiles and once alone, as
   // on the Recordings page, and each of a camera's views its own, since
@@ -1519,7 +1531,7 @@ export const livePage = (): LivePage => {
     ["l", nextLens],
     ["z", zoom.toggleFill],
     ["f", () => fullscreenButton?.click()],
-    ["?", () => helpButton?.click()],
+    ["?", help.toggle],
     // A digit key for each count up to 9, and A for All
     ...Array.from(
       { length: keyedLayouts },
