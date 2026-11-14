@@ -51,8 +51,15 @@ export interface GroupEvents {
 }
 
 export interface Group extends Player {
-  /** The cameras to play, in order, and the picked one, which comes first and largest. */
-  readonly setCameras: (tracks: ReadonlyArray<Track>, picked: CameraId) => void;
+  /**
+   * The cameras to play, in order, and the picked one, which comes first and
+   * largest. Those `pending` shimmer, as their recordings are still coming.
+   */
+  readonly setCameras: (
+    tracks: ReadonlyArray<Track>,
+    picked: CameraId,
+    pending?: ReadonlyArray<CameraId>,
+  ) => void;
   /** Shows the picked camera alone, or every camera again, on the same clock. */
   readonly solo: (on: boolean) => void;
   /**
@@ -457,7 +464,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   };
 
   return {
-    setCameras: (next, pickedCamera) => {
+    setCameras: (next, pickedCamera, pending = []) => {
       const at = now();
       const wanted = new Set(next.map((track) => track.camera));
 
@@ -489,6 +496,14 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       grid.replaceChildren(
         ...order.flatMap((track) => tiles.get(track.camera)?.figure ?? []),
       );
+
+      for (const tile of tiles.values()) {
+        tile.figure.toggleAttribute(
+          "data-pending",
+          pending.includes(tile.camera),
+        );
+      }
+
       arrange();
 
       // Cameras joining part way through come in at the clock's time

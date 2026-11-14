@@ -21,6 +21,8 @@ export interface TimelineSpan {
 export interface TimelineRow {
   readonly label: string;
   readonly spans: ReadonlyArray<TimelineSpan>;
+  /** Shimmering, for a camera whose recordings are still coming. */
+  readonly loading?: boolean;
 }
 
 export interface TimelineElements {
@@ -107,6 +109,7 @@ export const timelineFor = (
         const band = document.createElement("div");
 
         band.className = "timeline-row";
+        band.toggleAttribute("data-loading", row.loading === true);
         band.style.top = `${(index / rows.length) * 100}%`;
         band.style.height = `${100 / rows.length}%`;
 

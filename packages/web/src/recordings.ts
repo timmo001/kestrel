@@ -1299,12 +1299,16 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     const date = day;
 
+    // One camera's list that can't be read shows as nothing recorded, rather
+    // than holding the others, or a camera just added, loading
     const lists = await Promise.all(
       ticked.map((id) =>
-        recordingsOn(id, date).then((list) => ({
-          camera: id,
-          recordings: list.toSorted((a, b) => a.begin.localeCompare(b.begin)),
-        })),
+        recordingsOn(id, date)
+          .catch((): ReadonlyArray<Recording> => [])
+          .then((list) => ({
+            camera: id,
+            recordings: list.toSorted((a, b) => a.begin.localeCompare(b.begin)),
+          })),
       ),
     );
 
@@ -1467,10 +1471,44 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       player?.solo(false);
     }
 
+    const before = ticked;
+    const sameDay = picked.date === day;
+
     camera = picked.camera;
     ticked = picked.cameras;
     day = picked.date;
     keep(storageKey, { camera, cameras: [...ticked], date: day });
+
+    // On the same day, the cameras ticked show at once, those just added
+    // shimmering on the player and the timeline until their recordings come,
+    // and those unticked go
+    const added = ticked.filter((id) => !before.includes(id));
+
+    if (sameDay && !sameCameras(before, ticked)) {
+      player?.setCameras(
+        ticked.map(
+          (id) =>
+            tracks.find((track) => track.camera === id) ?? {
+              camera: id,
+              recordings: [],
+            },
+        ),
+        camera,
+        added,
+      );
+      timeline?.show(
+        ticked.map((id) => ({
+          label: cameraLabel(id),
+          spans: listed
+            .filter((recording) => recording.camera === id)
+            .map(spanOf),
+          loading: added.includes(id),
+        })),
+      );
+      showView();
+      zoom.show();
+      showState();
+    }
 
     if (cameraSelect !== null) cameraSelect.values = [...ticked];
 
@@ -1482,12 +1520,14 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     if (nextDay !== null) nextDay.disabled = lastDay !== "" && day >= lastDay;
 
+    // The recordings don't wait on the month's days
+    const shown = showRecordings();
     const days = await recordedDaysIn(day.slice(0, 7));
 
     showDays(days);
     markDays(days);
     void findRecordedCameras(day);
-    await showRecordings();
+    await shown;
   };
 
   /** The day `by` days from the picked one. */

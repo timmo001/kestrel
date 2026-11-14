@@ -388,9 +388,11 @@ gw-table gw-sheet {
   display: none;
 }
 
-/* A shimmer until the camera's first frames play, then the video fades in */
+/* A shimmer until the camera's first frames play, then the video fades in.
+   A camera just added to Recordings shimmers until its recordings come */
 .live-tile[data-loading],
-.player-tile[data-loading] {
+.player-tile[data-loading],
+.player-tile[data-pending] {
   background: linear-gradient(
       100deg,
       transparent 30%,
@@ -423,7 +425,8 @@ gw-table gw-sheet {
 
 @media (prefers-reduced-motion: reduce) {
   .live-tile[data-loading],
-  .player-tile[data-loading] {
+  .player-tile[data-loading],
+  .player-tile[data-pending] {
     animation: none;
   }
 }
@@ -768,6 +771,7 @@ gw-table gw-sheet {
 }
 
 .player-tile:not([data-empty]) > p,
+.player-tile[data-pending] > p,
 .player-tile[data-empty] > video {
   display: none;
 }
@@ -1279,6 +1283,24 @@ kbd {
 .timeline-row {
   position: absolute;
   inset-inline: 0;
+}
+
+/* A camera just added, until its recordings come, shimmers as its tile does */
+.timeline-row[data-loading] {
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 8%) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: live-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-row[data-loading] {
+    animation: none;
+  }
 }
 
 /* Each track's channel, at its start, over the recordings */
