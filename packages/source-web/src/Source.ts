@@ -120,7 +120,9 @@ const quoted = (program: string) =>
  * has no spaces or quotes at its start, and comes after `--` so yt-dlp never
  * reads it as an option. Its fragment is left off, since go2rtc reads `#`
  * as its own. yt-dlp answers with the stream for go2rtc's ffmpeg to copy,
- * since go2rtc's own reader drops YouTube's streams every few seconds.
+ * since go2rtc's own reader drops YouTube's streams every few seconds. The
+ * sound is made again as AAC: a site's HLS, such as Twitch's, carries AAC
+ * that ffmpeg can't copy into go2rtc's RTSP, and the whole stream fails.
  */
 export const echoAddress = (
   ytDlp: string,
@@ -144,7 +146,7 @@ export const echoAddress = (
     "--format",
     format,
     "--print",
-    "ffmpeg:%(url)s#video=copy#audio=copy",
+    "ffmpeg:%(url)s#video=copy#audio=aac",
     "--",
     url.href,
   ].join(" ");

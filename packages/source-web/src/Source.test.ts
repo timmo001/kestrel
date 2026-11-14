@@ -36,6 +36,6 @@ test("puts the page after -- with no spaces or fragment", () => {
   );
 
   expect(address).toBe(
-    `echo:"C:\\Program Files\\Kestrel\\yt-dlp.exe" --ignore-config --quiet --no-warnings --js-runtimes "node:C:\\Program Files\\Kestrel\\node.exe" --format b/bv --print ffmpeg:%(url)s#video=copy#audio=copy -- https://www.example.com/watch?v=a%20b&x=%27--exec%27`,
+    `echo:"C:\\Program Files\\Kestrel\\yt-dlp.exe" --ignore-config --quiet --no-warnings --js-runtimes "node:C:\\Program Files\\Kestrel\\node.exe" --format b/bv --print ffmpeg:%(url)s#video=copy#audio=aac -- https://www.example.com/watch?v=a%20b&x=%27--exec%27`,
   );
 });

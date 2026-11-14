@@ -207,10 +207,10 @@ view only: no recordings, events or stills.
 The desktop app, the release archives, the Linux packages and the Home
 Assistant app have their own yt-dlp, and Node.js for the sites yt-dlp reads
 with JavaScript, such as YouTube; elsewhere, set `KESTREL_YT_DLP` and
-`KESTREL_NODE` for ones that aren't on the path. go2rtc copies each stream
-through ffmpeg, the one `KESTREL_FFMPEG` names or the one on the path. Sites
-change, and yt-dlp catches up in its releases, so a page that stops playing
-may need a newer one.
+`KESTREL_NODE` for ones that aren't on the path. go2rtc copies each stream's
+picture through ffmpeg, the one `KESTREL_FFMPEG` names or the one on the
+path, and makes its sound again as AAC. Sites change, and yt-dlp catches up
+in its releases, so a page that stops playing may need a newer one.
 
 Keep to each site's terms. Some don't allow their streams to be shown
 elsewhere, and Twitch's ads play in the stream as they would on its page.
