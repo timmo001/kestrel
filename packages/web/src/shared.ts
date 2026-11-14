@@ -515,9 +515,17 @@ export const overlayControls = (bar: HTMLElement) => {
     tab.setAttribute("aria-expanded", String(open));
   };
 
-  /** Paused, as either page's Play button says, or with its rows open. */
+  /**
+   * Paused, as either page's Play button says, with its rows open, or with
+   * one of its menus or popovers open: hidden, the bar would stop taking
+   * presses, and so would the open one's surface and the clear layer that
+   * keeps a press outside from reaching the cameras.
+   */
   const stays = () =>
     bar.hasAttribute("data-expanded") ||
+    [...bar.querySelectorAll("*")].some((each) =>
+      each.shadowRoot?.querySelector(".gw-scrim:popover-open"),
+    ) ||
     (
       bar.querySelector(".control-play, .live-play")?.getAttribute("label") ??
       ""
