@@ -207,11 +207,13 @@ view only: no recordings, events or stills.
 The desktop app, the release archives, the Linux packages and the Home
 Assistant app have their own yt-dlp; elsewhere, set `KESTREL_YT_DLP` for one
 that isn't on the path. go2rtc copies each stream through ffmpeg, the one
-`KESTREL_FFMPEG` names or the one on the path. YouTube needs a JavaScript runtime for yt-dlp to
-read its streams: [Deno](https://deno.com) or Node.js on the server's path.
-Kestrel doesn't bring one, and the Home Assistant app has neither, so
-YouTube pages may not play there. Sites change, and yt-dlp catches up in its
-releases, so a page that stops playing may need a newer one.
+`KESTREL_FFMPEG` names or the one on the path. Sites change, and yt-dlp
+catches up in its releases, so a page that stops playing may need a newer
+one. YouTube's live streams play without anything else today, but yt-dlp
+reads YouTube's other pages with a JavaScript runtime, and may come to need
+one for live streams too. If YouTube pages stop playing, put
+[Deno](https://deno.com) or Node.js on the server's path; Kestrel doesn't
+bring one.
 
 Keep to each site's terms. Some don't allow their streams to be shown
 elsewhere, and Twitch's ads play in the stream as they would on its page.

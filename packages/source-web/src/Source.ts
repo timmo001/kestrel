@@ -104,20 +104,9 @@ export const info: Kind["info"] = {
       label: "Page",
       type: "address",
       required: true,
-      hint: "The live stream's page, such as https://www.twitch.tv/<channel> or a YouTube live link; any page yt-dlp reads. YouTube needs Deno or Node.js on the server",
+      hint: "The live stream's page, such as https://www.twitch.tv/<channel> or a YouTube live link; any page yt-dlp reads",
     },
   ],
-};
-
-/** Whether a page is on YouTube, whose streams yt-dlp reads best with a JavaScript runtime. */
-const onYouTube = (page: string) => {
-  const host = new URL(page).hostname;
-
-  return (
-    host === "youtu.be" ||
-    host === "youtube.com" ||
-    host.endsWith(".youtube.com")
-  );
 };
 
 /** A program's path as go2rtc reads it, quoted where it has spaces, such as under `C:\Program Files`. */
@@ -142,7 +131,8 @@ export const echoAddress = (ytDlp: string, page: string, format: string) => {
     "--ignore-config",
     "--quiet",
     "--no-warnings",
-    // Deno is the one yt-dlp looks for by itself
+    // Deno is the one yt-dlp looks for by itself; this lets it use Node too,
+    // should YouTube's live streams come to need one
     "--js-runtimes",
     "node",
     "--format",
@@ -215,33 +205,17 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
 
   const since = DateTime.formatIso(yield* DateTime.now);
 
-  const noRuntime =
-    cameras.some((camera) => onYouTube(camera.page)) &&
-    Bun.which("deno") === null &&
-    Bun.which("node") === null;
-
-  const attention: Array<Attention> = [
-    ...(missing === null
+  const attention: ReadonlyArray<Attention> =
+    missing === null
       ? []
       : [
           {
             source: id,
-            level: "alert" as const,
-            kind: "connection" as const,
+            level: "alert",
+            kind: "connection",
             message: `${name} can't play its streams: ${missing}`,
           },
-        ]),
-    ...(noRuntime
-      ? [
-          {
-            source: id,
-            level: "passive" as const,
-            kind: "connection" as const,
-            message: `${name}'s YouTube pages need Deno or Node.js on the server's path; without one, some may not play`,
-          },
-        ]
-      : []),
-  ];
+        ];
 
   const source: Source = {
     id,
