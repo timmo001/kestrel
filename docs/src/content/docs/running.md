@@ -30,7 +30,8 @@ in the app's own data.
 The [container image](/install) runs as its own `kestrel` user and keeps its
 config, state and recordings in `/data`, with `ffmpeg` built in. On the
 host's network it announces itself so devices find it; with `-p 7380:7380`
-instead, pair them by its address. `docker exec kestrel kestrel pair` shows a
+instead, pair them by its address. Cameras can only send it their clips on
+the host's network. `docker exec kestrel kestrel pair` shows a
 code for the first device.
 
 ### Linux services
@@ -172,7 +173,13 @@ Recordings page; download the clip to play it in another player. A
 camera's own SD card recordings are listed beside the server's, marked as
 on the source only and faded on the timeline, but not copied or played: it
 cuts a download short, and older firmware won't replay a file.
-Record the camera on the server for footage you can play.
+Record the camera on the server for footage you can play, or turn on
+**Send clips to Kestrel** on its source in Settings. That points the
+camera's FTP uploads at the server's own receiver, on port 7381 with data
+on ports 7390 to 7399, with a login the server makes for it, and runs the
+camera's own test where it has one. Each clip it sends when it sees motion
+is kept as a motion clip, for the clip hours, and plays like any other.
+Turning it off stops the camera sending.
 
 A `bambu` source is a Bambu Lab P1 or A1 printer's camera, from its `host`
 and the LAN `accessCode` on its network settings screen. These printers
@@ -349,7 +356,8 @@ why each was made, such as motion, in the file's name:
 as footage older than the hours kept, is listed too, marked as on the
 source, and plays from it. A source that can't hand its recordings over,
 such as a Reolink camera's SD card, has them listed as on the source only,
-faded on the timeline, with no Play or Download.
+faded on the timeline, with no Play or Download, unless the camera sends
+its clips to the server itself.
 
 ### Copying from sources
 
@@ -436,6 +444,7 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 | -------------------------- | -------------------------------- | ------------------------------------------------------------------ |
 | `KESTREL_HOST`             | `::`                             | The address the server listens on; `serve:server` sets `127.0.0.1` |
 | `KESTREL_PORT`             | `7380`                           | The server's port (`PORT` too, for Pitchfork)                      |
+| `KESTREL_FTP_PORT`         | `7381`                           | The port cameras send their clips to, with data on 7390 to 7399    |
 | `KESTREL_GO2RTC_PORT`      | `1984`                           | go2rtc's port                                                      |
 | `KESTREL_GO2RTC_RTSP_PORT` | `1985`                           | go2rtc's RTSP port, on 127.0.0.1 only                              |
 | `KESTREL_GO2RTC`           | `go2rtc`                         | The go2rtc binary; the desktop app uses its own                    |
