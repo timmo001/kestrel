@@ -5,10 +5,11 @@
  * login, with Node.js's licence; and the CLI
  * with the server in it, built into one script, which the bundle's
  * `kestrel` command runs on the bundle's own Bun for `kestrel serve` and
- * the rest of the CLI.
+ * the rest of the CLI. yt-dlp is its unpacked build, so it goes in its own
+ * folder with the `_internal` folder it runs from.
  */
-import { chmod, copyFile, mkdir } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { chmod, copyFile, cp, mkdir, rm } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 
 const vendor = join(import.meta.dir, "..", "vendor");
 
@@ -29,7 +30,7 @@ const mise = (command: string, tool: string) => {
   return path;
 };
 
-for (const tool of ["go2rtc", "yt-dlp", "node"]) {
+for (const tool of ["go2rtc", "node"]) {
   const source = mise("which", tool);
 
   const target = join(vendor, basename(source));
@@ -38,6 +39,31 @@ for (const tool of ["go2rtc", "yt-dlp", "node"]) {
 
   await chmod(target, 0o755);
 }
+
+const ytDlp = mise("which", "yt-dlp");
+
+const ytDlpFolder = join(vendor, "yt-dlp");
+
+await rm(ytDlpFolder, { recursive: true, force: true });
+
+await mkdir(ytDlpFolder);
+
+await copyFile(ytDlp, join(ytDlpFolder, basename(ytDlp)));
+
+await chmod(join(ytDlpFolder, basename(ytDlp)), 0o755);
+
+await cp(join(dirname(ytDlp), "_internal"), join(ytDlpFolder, "_internal"), {
+  recursive: true,
+});
+
+const licenses = join(import.meta.dir, "..", "licenses");
+
+await copyFile(join(licenses, "yt-dlp.LICENSE"), join(ytDlpFolder, "LICENSE"));
+
+await copyFile(
+  join(licenses, "yt-dlp.THIRD_PARTY_LICENSES"),
+  join(ytDlpFolder, "THIRD_PARTY_LICENSES"),
+);
 
 await copyFile(
   join(mise("where", "node"), "LICENSE"),

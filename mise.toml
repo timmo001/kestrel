@@ -21,16 +21,18 @@ shellcheck = "0.11.0"
 
 # Finds the stream behind a web page, such as a Twitch channel, for the web
 # source. The server runs it through go2rtc each time a stream starts. These
-# are its standalone builds, which need no Python.
+# are its standalone builds, which need no Python: the unpacked ones, a
+# program beside an _internal folder, since the single-file builds unpack
+# themselves on every run, which takes seconds on a small box.
 [tools."github:yt-dlp/yt-dlp"]
 version = "2026.10.26"
 
 [tools."github:yt-dlp/yt-dlp".platforms]
-linux-x64 = { asset_pattern = "yt-dlp_linux", bin = "yt-dlp" }
-linux-arm64 = { asset_pattern = "yt-dlp_linux_aarch64", bin = "yt-dlp" }
-macos-x64 = { asset_pattern = "yt-dlp_macos", bin = "yt-dlp" }
-macos-arm64 = { asset_pattern = "yt-dlp_macos", bin = "yt-dlp" }
-windows-x64 = { asset_pattern = "yt-dlp.exe", bin = "yt-dlp.exe" }
+linux-x64 = { asset_pattern = "yt-dlp_linux.zip", rename_exe = "yt-dlp" }
+linux-arm64 = { asset_pattern = "yt-dlp_linux_aarch64.zip", rename_exe = "yt-dlp" }
+macos-x64 = { asset_pattern = "yt-dlp_macos.zip", rename_exe = "yt-dlp" }
+macos-arm64 = { asset_pattern = "yt-dlp_macos.zip", rename_exe = "yt-dlp" }
+windows-x64 = { asset_pattern = "yt-dlp_win.zip" }
 
 [tasks.install]
 description = "Install dependencies"

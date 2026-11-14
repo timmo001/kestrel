@@ -9,7 +9,6 @@ import type { ElectrobunConfig } from "electrobun";
 import { version } from "../core/src/Version.ts";
 
 const go2rtc = process.platform === "win32" ? "go2rtc.exe" : "go2rtc";
-const ytDlp = process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp";
 const node = process.platform === "win32" ? "node.exe" : "node";
 
 export default {
@@ -43,9 +42,8 @@ export default {
       "../web/dist/icons/icon-192.png": "views/tray/icon.png",
       [`vendor/${go2rtc}`]: `go2rtc/${go2rtc}`,
       "licenses/go2rtc.LICENSE": "go2rtc/LICENSE",
-      [`vendor/${ytDlp}`]: `yt-dlp/${ytDlp}`,
-      "licenses/yt-dlp.LICENSE": "yt-dlp/LICENSE",
-      "licenses/yt-dlp.THIRD_PARTY_LICENSES": "yt-dlp/THIRD_PARTY_LICENSES",
+      // yt-dlp's unpacked build, with its licences
+      "vendor/yt-dlp": "yt-dlp",
       [`vendor/${node}`]: `node/${node}`,
       "vendor/node.LICENSE": "node/LICENSE",
       "../../LICENSE": "LICENSE",
