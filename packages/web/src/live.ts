@@ -1462,20 +1462,28 @@ export const livePage = (): LivePage => {
     canvas.width = width;
     canvas.height = height;
     canvas.getContext("2d")?.drawImage(source, 0, 0, width, height);
-    canvas.toBlob(
-      (blob) => {
-        if (blob === null) return;
 
-        const href = URL.createObjectURL(blob);
-        const link = element("a");
+    // Pending while the still's made, still taking another press
+    void captureButton?.waitFor(
+      new Promise<void>((resolve) => {
+        canvas.toBlob(
+          (blob) => {
+            resolve();
 
-        link.href = href;
-        link.download = `${fileName(tile.stream.id)}_live_${fileTime()}.jpg`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(href), 10_000);
-      },
-      "image/jpeg",
-      0.92,
+            if (blob === null) return;
+
+            const href = URL.createObjectURL(blob);
+            const link = element("a");
+
+            link.href = href;
+            link.download = `${fileName(tile.stream.id)}_live_${fileTime()}.jpg`;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(href), 10_000);
+          },
+          "image/jpeg",
+          0.92,
+        );
+      }),
     );
   };
 

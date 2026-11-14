@@ -182,12 +182,16 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     sentAt = Date.now();
     note("");
 
-    const state = await call((api) =>
+    // Its button pulses until the camera answers, as the panel may cover the
+    // picture's own change
+    const sent = call((api) =>
       api.cameras.adjust({
         params: cameraParts(id),
         payload: PictureCommand.cases.Set.make(change),
       }),
-    ).catch(() => undefined);
+    );
+
+    const state = await (button?.waitFor(sent) ?? sent).catch(() => undefined);
 
     sending = false;
     took(id, state, "Couldn't change the picture");
@@ -221,15 +225,19 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     clearTimeout(timer);
     timer = undefined;
     waiting = {};
-    reset.disabled = true;
     note("");
 
-    const state = await call((api) =>
-      api.cameras.adjust({
-        params: cameraParts(id),
-        payload: PictureCommand.cases.Reset.make({}),
-      }),
-    ).catch(() => undefined);
+    // Pending until the camera answers, still taking another press
+    const state = await reset
+      .waitFor(
+        call((api) =>
+          api.cameras.adjust({
+            params: cameraParts(id),
+            payload: PictureCommand.cases.Reset.make({}),
+          }),
+        ),
+      )
+      .catch(() => undefined);
 
     took(id, state, "Couldn't put the picture back");
     fill();

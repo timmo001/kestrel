@@ -1030,17 +1030,28 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     canvas.width = shot.videoWidth;
     canvas.height = shot.videoHeight;
     canvas.getContext("2d")?.drawImage(shot, 0, 0);
-    canvas.toBlob(
-      (blob) => {
-        if (blob === null) return;
 
-        const href = URL.createObjectURL(blob);
+    // Pending while the still's made, still taking another press
+    void captureButton?.waitFor(
+      new Promise<void>((resolve) => {
+        canvas.toBlob(
+          (blob) => {
+            resolve();
 
-        save(href, `${fileName(cameraShown)}_${time.replaceAll(":", "-")}.jpg`);
-        setTimeout(() => URL.revokeObjectURL(href), 10_000);
-      },
-      "image/jpeg",
-      0.92,
+            if (blob === null) return;
+
+            const href = URL.createObjectURL(blob);
+
+            save(
+              href,
+              `${fileName(cameraShown)}_${time.replaceAll(":", "-")}.jpg`,
+            );
+            setTimeout(() => URL.revokeObjectURL(href), 10_000);
+          },
+          "image/jpeg",
+          0.92,
+        );
+      }),
     );
   });
 
