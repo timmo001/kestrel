@@ -1196,6 +1196,22 @@ gw-table gw-sheet {
   display: none;
 }
 
+/* Tight, the start gives way to the transport and the end, so a control that
+   folds what doesn't fit into its own More, such as Live's layouts, gets the
+   room left rather than its full width */
+.player-controls[data-tight] {
+  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+}
+
+.player-controls[data-split][data-tight] {
+  grid-template-columns: minmax(0, 1fr) max-content;
+}
+
+.player-controls[data-tight] > .controls-start,
+.player-controls[data-tight] .live-pager {
+  min-width: 0;
+}
+
 .player-controls[data-split] > .controls-transport {
   grid-column: 1 / -1;
   grid-row: 1;

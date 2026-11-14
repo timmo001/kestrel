@@ -1,12 +1,12 @@
 /**
- * Live's pager: one Layout menu for how many cameras show at once, every
- * count from one to one fewer than there are and All, and how they tile, and
- * beside it, while the layout pages them, which page shows between Previous
- * and Next, with a pick of the others. The count and the page go together,
- * as a table's rows per page sits beside its pages.
+ * Live's pager: how many cameras show at once, every count from one to one
+ * fewer than there are and All, as many as fit with the rest and how they
+ * tile in its More menu, and beside it, while the layout pages them, which
+ * page shows between Previous and Next, with a pick of the others. The count
+ * and the page go together, as a table's rows per page sits beside its pages.
  */
 import { on } from "@timmo001/groundwork-ui";
-import { phCaretLeft, phCaretRight, phSquaresFour } from "./icons.ts";
+import { phCaretLeft, phCaretRight } from "./icons.ts";
 import { controlIcon, find } from "./shared.ts";
 import { tilingItems, tilingOf, type TilingMode } from "./tiling.ts";
 
@@ -22,14 +22,14 @@ export const layoutsFor = (cameras: number): Array<Layout> => [
   "all",
 ];
 
-/** A layout as the menu names it. */
+/** A layout in full, as its option's tooltip says it. */
 const layoutName = (layout: Layout, cameras: number) => {
-  if (layout === "all") return `All ${cameras}`;
+  if (layout === "all") return `All ${cameras} cameras`;
 
-  return layout === 1 ? "1 camera" : `${layout} at once`;
+  return layout === 1 ? "1 camera" : `${layout} cameras at once`;
 };
 
-/** A layout as the menu's trigger shows it, short, so the pager fits a phone. */
+/** A layout as its option shows it, short, so more of them fit a phone. */
 const layoutCount = (layout: Layout) =>
   layout === "all" ? "All" : String(layout);
 
@@ -56,28 +56,28 @@ export const cameraPager = (options: {
   readonly onPage: (page: number) => void;
   readonly onStep: (by: -1 | 1) => void;
 }): Pager => {
-  const menu = find("gw-menu-button", "live-layout");
+  const layouts = find("gw-segmented", "live-layout");
   const pages = find("gw-row", "live-pages");
   const previous = find("gw-button", "live-previous");
   const select = find("gw-select", "live-page");
   const next = find("gw-button", "live-next");
 
-  menu?.setAttribute("icon", phSquaresFour);
   controlIcon(previous, phCaretLeft, { label: "Previous cameras (Page Up)" });
   controlIcon(next, phCaretRight, { label: "Next cameras (Page Down)" });
   previous?.setAttribute("aria-keyshortcuts", "PageUp");
   next?.setAttribute("aria-keyshortcuts", "PageDown");
 
-  if (menu !== null) {
-    on(menu, "select", (event) => {
-      const { value } = event.detail;
-      const tiling = tilingOf(value);
+  if (layouts !== null) {
+    on(layouts, "change", () => {
+      const { value } = layouts;
 
-      if (tiling !== undefined) {
-        options.onTiling(tiling);
-      } else {
-        options.onLayout(value === "all" ? "all" : Number(value));
-      }
+      options.onLayout(value === "all" ? "all" : Number(value));
+    });
+
+    on(layouts, "menu-select", (event) => {
+      const tiling = tilingOf(event.detail.value);
+
+      if (tiling !== undefined) options.onTiling(tiling);
     });
   }
 
@@ -92,17 +92,14 @@ export const cameraPager = (options: {
     show: (state) => {
       const single = state.layout === 1;
 
-      if (menu !== null) {
-        menu.label = layoutCount(state.layout);
-        menu.items = [
-          ...layoutsFor(state.cameras).map((each) => ({
-            value: String(each),
-            label: layoutName(each, state.cameras),
-            group: "Cameras at once",
-            checked: each === state.layout,
-          })),
-          ...tilingItems(state.tiling),
-        ];
+      if (layouts !== null) {
+        layouts.options = layoutsFor(state.cameras).map((each) => ({
+          value: String(each),
+          label: layoutCount(each),
+          hint: layoutName(each, state.cameras),
+        }));
+        layouts.value = String(state.layout);
+        layouts.menuItems = tilingItems(state.tiling);
       }
 
       // The page and the way to the others, only while there's more than one

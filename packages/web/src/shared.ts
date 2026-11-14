@@ -4,6 +4,7 @@
  */
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import {
+  GwSegmented,
   GwVolume,
   on,
   onSwipe,
@@ -247,14 +248,33 @@ const lineWidths = (group: Element | null) => {
 
   const gap = Number.parseFloat(getComputedStyle(group).columnGap) || 0;
 
-  // A volume control measures as it is now, so it says what it needs
-  const fullWidth = (child: Element) =>
-    child instanceof GwVolume ? child.inlineWidth : outerWidth(child);
+  // A volume control, or a segmented one that folds options into its More,
+  // measures as it is now, so it says what it needs; one nested in a row,
+  // such as Live's pager, counts with the row
+  const shrinker = (child: Element) =>
+    [child, ...child.children].find(
+      (each): each is GwVolume | GwSegmented =>
+        each instanceof GwVolume ||
+        (each instanceof GwSegmented && each.overflow),
+    ) ?? null;
 
-  const tightWidth = (child: Element) =>
-    child instanceof GwVolume
-      ? Number.parseFloat(getComputedStyle(child).minInlineSize)
-      : outerWidth(child);
+  const fullWidth = (child: Element) => {
+    const inner = shrinker(child);
+
+    if (inner === null) return outerWidth(child);
+
+    return outerWidth(child) - outerWidth(inner) + inner.inlineWidth;
+  };
+
+  const tightWidth = (child: Element) => {
+    const inner = shrinker(child);
+
+    if (inner === null) return outerWidth(child);
+
+    const least = Number.parseFloat(getComputedStyle(inner).minInlineSize);
+
+    return outerWidth(child) - outerWidth(inner) + (least || 0);
+  };
 
   const width = (
     children: ReadonlyArray<Element>,

@@ -111,15 +111,17 @@
             </div>
             <div class="player-controls" role="toolbar" aria-label="Live view">
               <gw-row class="controls-start">
-                <!-- The pager: how many cameras show at once and how they
-                     tile, in one menu, and beside it, while that pages them,
-                     which page shows between Previous and Next -->
+                <!-- The pager: how many cameras show at once, as many as fit
+                     with the rest and how they tile in its More menu, and
+                     beside it, while that pages them, which page shows
+                     between Previous and Next -->
                 <gw-row class="live-pager" role="group" aria-label="Cameras">
-                  <gw-menu-button
+                  <gw-segmented
                     class="live-layout"
-                    heading="Layout"
-                    appearance="plain"
-                  ></gw-menu-button>
+                    label="Cameras at once"
+                    more-label="More layouts"
+                    overflow
+                  ></gw-segmented>
                   <gw-row class="live-pages" hidden>
                     <gw-button
                       class="live-previous"
