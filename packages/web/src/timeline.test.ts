@@ -1,6 +1,6 @@
-/** Where a press on the timeline lands: snapped to the nearest recording or event. */
+/** Where a press, drag or step on the timeline lands: snapped to a recording or event. */
 import { describe, expect, test } from "bun:test";
-import { snapTo } from "./timeline.ts";
+import { snapTo, snapToward } from "./timeline.ts";
 
 const targets = [
   { start: 100, end: 200 },
@@ -25,5 +25,24 @@ describe("snapTo", () => {
 
   test("with nothing to snap to, the second itself", () => {
     expect(snapTo(42, [])).toBe(42);
+  });
+});
+
+describe("snapToward", () => {
+  test("a landing in a gap keeps going the way it moved", () => {
+    // Nearer the first's end, but moving on goes to the second's start
+    expect(snapToward(400, targets, "end")).toBe(1000);
+    // Nearer the second's start, but moving back goes to the first's end
+    expect(snapToward(900, targets, "start")).toBe(199);
+  });
+
+  test("inside a target keeps its second", () => {
+    expect(snapToward(150, targets, "start")).toBe(150);
+    expect(snapToward(150, targets, "end")).toBe(150);
+  });
+
+  test("with nothing that way, the nearest either way", () => {
+    expect(snapToward(50, targets, "start")).toBe(100);
+    expect(snapToward(80_000, targets, "end")).toBe(1004);
   });
 });

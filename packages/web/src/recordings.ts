@@ -481,13 +481,17 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const recordingAt = (second: number) =>
     recordings.find((recording) => secondOfDay(recording.end) > second);
 
+  const timelineFrame = find("div", "timeline-frame");
   const timelineTrack = find("div", "timeline-track");
+  const timelineDay = find("div", "timeline-day");
   const timelineSpans = find("div", "timeline-spans");
+  const timelineLabels = find("div", "timeline-labels");
   const timelinePlayhead = find("span", "timeline-playhead");
   const timelineHover = find("span", "timeline-hover");
   const timelineClip = find("span", "timeline-clip");
   const timelineTicks = find("div", "timeline-ticks");
-  const timelineOverview = find("div", "timeline-overview");
+  const timelineEarlier = find("gw-button", "timeline-earlier");
+  const timelineLater = find("gw-button", "timeline-later");
   const idleText = find("p", "player-idle");
   const pickText = idleText?.textContent.trim() ?? "";
   const cameraOnlyKey = find("div", "timeline-legend-camera");
@@ -498,26 +502,60 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   keyButton?.setAttribute("size", "small");
   helpToggle(find("gw-popover", "timeline-key"), keyButton);
 
+  // ‹ and › step along the day, as the camera panel's presets scroll
+  controlIcon(timelineEarlier, phCaretLeft);
+  controlIcon(timelineLater, phCaretRight);
+
+  for (const step of [timelineEarlier, timelineLater]) {
+    step?.setAttribute("appearance", "filled");
+  }
+
   const timeline =
+    timelineFrame === null ||
     timelineTrack === null ||
+    timelineDay === null ||
     timelineSpans === null ||
+    timelineLabels === null ||
     timelinePlayhead === null ||
     timelineHover === null ||
     timelineClip === null ||
     timelineTicks === null ||
-    timelineOverview === null
+    timelineEarlier === null ||
+    timelineLater === null
       ? undefined
       : timelineFor(
           {
+            frame: timelineFrame,
             track: timelineTrack,
+            day: timelineDay,
             spans: timelineSpans,
+            labels: timelineLabels,
             playhead: timelinePlayhead,
             hover: timelineHover,
             clip: timelineClip,
             ticks: timelineTicks,
-            overview: timelineOverview,
+            earlier: timelineEarlier,
+            later: timelineLater,
           },
           {
+            // While it's dragged, the video follows within the recording
+            // playing, where that part has loaded; it plays from wherever
+            // it lands
+            onScrub: (second) => {
+              const playing = player?.clip();
+
+              if (playing === undefined || !onTimeline(playing)) return;
+
+              const into = second - secondOfDay(playing.begin);
+
+              if (
+                into >= 0 &&
+                second < secondOfDay(playing.end) &&
+                player?.loaded(into) === true
+              ) {
+                player.seek(into);
+              }
+            },
             // A click plays every camera from there, snapped to the nearest
             // recording; in the recording already playing, it seeks. Any
             // click clears the last one's note
@@ -1283,7 +1321,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   // The timeline's zoom, joined in one group: a step out or in either side
   // of a menu that names how much it shows and holds the presets. A pinch,
-  // Ctrl and the wheel or the overview zoom it too, and the menu follows
+  // or Ctrl and the wheel, zoom it too, and the menu follows
   controlIcon(timelineZoomOut, phMagnifyingGlassMinus);
   controlIcon(timelineZoomIn, phMagnifyingGlassPlus);
   timelineZoomOut?.setAttribute("size", "small");

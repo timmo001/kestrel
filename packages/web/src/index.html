@@ -459,6 +459,15 @@
                       <dt>Three fingers up or down</dt>
                       <dd>Open or close this help</dd>
                     </dl>
+                    <h3>Timeline</h3>
+                    <dl>
+                      <dt>Drag it</dt>
+                      <dd>Move through the day, playing from where it stops</dd>
+                      <dt>Tap</dt>
+                      <dd>Play from there, or the nearest recording</dd>
+                      <dt>Pinch</dt>
+                      <dd>Show more or less of the day</dd>
+                    </dl>
                   </gw-key-list>
                   <gw-key-list input="keys">
                     <h3>Playing</h3>
@@ -527,16 +536,34 @@
             <!-- The day on the cameras playing. A click plays from there; the
                  table below is the way in from a keyboard or screen reader -->
             <div class="timeline">
-              <div class="timeline-track" aria-hidden="true">
-                <div class="timeline-spans"></div>
-                <span class="timeline-clip" hidden></span>
-                <span class="timeline-playhead" hidden></span>
-                <span class="timeline-hover" hidden></span>
+              <!-- The day moves under a line fixed in the middle: a drag
+                   scrubs, ‹ and › step along, and wherever it lands plays -->
+              <div class="timeline-frame">
+                <div class="timeline-track" aria-hidden="true">
+                  <div class="timeline-day">
+                    <div class="timeline-spans"></div>
+                    <span class="timeline-clip" hidden></span>
+                    <div class="timeline-ticks"></div>
+                  </div>
+                </div>
+                <div class="timeline-labels" aria-hidden="true"></div>
+                <span
+                  class="timeline-playhead"
+                  aria-hidden="true"
+                  data-idle
+                ></span>
+                <span class="timeline-hover" aria-hidden="true" hidden></span>
+                <gw-button
+                  class="timeline-earlier"
+                  label="Earlier"
+                  hidden
+                ></gw-button>
+                <gw-button
+                  class="timeline-later"
+                  label="Later"
+                  hidden
+                ></gw-button>
               </div>
-              <div class="timeline-ticks" aria-hidden="true"></div>
-              <!-- The whole day in small while zoomed in: a drag across it
-                   zooms to that stretch, a drag on the view moves it -->
-              <div class="timeline-overview" aria-hidden="true" hidden></div>
               <gw-row class="timeline-foot">
                 <!-- The day the timeline shows -->
                 <gw-control-group class="day-picker" label="Day">

@@ -1,14 +1,18 @@
 /**
- * The playback timeline under the player: one day's recordings as a bar,
- * a track per channel when several play, zoomed from the whole day down to
- * a minute, as Chrome DevTools' Performance timeline zooms: Ctrl and the
- * wheel or a pinch zoom at the pointer, a drag pans, and while zoomed an
- * overview of the whole day shows where the view is, a drag across it
- * zooming to that stretch and a drag on the view moving it. It follows the
- * playhead, and calls back with the second of the day that's clicked,
- * snapped to the nearest recording. It only draws; what plays is the
+ * The playback timeline under the player, as camera apps have it: a line
+ * fixed in the middle is the playhead, and the day moves under it. A drag
+ * or a scroll scrubs, the video following where it's already loaded, and
+ * plays from where it lets go; a click or tap jumps there; ‹ and › step
+ * along by most of a view; a pinch or Ctrl and the wheel zoom from the whole
+ * day down to a minute. Wherever it lands snaps to the nearest recording. A
+ * track per channel when several play. It only draws; what plays is the
  * page's to decide.
  */
+import { scrollButtons } from "@timmo001/groundwork-ui/scroll-buttons.ts";
+
+/** Whether the person asked for reduced motion. */
+const reducedMotion = () =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** A recording on the timeline, in seconds of its day. */
 export interface TimelineSpan {
@@ -30,10 +34,17 @@ export interface TimelineRow {
 }
 
 export interface TimelineElements {
-  /** The bar that's clicked and dragged. */
+  /** Holds what follows, so the playhead and the steps sit over the track. */
+  readonly frame: HTMLElement;
+  /** What scrolls, and what's dragged. */
   readonly track: HTMLElement;
+  /** The day inside it, sized to the zoom, with half a view either side. */
+  readonly day: HTMLElement;
   /** Holds the recordings, clipped to the bar. */
   readonly spans: HTMLElement;
+  /** The tracks' names, which stay put as the day moves. */
+  readonly labels: HTMLElement;
+  /** The line fixed in the middle. */
   readonly playhead: HTMLElement;
   /** The line and time under the pointer. */
   readonly hover: HTMLElement;
@@ -41,27 +52,30 @@ export interface TimelineElements {
   readonly clip: HTMLElement;
   /** The time labels under the bar. */
   readonly ticks: HTMLElement;
-  /** The whole day in small while zoomed, where a drag picks what the bar shows. */
-  readonly overview: HTMLElement;
+  /** The buttons that step back or on by most of a view. */
+  readonly earlier: HTMLElement;
+  readonly later: HTMLElement;
 }
 
 export interface Timeline {
   /** Draws a day's recordings, a track per row, in place of the last day's. */
   readonly show: (rows: ReadonlyArray<TimelineRow>) => void;
-  /** Moves the playhead, or hides it; the view follows it when zoomed. */
+  /** Moves the day so the playhead's second is in the middle, or marks none playing. */
   readonly playhead: (second: number | undefined) => void;
   /** Shows the stretch marked for a clip, or hides it. */
   readonly clip: (from: number | undefined, to: number | undefined) => void;
-  /** How many seconds the bar shows, from a whole day down, around the playhead. */
+  /** How many seconds the bar shows, from a whole day down, around the middle. */
   readonly zoom: (seconds: number) => void;
-  /** Zooms in (above 1) or out (below 1) by a factor, around the playhead. */
+  /** Zooms in (above 1) or out (below 1) by a factor, around the middle. */
   readonly zoomBy: (factor: number) => void;
 }
 
 export interface TimelineOptions {
-  /** Hears the second of the day clicked, snapped. */
+  /** Hears the second of the day it lands on, snapped, to play from there. */
   readonly onPick: (second: number) => void;
-  /** What a click snaps to, such as only the events; every recording that plays otherwise. */
+  /** Hears the second in the middle as a drag or scroll moves it, before it lands. */
+  readonly onScrub?: (second: number) => void;
+  /** What it snaps to, such as only the events; every recording that plays otherwise. */
   readonly targets?: () => ReadonlyArray<Snap> | undefined;
   /** Hears how many seconds the bar shows, as it zooms. */
   readonly onZoom?: (seconds: number) => void;
@@ -74,6 +88,12 @@ export const minimumSpan = 60;
 
 /** How far a press moves before it's a drag rather than a click, in pixels. */
 const dragAfter = 4;
+
+/** How long a scroll is quiet before it's landed, in milliseconds. */
+const settleAfter = 150;
+
+/** How long after a wheel, press or key a scroll counts as the person's, in milliseconds. */
+const gestureReach = 1000;
 
 /** Seconds of the day as `HH:MM:SS`. */
 export const clockOf = (second: number) =>
@@ -127,6 +147,32 @@ export const snapTo = (second: number, targets: ReadonlyArray<Snap>) =>
       undefined,
     )?.at ?? second;
 
+/**
+ * As `snapTo`, but only toward `toward`: the latest point at or before
+ * `second` for `start`, the earliest at or after it for `end`, so a step or
+ * a drag that lands in a gap never goes back where it came from. With
+ * nothing that way, the nearest point either way.
+ */
+export const snapToward = (
+  second: number,
+  targets: ReadonlyArray<Snap>,
+  toward: "start" | "end",
+) => {
+  const points = targets.flatMap((target) => {
+    const last = Math.max(target.start, Math.ceil(target.end) - 1);
+
+    if (toward === "start") {
+      return target.start <= second ? [Math.min(second, last)] : [];
+    }
+
+    return target.end > second ? [Math.max(second, target.start)] : [];
+  });
+
+  if (points.length === 0) return snapTo(second, targets);
+
+  return toward === "start" ? Math.max(...points) : Math.min(...points);
+};
+
 /** A span of seconds in words, such as `Day`, `4 h` or `25 min`. */
 export const spanLabel = (seconds: number) => {
   if (seconds >= daySeconds) return "Day";
@@ -140,74 +186,84 @@ export const spanLabel = (seconds: number) => {
   return `${Math.max(1, Math.round(seconds / 60))} min`;
 };
 
+const dayPercent = (second: number) => `${(second / daySeconds) * 100}%`;
+
 /** A timeline over `elements`, calling back as `options` asks. */
 export const timelineFor = (
   elements: TimelineElements,
   options: TimelineOptions,
 ): Timeline => {
-  const { onPick, targets, onZoom } = options;
+  const { onPick, onScrub, targets, onZoom } = options;
+  const { track } = elements;
   let rows: ReadonlyArray<TimelineRow> = [];
   let span = daySeconds;
-  let start = 0;
+  /** The second in the middle, under the playhead. */
+  let centre = daySeconds / 2;
   let head: number | undefined;
-  let marked: readonly [number, number] | undefined;
   let fit = 8;
+  let drawnStep = 0;
+  /** Pixels a second, at this zoom and width. */
+  let scale = 0;
+  /**
+   * What's moving the day: only the playhead, a drag, the person's own
+   * scroll, a pinch, or a glide to where a press landed.
+   */
+  let mode: "idle" | "drag" | "scroll" | "pinch" | "glide" = "idle";
+  /** Whether the person has moved it, so new recordings don't move it back. */
+  let moved = false;
+  /** Where it last scrolled itself, to tell its own scrolls from the person's. */
+  let own = -1;
+  /** When the person last used a wheel, a press or a key on it. */
+  let gestureAt = Number.NEGATIVE_INFINITY;
+  let settling: ReturnType<typeof setTimeout> | undefined;
 
-  const clamp = (value: number) =>
-    Math.min(Math.max(value, 0), daySeconds - span);
+  const held = (second: number) => Math.min(Math.max(second, 0), daySeconds);
 
-  const percent = (second: number) => `${((second - start) / span) * 100}%`;
+  /** Scrolls so `second` is in the middle, at once. */
+  const centreOn = (second: number) => {
+    centre = held(second);
+    track.scrollLeft = centre * scale;
+    own = track.scrollLeft;
+  };
 
-  /** The overview's parts: the day's recordings in small, the view, and a stretch being picked. */
-  const overviewSpans = document.createElement("div");
-  const overviewView = document.createElement("span");
-  const overviewPick = document.createElement("span");
+  const drawTicks = () => {
+    const step = tickStep(span, fit);
 
-  overviewSpans.className = "timeline-overview-spans";
-  overviewView.className = "timeline-overview-view";
-  overviewPick.className = "timeline-overview-pick";
-  overviewPick.hidden = true;
-  elements.overview.append(overviewSpans, overviewView, overviewPick);
+    if (step === drawnStep) return;
 
-  const dayPercent = (second: number) => `${(second / daySeconds) * 100}%`;
+    drawnStep = step;
 
-  /** Draws the day in small, once per day's recordings. */
-  const drawOverview = () => {
-    overviewSpans.replaceChildren(
-      ...rows.flatMap((row) =>
-        row.spans.map((recording) => {
-          const bar = document.createElement("span");
+    const ticks: Array<HTMLElement> = [];
 
-          bar.className = "timeline-span";
-          bar.dataset.tone = recording.tone;
-          bar.toggleAttribute("data-muted", recording.muted === true);
-          bar.style.left = dayPercent(recording.start);
-          bar.style.width = dayPercent(recording.end - recording.start);
+    for (let second = 0; second <= daySeconds; second += step) {
+      const tick = document.createElement("span");
 
-          return bar;
-        }),
-      ),
+      tick.textContent = clockOf(second).slice(0, 5);
+      tick.style.left = dayPercent(second);
+      ticks.push(tick);
+    }
+
+    elements.ticks.replaceChildren(...ticks);
+  };
+
+  /** Sizes the day to the zoom and the width, keeping the middle where it is. */
+  const layout = () => {
+    const width = track.clientWidth;
+
+    if (width === 0) return;
+
+    scale = width / span;
+    elements.frame.style.setProperty("--timeline-half", `${width / 2}px`);
+    elements.frame.style.setProperty(
+      "--timeline-day",
+      `${daySeconds * scale}px`,
     );
+    drawTicks();
+    centreOn(centre);
   };
 
-  /** Where the view is on the overview, which only shows while zoomed. */
-  const showView = () => {
-    const zoomed = span < daySeconds;
-
-    elements.overview.hidden = !zoomed;
-    overviewView.style.left = dayPercent(start);
-    overviewView.style.width = dayPercent(span);
-  };
-
-  const place = (element: HTMLElement, second: number | undefined) => {
-    element.hidden =
-      second === undefined || second < start || second > start + span;
-
-    if (second !== undefined) element.style.left = percent(second);
-  };
-
-  const draw = () => {
-    elements.track.style.setProperty("--timeline-rows", String(rows.length));
+  const drawRows = () => {
+    elements.frame.style.setProperty("--timeline-rows", String(rows.length));
 
     elements.spans.replaceChildren(
       ...rows.map((row, index) => {
@@ -219,115 +275,199 @@ export const timelineFor = (
         band.style.height = `${100 / rows.length}%`;
 
         band.append(
-          ...row.spans.flatMap((recording) => {
-            if (recording.end < start || recording.start > start + span) {
-              return [];
-            }
-
+          ...row.spans.map((recording) => {
             const bar = document.createElement("span");
 
             bar.className = "timeline-span";
             bar.dataset.tone = recording.tone;
             bar.toggleAttribute("data-muted", recording.muted === true);
             bar.title = recording.title;
-            bar.style.left = percent(recording.start);
-            bar.style.width = `${((recording.end - recording.start) / span) * 100}%`;
+            bar.style.left = dayPercent(recording.start);
+            bar.style.width = dayPercent(recording.end - recording.start);
 
-            return [bar];
+            return bar;
           }),
         );
-
-        // Named only when there's more than one to tell apart, over the
-        // recordings
-        if (rows.length > 1) {
-          const name = document.createElement("span");
-
-          name.className = "timeline-row-label";
-          name.textContent = row.label;
-          band.append(name);
-        }
 
         return band;
       }),
     );
 
-    const step = tickStep(span, fit);
-    const ticks: Array<HTMLElement> = [];
+    // Named only when there's more than one to tell apart, over the start
+    elements.labels.replaceChildren(
+      ...(rows.length > 1 ? rows : []).map((row, index) => {
+        const name = document.createElement("span");
 
-    for (
-      let second = Math.ceil(start / step) * step;
-      second <= start + span;
-      second += step
-    ) {
-      const tick = document.createElement("span");
+        name.className = "timeline-row-label";
+        name.textContent = row.label;
+        name.style.top = `${((index + 0.5) / rows.length) * 100}%`;
 
-      const share = (second - start) / span;
-
-      tick.textContent = clockOf(Math.min(second, daySeconds - 1)).slice(0, 5);
-      tick.style.left = percent(second);
-      // Labels at the ends sit inside the bar rather than half off it
-      tick.dataset.edge = share < 0.03 ? "start" : share > 0.97 ? "end" : "";
-      ticks.push(tick);
-    }
-
-    elements.ticks.replaceChildren(...ticks);
-    place(elements.playhead, head);
-    showView();
-
-    elements.clip.hidden = marked === undefined;
-
-    if (marked !== undefined) {
-      elements.clip.style.left = percent(marked[0]);
-      elements.clip.style.width = `${((marked[1] - marked[0]) / span) * 100}%`;
-    }
+        return name;
+      }),
+    );
   };
 
-  /** Shows `nextSpan` seconds from `nextStart`, held to the day, and says so. */
-  const view = (nextStart: number, nextSpan: number) => {
-    const before = span;
+  const snaps = () =>
+    targets?.() ??
+    rows.flatMap((row) => row.spans.filter((each) => each.muted !== true));
 
-    span = Math.min(Math.max(nextSpan, minimumSpan), daySeconds);
-    start = clamp(nextStart);
-    draw();
+  /**
+   * The second a landing at `second` picks: the nearest target, or after a
+   * move, the nearest the way it moved.
+   */
+  const pickFor = (second: number, toward?: "start" | "end") => {
+    const at = Math.min(Math.floor(second), daySeconds - 1);
 
-    if (span !== before) onZoom?.(span);
+    return toward === undefined
+      ? snapTo(at, snaps())
+      : snapToward(at, snaps(), toward);
   };
 
-  /** Zooms to `nextSpan`, keeping `anchor` where it is across the bar, at `share` of the way. */
-  const zoomAround = (nextSpan: number, anchor: number, share: number) => {
-    const held = Math.min(Math.max(nextSpan, minimumSpan), daySeconds);
+  /** Where the middle was as the day began to move, to know which way it went. */
+  let movedFrom: number | undefined;
 
-    view(anchor - share * held, held);
-  };
-
-  /** The share of the way across the bar a pointer's x is. */
-  const shareAt = (x: number) => {
-    const box = elements.track.getBoundingClientRect();
-
-    return box.width === 0
-      ? 0.5
-      : Math.min(Math.max((x - box.left) / box.width, 0), 1);
+  const startMove = () => {
+    movedFrom ??= centre;
   };
 
   /** The second of the day under a pointer's x. */
-  const secondAt = (x: number) =>
-    Math.min(Math.floor(start + shareAt(x) * span), daySeconds - 1);
+  const secondAt = (x: number) => {
+    const box = track.getBoundingClientRect();
 
-  /** The second a press at `x` picks, snapped to the nearest target. */
-  const pickAt = (x: number) =>
-    snapTo(
-      secondAt(x),
-      targets?.() ??
-        rows.flatMap((row) => row.spans.filter((each) => each.muted !== true)),
+    return scale === 0
+      ? centre
+      : held(centre + (x - box.left - box.width / 2) / scale);
+  };
+
+  /** The time in the middle, over the playhead, while it's scrubbed. */
+  const showScrub = (on: boolean) => {
+    elements.playhead.toggleAttribute("data-scrubbing", on);
+
+    if (on) elements.playhead.dataset.time = clockOf(Math.floor(centre));
+  };
+
+  /** Settles to idle once it's quiet, as a glide ends. */
+  let land: () => void = () => undefined;
+
+  const settleLater = () => {
+    clearTimeout(settling);
+    settling = setTimeout(() => {
+      settling = undefined;
+
+      if (mode === "scroll") land();
+      else if (mode === "glide") {
+        mode = "idle";
+        own = track.scrollLeft;
+      }
+    }, settleAfter);
+  };
+
+  /** Moves `second` to the middle smoothly, or at once under reduced motion. */
+  const glideTo = (second: number) => {
+    const left = held(second) * scale;
+
+    if (reducedMotion() || Math.abs(left - track.scrollLeft) < 1) {
+      mode = "idle";
+      centreOn(second);
+
+      return;
+    }
+
+    mode = "glide";
+    centre = held(second);
+    track.scrollTo({ left, behavior: "smooth" });
+    settleLater();
+  };
+
+  // Plays from the second in the middle, snapped, and glides it there
+  land = () => {
+    showScrub(false);
+
+    const from = movedFrom;
+
+    movedFrom = undefined;
+
+    const second = pickFor(
+      centre,
+      from === undefined || from === centre
+        ? undefined
+        : centre < from
+          ? "start"
+          : "end",
     );
 
-  let press: { x: number; start: number; dragged: boolean } | undefined;
+    onPick(second);
+    glideTo(second);
+  };
+
+  /** Zooms to `next` seconds across, around the middle. */
+  const zoomTo = (next: number) => {
+    const before = span;
+
+    span = Math.min(Math.max(next, minimumSpan), daySeconds);
+
+    if (span === before) return;
+
+    layout();
+    onZoom?.(span);
+  };
+
+  track.addEventListener(
+    "scroll",
+    () => {
+      const ours = Math.abs(track.scrollLeft - own) < 1;
+
+      // The person's only straight after their own wheel, press or key, so
+      // a scroll the page causes never plays anything
+      if (mode === "idle") {
+        if (ours || performance.now() - gestureAt > gestureReach) return;
+
+        startMove();
+        mode = "scroll";
+      }
+
+      if (scale > 0) centre = held(track.scrollLeft / scale);
+
+      if (mode === "glide" || mode === "scroll") settleLater();
+
+      if (mode === "drag" || mode === "scroll") {
+        moved = true;
+        elements.hover.hidden = true;
+        showScrub(true);
+        onScrub?.(centre);
+      }
+    },
+    { passive: true },
+  );
+
+  const gesture = () => {
+    gestureAt = performance.now();
+  };
+
+  // A click too, for ‹ and › pressed from a keyboard
+  for (const type of ["wheel", "keydown", "pointerdown", "click"]) {
+    elements.frame.addEventListener(type, gesture, {
+      capture: true,
+      passive: true,
+    });
+  }
+
+  /** A press that may become a drag: where it began, and how fast it's going. */
+  let press:
+    | {
+        x: number;
+        left: number;
+        dragged: boolean;
+        last: { x: number; at: number };
+        speed: number;
+      }
+    | undefined;
 
   /** The fingers on the bar, for a pinch, by pointer. */
   const fingers = new Map<number, number>();
 
-  /** A pinch under way: the span and the fingers' spread it began at, and the second between them. */
-  let pinch: { span: number; spread: number; anchor: number } | undefined;
+  /** A pinch under way: the span and the fingers' spread it began at. */
+  let pinch: { span: number; spread: number } | undefined;
 
   const spreadOf = () => {
     const [a = 0, b = 0] = [...fingers.values()];
@@ -335,249 +475,221 @@ export const timelineFor = (
     return Math.abs(a - b);
   };
 
-  const middleOf = () => {
-    const [a = 0, b = 0] = [...fingers.values()];
+  const showHover = (x: number) => {
+    const second = pickFor(secondAt(x));
+    const width = track.clientWidth;
+    const left = width / 2 + (second - centre) * scale;
 
-    return (a + b) / 2;
+    elements.hover.hidden = left < 0 || left > width;
+    elements.hover.style.left = `${left}px`;
+    elements.hover.dataset.time = clockOf(second);
   };
 
-  elements.track.addEventListener("pointerdown", (event) => {
+  track.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+
     if (event.pointerType === "touch")
       fingers.set(event.pointerId, event.clientX);
 
     // A second finger makes it a pinch, not a drag or a click
     if (fingers.size === 2) {
       press = undefined;
-      pinch = {
-        span,
-        spread: Math.max(spreadOf(), 1),
-        anchor: start + shareAt(middleOf()) * span,
-      };
+      mode = "pinch";
+      pinch = { span, spread: Math.max(spreadOf(), 1) };
+      showScrub(false);
 
       return;
     }
 
-    press = { x: event.clientX, start, dragged: false };
-    elements.track.setPointerCapture(event.pointerId);
+    clearTimeout(settling);
+    press = {
+      x: event.clientX,
+      left: track.scrollLeft,
+      dragged: false,
+      last: { x: event.clientX, at: event.timeStamp },
+      speed: 0,
+    };
+    track.setPointerCapture(event.pointerId);
   });
 
-  elements.track.addEventListener("pointermove", (event) => {
+  track.addEventListener("pointermove", (event) => {
     if (fingers.has(event.pointerId)) {
       fingers.set(event.pointerId, event.clientX);
     }
 
     if (pinch !== undefined && fingers.size === 2) {
-      zoomAround(
-        (pinch.span * pinch.spread) / Math.max(spreadOf(), 1),
-        pinch.anchor,
-        shareAt(middleOf()),
-      );
+      zoomTo((pinch.span * pinch.spread) / Math.max(spreadOf(), 1));
 
       return;
     }
 
-    if (press !== undefined && span < daySeconds) {
+    if (press !== undefined) {
       const moved = event.clientX - press.x;
 
-      if (Math.abs(moved) > dragAfter) press.dragged = true;
+      if (!press.dragged && Math.abs(moved) > dragAfter) {
+        press.dragged = true;
+        startMove();
+        mode = "drag";
+      }
 
       if (press.dragged) {
-        const width = elements.track.getBoundingClientRect().width;
+        const gap = event.timeStamp - press.last.at;
 
-        start = clamp(press.start - (moved / width) * span);
-        draw();
-      }
-    }
+        if (gap > 0) press.speed = (event.clientX - press.last.x) / gap;
 
-    const second = pickAt(event.clientX);
-
-    elements.hover.hidden = press?.dragged === true;
-    elements.hover.style.left = percent(second);
-    elements.hover.dataset.time = clockOf(second);
-  });
-
-  elements.track.addEventListener("pointerup", (event) => {
-    fingers.delete(event.pointerId);
-
-    if (pinch !== undefined) {
-      if (fingers.size === 0) pinch = undefined;
-
-      return;
-    }
-
-    const picked = press !== undefined && !press.dragged;
-
-    press = undefined;
-
-    if (picked) onPick(pickAt(event.clientX));
-  });
-
-  elements.track.addEventListener("pointercancel", (event) => {
-    fingers.delete(event.pointerId);
-    press = undefined;
-
-    if (fingers.size === 0) pinch = undefined;
-  });
-
-  // Ctrl or ⌘ and the wheel, as a trackpad's pinch sends it, zooms at the
-  // pointer; across, or with Shift, it pans; the wheel alone scrolls the page
-  elements.track.addEventListener(
-    "wheel",
-    (event) => {
-      if (event.ctrlKey || event.metaKey) {
-        event.preventDefault();
-        // A mouse's notch is a big step and a trackpad's pinch many small
-        // ones, so each is held to at most about half again or a third less
-        zoomAround(
-          span * Math.exp(Math.min(Math.max(event.deltaY, -40), 40) * 0.01),
-          start + shareAt(event.clientX) * span,
-          shareAt(event.clientX),
-        );
+        press.last = { x: event.clientX, at: event.timeStamp };
+        track.scrollLeft = press.left - moved;
 
         return;
       }
+    }
 
-      const across = event.shiftKey ? event.deltaY : event.deltaX;
+    if (event.pointerType === "mouse") showHover(event.clientX);
+  });
 
-      if (across === 0 || span >= daySeconds) return;
+  track.addEventListener("pointerup", (event) => {
+    fingers.delete(event.pointerId);
+
+    if (pinch !== undefined) {
+      if (fingers.size === 0) {
+        pinch = undefined;
+        mode = "idle";
+        own = track.scrollLeft;
+      }
+
+      return;
+    }
+
+    const pressed = press;
+
+    press = undefined;
+
+    if (pressed === undefined) return;
+
+    // A click or tap jumps there
+    if (!pressed.dragged) {
+      const second = pickFor(secondAt(event.clientX));
+
+      moved = true;
+      elements.hover.hidden = true;
+      onPick(second);
+      glideTo(second);
+
+      return;
+    }
+
+    // A flick carries on a little, as a scroll does, then lands
+    const flick =
+      event.timeStamp - pressed.last.at < 80 && Math.abs(pressed.speed) > 0.3;
+
+    mode = "scroll";
+
+    if (flick && !reducedMotion()) {
+      track.scrollBy({ left: -pressed.speed * 300, behavior: "smooth" });
+      settleLater();
+
+      return;
+    }
+
+    land();
+  });
+
+  track.addEventListener("pointercancel", (event) => {
+    fingers.delete(event.pointerId);
+    press = undefined;
+
+    if (pinch !== undefined && fingers.size === 0) {
+      pinch = undefined;
+      mode = "idle";
+    } else if (mode === "drag") {
+      mode = "scroll";
+      land();
+    }
+  });
+
+  track.addEventListener("pointerleave", () => {
+    elements.hover.hidden = true;
+  });
+
+  // Ctrl or ⌘ and the wheel, as a trackpad's pinch sends it, zooms around
+  // the middle; across, or with Shift, it scrolls; the wheel alone scrolls
+  // the page
+  track.addEventListener(
+    "wheel",
+    (event) => {
+      if (!event.ctrlKey && !event.metaKey) return;
 
       event.preventDefault();
-
-      const width = elements.track.getBoundingClientRect().width;
-
-      view(start + (across / Math.max(width, 1)) * span, span);
+      // A mouse's notch is a big step and a trackpad's pinch many small
+      // ones, so each is held to at most about half again or a third less
+      zoomTo(span * Math.exp(Math.min(Math.max(event.deltaY, -40), 40) * 0.01));
     },
     { passive: false },
   );
 
-  // The overview: a drag across it zooms to that stretch, a drag on the view
-  // moves it, and a click centres the view there
-  let overviewPress:
-    { x: number; moved: boolean; onView: boolean; start: number } | undefined;
-
-  const overviewSecond = (x: number) => {
-    const box = elements.overview.getBoundingClientRect();
-
-    return box.width === 0
-      ? 0
-      : Math.min(Math.max((x - box.left) / box.width, 0), 1) * daySeconds;
-  };
-
-  elements.overview.addEventListener("pointerdown", (event) => {
-    const second = overviewSecond(event.clientX);
-
-    overviewPress = {
-      x: event.clientX,
-      moved: false,
-      onView: second >= start && second <= start + span,
-      start,
-    };
-    elements.overview.setPointerCapture(event.pointerId);
+  // ‹ and ›, each shown while there's more of the day its way; a press moves
+  // the day as a drag does, so the playhead doesn't pull it back, and it
+  // plays from where it lands
+  scrollButtons(track, {
+    start: elements.earlier,
+    end: elements.later,
+    items: () => [elements.day],
   });
 
-  elements.overview.addEventListener("pointermove", (event) => {
-    if (overviewPress === undefined) return;
-
-    if (Math.abs(event.clientX - overviewPress.x) > dragAfter) {
-      overviewPress.moved = true;
-    }
-
-    if (!overviewPress.moved) return;
-
-    const from = overviewSecond(overviewPress.x);
-    const to = overviewSecond(event.clientX);
-
-    if (overviewPress.onView) {
-      view(overviewPress.start + (to - from), span);
-
-      return;
-    }
-
-    overviewPick.hidden = false;
-    overviewPick.style.left = dayPercent(Math.min(from, to));
-    overviewPick.style.width = dayPercent(Math.abs(to - from));
-  });
-
-  elements.overview.addEventListener("pointerup", (event) => {
-    const pressed = overviewPress;
-
-    overviewPress = undefined;
-    overviewPick.hidden = true;
-
-    if (pressed === undefined) return;
-
-    const from = overviewSecond(pressed.x);
-    const to = overviewSecond(event.clientX);
-
-    if (!pressed.moved) {
-      view(to - span / 2, span);
-    } else if (!pressed.onView) {
-      view(Math.min(from, to), Math.abs(to - from));
-    }
-  });
-
-  elements.overview.addEventListener("pointercancel", () => {
-    overviewPress = undefined;
-    overviewPick.hidden = true;
-  });
-
-  elements.track.addEventListener("pointerleave", () => {
-    elements.hover.hidden = true;
-  });
+  for (const step of [elements.earlier, elements.later]) {
+    step.addEventListener("click", () => {
+      startMove();
+      mode = "scroll";
+      settleLater();
+    });
+  }
 
   // Fewer labels on a narrow bar, such as a phone's, so they don't run
-  // together
+  // together, and the day sized again to the width
   new ResizeObserver(() => {
-    const across = labelsAcross(elements.ticks.clientWidth);
-
-    if (across === fit) return;
-
-    fit = across;
-    draw();
-  }).observe(elements.ticks);
+    fit = labelsAcross(track.clientWidth);
+    layout();
+  }).observe(track);
 
   return {
     show: (next) => {
       rows = next;
-      drawOverview();
-      draw();
+      drawRows();
+
+      // Nothing playing and not moved yet: the middle of the day's recordings
+      if (head === undefined && !moved && mode === "idle") {
+        const spans = rows.flatMap((row) => row.spans);
+
+        if (spans.length > 0) {
+          const first = Math.min(...spans.map((each) => each.start));
+          const last = Math.max(...spans.map((each) => each.end));
+
+          centreOn((first + last) / 2);
+        }
+      }
     },
     playhead: (second) => {
       head = second;
+      elements.playhead.toggleAttribute("data-idle", second === undefined);
 
-      // Zoomed in, the view turns a page as the playhead nears its edge,
-      // unless it's being dragged
-      const nearEdge =
-        second !== undefined &&
-        (second < start + span * 0.05 || second > start + span * 0.9);
-
-      if (
-        nearEdge &&
-        press === undefined &&
-        overviewPress === undefined &&
-        pinch === undefined &&
-        span < daySeconds
-      ) {
-        start = clamp(second - span * 0.2);
-        draw();
-
-        return;
-      }
-
-      place(elements.playhead, head);
+      // The day follows the playhead, unless the person is moving it
+      if (second !== undefined && mode === "idle") centreOn(second);
     },
     clip: (from, to) => {
-      marked =
-        from !== undefined && to !== undefined && to > from
-          ? [from, to]
-          : undefined;
-      draw();
+      const marked = from !== undefined && to !== undefined && to > from;
+
+      elements.clip.hidden = !marked;
+
+      if (marked) {
+        elements.clip.style.left = dayPercent(from);
+        elements.clip.style.width = dayPercent(to - from);
+      }
     },
     zoom: (seconds) => {
-      zoomAround(seconds, head ?? start + span / 2, 0.5);
+      zoomTo(seconds);
     },
     zoomBy: (factor) => {
-      zoomAround(span / factor, head ?? start + span / 2, 0.5);
+      zoomTo(span / factor);
     },
   };
 };
