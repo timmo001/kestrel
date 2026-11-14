@@ -1,14 +1,28 @@
 /** Checks which recording each camera plays at a moment, and where playback runs on to. */
 import type { Recording } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
-import { momentAt, nextMoment, recordingAt, type Track } from "./moments.ts";
+import {
+  eventSpans,
+  momentAt,
+  nextMoment,
+  nextSpan,
+  previousSpan,
+  recordingAt,
+  spanAt,
+  type Track,
+} from "./moments.ts";
 import { toSeconds } from "./recording-player.ts";
 
-const recording = (camera: string, begin: string, end: string): Recording => ({
+const recording = (
+  camera: string,
+  begin: string,
+  end: string,
+  reasons: Recording["reasons"] = ["normal"],
+): Recording => ({
   camera,
   begin: `2026-11-11T${begin}`,
   end: `2026-11-11T${end}`,
-  reasons: ["normal"],
+  reasons,
   bytes: null,
 });
 
@@ -55,6 +69,42 @@ test("with nothing recorded, playback runs on to the next start on any camera", 
   expect(momentAt(tracks, "swann/1", gap).driver).toBeUndefined();
   expect(nextMoment(tracks, gap)).toBe(at("10:30:00"));
   expect(nextMoment(tracks, at("10:30:30"))).toBeUndefined();
+});
+
+test("events take the footage around them where there is some, and join where they meet", () => {
+  const motion = (camera: string, begin: string, end: string) =>
+    recording(camera, begin, end, ["motion"]);
+
+  const withEvents: ReadonlyArray<Track> = [
+    {
+      camera: "swann/1",
+      recordings: [
+        ...(tracks[0]?.recordings ?? []),
+        motion("swann/1", "10:06:15", "10:06:30"),
+      ],
+    },
+    {
+      camera: "swann/3",
+      recordings: [
+        motion("swann/3", "10:05:00", "10:06:00"),
+        motion("swann/3", "10:30:00", "10:31:00"),
+      ],
+    },
+  ];
+
+  const spans = eventSpans(withEvents);
+
+  // The first two pad into camera 1's footage and overlap; the last has none
+  // around it
+  expect(spans).toEqual([
+    { start: at("10:04:40"), end: at("10:06:40") },
+    { start: at("10:30:00"), end: at("10:31:00") },
+  ]);
+
+  expect(spanAt(spans, at("10:20:00"))).toBeUndefined();
+  expect(nextSpan(spans, at("10:05:00"))?.start).toBe(at("10:30:00"));
+  expect(previousSpan(spans, at("10:30:10"))?.start).toBe(at("10:30:00"));
+  expect(previousSpan(spans, at("10:30:01"))?.start).toBe(at("10:04:40"));
 });
 
 test("where one file runs into the next, the join plays the later file", () => {

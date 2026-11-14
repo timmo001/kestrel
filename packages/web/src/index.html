@@ -382,6 +382,17 @@
                     label="Next recording"
                   ></gw-button>
                   <gw-button class="control-stop" label="Stop"></gw-button>
+                  <!-- On to the next motion, PIR or alarm, a little ahead of
+                       it, and only those, skipping the rest -->
+                  <gw-button
+                    class="control-next-event"
+                    label="Next event"
+                  ></gw-button>
+                  <gw-button
+                    class="control-events"
+                    label="Events only"
+                    toggle
+                  ></gw-button>
                 </gw-row>
                 <gw-row class="controls-end">
                   <gw-button
@@ -460,6 +471,13 @@
                       <dd>Next frame</dd>
                       <dt><kbd>P</kbd> <kbd>N</kbd></dt>
                       <dd>Previous or next recording</dd>
+                      <dt><kbd>W</kbd> <kbd>E</kbd></dt>
+                      <dd>
+                        Previous or next motion, PIR or alarm, from 20 seconds
+                        ahead of it where there's footage then
+                      </dd>
+                      <dt><kbd>O</kbd></dt>
+                      <dd>Events only: play those, skipping what's between</dd>
                       <dt><kbd>[</kbd> <kbd>]</kbd></dt>
                       <dd>Slower or faster</dd>
                       <dt><kbd>Enter</kbd> or a double click</dt>

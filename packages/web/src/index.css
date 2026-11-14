@@ -919,7 +919,9 @@ gw-table gw-sheet {
   .control-stop,
   .control-frame,
   .control-cut,
-  .control-download {
+  .control-download,
+  .control-next-event,
+  .control-events {
     display: none;
   }
 

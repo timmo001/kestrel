@@ -23,6 +23,7 @@ import { SavedCamera } from "./addresses.ts";
 import { call } from "./api.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
+  phBellRinging,
   phCamera,
   phCaretLeft,
   phCaretLineRight,
@@ -31,6 +32,7 @@ import {
   phCornersOut,
   phDotsThreeVertical,
   phDownloadSimple,
+  phFunnelSimple,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phQuestion,
@@ -43,7 +45,16 @@ import {
   phStop,
 } from "./icons.ts";
 import { mostCameras, playerGroup, type GroupTile } from "./player-group.ts";
-import { nextMoment, previousMoment, type Track } from "./moments.ts";
+import {
+  eventSpans,
+  nextMoment,
+  nextSpan,
+  previousMoment,
+  previousSpan,
+  spanAt,
+  type Span,
+  type Track,
+} from "./moments.ts";
 import {
   clipUrl,
   fullView,
@@ -81,6 +92,8 @@ const icons = {
   frame: phCaretLineRight,
   previous: phSkipBack,
   next: phSkipForward,
+  nextEvent: phBellRinging,
+  eventsOnly: phFunnelSimple,
   cut: phScissors,
   capture: phCamera,
   download: phDownloadSimple,
@@ -197,6 +210,7 @@ const kept = () => {
     date: isDate(date) ? date : undefined,
     speed: isText(speed) && isSpeed(Number(speed)) ? speed : "1",
     smart: tiling !== "fixed",
+    eventsOnly: values?.["eventsOnly"] === true,
     timelineZoom:
       isText(timelineZoom) &&
       timelineZooms.some((zoom) => zoom.value === timelineZoom)
@@ -259,6 +273,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const frameButton = find("gw-button", "control-frame");
   const previousButton = find("gw-button", "control-previous");
   const nextButton = find("gw-button", "control-next");
+  const nextEventButton = find("gw-button", "control-next-event");
+  const eventsButton = find("gw-button", "control-events");
   const speedToggle = find("gw-segmented", "control-speed");
   const speedCustom = find("gw-popover", "speed-custom");
   const speedOther = find("gw-input", "control-speed-other");
@@ -304,6 +320,15 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   /** Each playing camera's recordings on the picked day, earliest first. */
   let tracks: ReadonlyArray<Track> = [];
+
+  /** The stretches around their events, which Events only plays and E and W skip between. */
+  let spans: ReadonlyArray<Span> = [];
+
+  /** Whether only the events play, the rest skipped; kept in this browser. */
+  let eventsOnly = saved.eventsOnly;
+
+  /** Where a skip to an event is headed, until it gets there, so the time before it loads isn't skipped from again. */
+  let skipping: { readonly to: number; readonly since: number } | undefined;
 
   /** The stream and speed-up playing, which the caption names. */
   let shownView = fullView;
@@ -551,6 +576,18 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     const idle = player?.clip() === undefined;
 
     moreMenu.items = [
+      {
+        value: "next-event",
+        label: "Next event",
+        icon: icons.nextEvent,
+        disabled: spans.length === 0,
+      },
+      {
+        value: "events",
+        label: "Events only",
+        icon: icons.eventsOnly,
+        checked: eventsOnly,
+      },
       { value: "stop", label: "Stop", icon: icons.stop, disabled: idle },
       {
         value: "frame",
@@ -581,6 +618,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
       if (event.detail.value === "stop") stopButton?.click();
       else if (event.detail.value === "frame") frameButton?.click();
+      else if (event.detail.value === "next-event") nextEventButton?.click();
+      else if (event.detail.value === "events") eventsButton?.click();
       else if (event.detail.value === "cut") cutButton?.click();
       else if (event.detail.value === "download" && href) save(href);
     });
@@ -638,6 +677,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   setIcon(frameButton, icons.frame);
   setIcon(previousButton, icons.previous);
   setIcon(nextButton, icons.next);
+  setIcon(nextEventButton, icons.nextEvent);
+  setIcon(eventsButton, icons.eventsOnly);
   setIcon(cutButton, icons.cut);
   setIcon(captureButton, icons.capture);
   setIcon(downloadButton, icons.download);
@@ -680,6 +721,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     if (cutButton !== null && idle) cutButton.pressed = false;
 
+    // The events are there to skip to from the start, with nothing playing
+    if (nextEventButton !== null) nextEventButton.disabled = spans.length === 0;
+
     if (downloadButton !== null) {
       if (clip === undefined) downloadButton.removeAttribute("href");
       else downloadButton.setAttribute("href", clipUrl(clip, true));
@@ -720,7 +764,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     const first = recordings[0];
 
     if (player.clip() === undefined) {
-      if (first !== undefined) playClip(first);
+      // Events only starts at the day's first event
+      const firstEvent = eventsOnly ? spans[0] : undefined;
+
+      if (firstEvent !== undefined) playFrom(firstEvent.start);
+      else if (first !== undefined) playClip(first);
     } else if (player.paused()) {
       player.resume();
     } else {
@@ -763,6 +811,93 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   previousButton?.addEventListener("click", () => skip(-1));
   nextButton?.addEventListener("click", () => skip(1));
+
+  /** The recorder second the playhead is at, if anything's loaded. */
+  const playhead = () => {
+    const clip = player?.clip();
+    const offset = player?.offset();
+
+    return clip === undefined || offset === undefined
+      ? undefined
+      : toSeconds(clip.begin) + offset;
+  };
+
+  /** Plays every camera from a recorder second: a seek within what's playing, else the recording there. */
+  const playFrom = (at: number) => {
+    const clip = player?.clip();
+
+    skipping = { to: at, since: Date.now() };
+
+    if (
+      clip !== undefined &&
+      toSeconds(clip.begin) <= at &&
+      at < toSeconds(clip.end)
+    ) {
+      player?.seek(at - toSeconds(clip.begin));
+      player?.resume();
+
+      return;
+    }
+
+    const hit =
+      recordings.find(
+        (recording) =>
+          toSeconds(recording.begin) <= at && at < toSeconds(recording.end),
+      ) ?? recordings.find((recording) => toSeconds(recording.begin) > at);
+
+    if (hit !== undefined) {
+      playClip(hit, Math.max(at - toSeconds(hit.begin), 0));
+    }
+  };
+
+  /** On to the next event, or back to this one's start or the one before, from a little ahead of it. */
+  const skipEvent = (step: -1 | 1) => {
+    const at = playhead() ?? -Infinity;
+    const span = step === 1 ? nextSpan(spans, at) : previousSpan(spans, at);
+
+    if (span !== undefined) playFrom(span.start);
+  };
+
+  /**
+   * With Events only, playing past an event goes on to the next, and after
+   * the day's last it stops. A skip on its way is left to get there.
+   */
+  const followEvents = () => {
+    const at = playhead();
+
+    if (!eventsOnly || at === undefined || player?.paused() !== false) return;
+
+    if (skipping !== undefined) {
+      const arrived = Math.abs(at - skipping.to) < 2;
+
+      // A load that never comes is given up on
+      if (!arrived && Date.now() - skipping.since < 10_000) return;
+
+      skipping = undefined;
+    }
+
+    if (spans.length === 0 || spanAt(spans, at) !== undefined) return;
+
+    const next = nextSpan(spans, at);
+
+    if (next === undefined) player.pause();
+    else playFrom(next.start);
+  };
+
+  const setEventsOnly = (on: boolean) => {
+    eventsOnly = on;
+    keep(storageKey, { eventsOnly });
+
+    if (eventsButton !== null) eventsButton.pressed = on;
+
+    followEvents();
+    showMore();
+  };
+
+  nextEventButton?.addEventListener("click", () => skipEvent(1));
+  eventsButton?.addEventListener("click", () => setEventsOnly(!eventsOnly));
+
+  if (eventsButton !== null) eventsButton.pressed = eventsOnly;
 
   const showSpeed = () => {
     // Alone, the picked camera has the recorder's full stream to itself
@@ -1109,6 +1244,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     showPlayhead();
     keepPosition();
+    followEvents();
   };
 
   if (timelineZoom !== null) {
@@ -1186,6 +1322,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     recordings = tracks
       .flatMap((track) => track.recordings)
       .toSorted((a, b) => a.begin.localeCompare(b.begin));
+
+    spans = eventSpans(tracks);
 
     showColumns();
 
@@ -1539,6 +1677,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["PageUp", () => stepCamera(-1)],
     ["PageDown", () => stepCamera(1)],
     ["t", () => setTiling(smart ? "fixed" : "smart")],
+    ["w", () => skipEvent(-1)],
+    ["e", () => skipEvent(1)],
+    ["o", () => setEventsOnly(!eventsOnly)],
   ]);
 
   document.addEventListener("keydown", (event) => {
@@ -1594,6 +1735,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     [frameButton, ".", "."],
     [previousButton, "P", "p"],
     [nextButton, "N", "n"],
+    [nextEventButton, "E", "e"],
+    [eventsButton, "O", "o"],
     [cutButton, "C", "c"],
     [captureButton, "S", "s"],
     [zoomOutButton, "−", "-"],
