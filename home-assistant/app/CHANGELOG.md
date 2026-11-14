@@ -1,23 +1,34 @@
-Watching several cameras at speed now holds together: when one camera can't keep up, the others wait for it rather than running on, and a camera that keeps falling behind switches to key frames so everyone can carry on. On a phone held sideways, and in full screen, the player's controls now sit over the picture and fade away like a video player's. The day picker has moved onto the timeline.
+The players work better at every size, from a phone on its side in full screen to a wide desktop: the controls take the fewest rows they fit, the controls over the picture only come back when you ask, and touch screens get gestures.
+
+## Live
+
+- One pager for the cameras: the Layout menu holds how many cameras show at once (every count, and All) and smart or fixed tiling, and beside it, while the layout pages them, Previous and Next either side of the page, which lists each page's cameras.
+- Cameras slide and resize to their new places when the layout, the page or the tiling changes, or cameras are added, where the browser has view transitions and you haven't asked for reduced motion.
+- Picking a camera no longer flashes like a button press: its ring fades in, and a double click doesn't select its name.
+- The bar over the picture stays while paused, as on Recordings.
 
 ## Recordings
 
-- Several cameras at speed stay together. While one camera loads, the others pause and wait for it, then play on together. Previously the camera being waited for kept playing on its own and ran far ahead of the clock.
-- A camera that keeps running out of video at 4× or faster, such as a large-picture doorbell, switches to key frames only, so it keeps up instead of holding everyone up. Past 16× it takes one key frame per two seconds of footage. Changing speed tries the full video again.
-- Click another camera to pick it. The tiles stay where they are, so a double click shows the camera you clicked on its own, as on Live.
-- The row of day buttons is gone. Previous day, the date picker and Next day now sit at the start of the timeline's footer, and they stay with the timeline in full screen.
-- Recordings only asks for a camera's small sub stream when some of what's playing is still only on the camera. Kestrel's own copies are always full size.
+- Speed is one menu showing the speed, such as 1×, with Custom for any other.
+- The day picker is one pill, the arrows and the date together.
+- The timeline's colours are explained behind a ? beside its zoom, rather than taking a line under it.
+- Cameras you've turned off are left out of the camera picker, and out of Events.
 
-## Player controls
+## Both players
 
-- On a phone held sideways, and in full screen, the controls sit over the bottom of the picture on a see-through background, as a video player's do. They fade out after about three seconds of playing untouched. A tap on the picture, or moving the mouse, brings them back, and that tap does nothing else. They stay up while paused.
-- On a phone held sideways, the controls show one row: the time, previous, play, next, View and full screen. A tab on the bar's top edge opens the speeds and zoom.
-- Turning a phone sideways takes the player full screen, where the browser allows it, and turning it back upright leaves.
-- On Recordings on a phone held sideways, the player fills the screen, with the cameras and the timeline below it.
-- The control bar no longer gets stuck in the phone layout on a wide window. Between one row and the phone layout there's now a two-row step, with play and its neighbours across the top, and Next frame sits with them.
+- The controls take the fewest rows they fit: one row on most desktop windows, two on a tablet, and the phone's three only when needed. The volume slider and seldom used controls (Cut, Capture, Download and Help) step into a ⋮ menu before another row is taken.
+- The zoom is one pill: fit or fill, then a step at a time.
+- Every help button is a plain ?.
+- Over the picture, on a phone on its side or in full screen, the controls only come back from a tap where there's nothing to press, a swipe up, or a handle at the bottom, and a swipe down hides them. A tap on a camera, its own controls or Picture settings does its own thing, rather than only waking the controls.
+- Over the picture, the controls keep clear of a phone's rounded corners.
+- Touch gestures: on Live, a swipe across moves to the next or previous cameras; on Recordings, a swipe across goes on or back 10 seconds and two fingers the next or previous recording. Three fingers up or down open or close the help, which now lists the gestures on a touch screen.
 
 ## Fixes
 
-- Several cameras at speed no longer stretch the picture: Kestrel's own copies are drawn at their own shape. Only a recorder's squeezed sub stream is stretched back out.
-- A camera reaching the end of a short recording no longer starts it again from the beginning, which could hold the others for seconds at a time or send the clock back.
-- The Play and Pause button now updates straight away while one camera is waiting for another.
+- A banner, such as the offer to install, or an alert above the page no longer pushes the players' controls off the bottom of the window.
+- Hidden controls stay hidden, such as the volume slider for cameras without sound.
+- Recordings' middle controls no longer wrap onto a second line when the bar only just fits.
+
+## Docs
+
+- Installing with mise now goes through the aqua registry.
