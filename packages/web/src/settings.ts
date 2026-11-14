@@ -504,6 +504,12 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     remove.slot = "actions";
     remove.setAttribute("variant", "danger");
     remove.setAttribute("appearance", "plain");
+    // Only its icon on a phone, so the source's name keeps the row
+    remove.setAttribute("labels", "auto");
+    remove.setAttribute(
+      "label",
+      `Remove ${source.name.trim() || "this source"}`,
+    );
     remove.addEventListener("click", () => {
       drafts.splice(index, 1);
       render();
