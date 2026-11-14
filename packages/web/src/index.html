@@ -257,15 +257,7 @@
                     <dt><kbd>P</kbd></dt>
                     <dd>Picture settings, where it has them</dd>
                   </dl>
-                  <h3>Zoom</h3>
-                  <dl>
-                    <dt><kbd>Z</kbd></dt>
-                    <dd>Fit the picture whole, or fill its tile</dd>
-                    <dt><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></dt>
-                    <dd>Zoom in, out, or back to the whole picture</dd>
-                    <dt><kbd>Ctrl</kbd> + scroll</dt>
-                    <dd>Zoom at the pointer; drag to move around</dd>
-                  </dl>
+                  <template data-help="zoom"></template>
                   <h3>Move mode</h3>
                   <dl>
                     <dt><kbd>M</kbd></dt>
@@ -277,13 +269,7 @@
                     <dt><kbd>Esc</kbd></dt>
                     <dd>End Move mode</dd>
                   </dl>
-                  <h3>Page</h3>
-                  <dl>
-                    <dt><kbd>F</kbd></dt>
-                    <dd>Full screen</dd>
-                    <dt><kbd>?</kbd></dt>
-                    <dd>This help</dd>
-                  </dl>
+                  <template data-help="page"></template>
                 </gw-key-list>
               </gw-popover>
             </gw-control-bar>
@@ -505,15 +491,7 @@
                       <dt><kbd>T</kbd></dt>
                       <dd>Smart tiling, or the View menu's fixed layouts</dd>
                     </dl>
-                    <h3>Zoom</h3>
-                    <dl>
-                      <dt><kbd>Z</kbd></dt>
-                      <dd>Fit the picture whole, or fill its tile</dd>
-                      <dt><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></dt>
-                      <dd>Zoom in, out, or back to the whole picture</dd>
-                      <dt><kbd>Ctrl</kbd> + scroll</dt>
-                      <dd>Zoom at the pointer; drag to move around</dd>
-                    </dl>
+                    <template data-help="zoom"></template>
                     <h3>Clip and still</h3>
                     <dl>
                       <dt><kbd>C</kbd></dt>
@@ -521,13 +499,7 @@
                       <dt><kbd>S</kbd></dt>
                       <dd>Save a still</dd>
                     </dl>
-                    <h3>Page</h3>
-                    <dl>
-                      <dt><kbd>F</kbd></dt>
-                      <dd>Full screen</dd>
-                      <dt><kbd>?</kbd></dt>
-                      <dd>This help</dd>
-                    </dl>
+                    <template data-help="page"></template>
                   </gw-key-list>
                 </gw-popover>
               </gw-control-bar>
@@ -899,6 +871,28 @@
         </section>
       </gw-stack>
     </gw-page>
+    <!-- Help both players share, put in place of each
+         <template data-help="…"> above as the page starts -->
+    <template id="help-zoom">
+      <h3>Zoom</h3>
+      <dl>
+        <dt><kbd>Z</kbd></dt>
+        <dd>Fit the picture whole, or fill its tile</dd>
+        <dt><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></dt>
+        <dd>Zoom in, out, or back to the whole picture</dd>
+        <dt><kbd>Ctrl</kbd> + scroll</dt>
+        <dd>Zoom at the pointer; drag to move around</dd>
+      </dl>
+    </template>
+    <template id="help-page">
+      <h3>Page</h3>
+      <dl>
+        <dt><kbd>F</kbd></dt>
+        <dd>Full screen</dd>
+        <dt><kbd>?</kbd></dt>
+        <dd>This help</dd>
+      </dl>
+    </template>
     <script type="module" src="index.js"></script>
   </body>
 </html>

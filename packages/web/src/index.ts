@@ -186,6 +186,17 @@ const showAttention = (all: ReadonlyArray<Attention>) => {
 for (const bar of document.querySelectorAll("gw-control-bar")) {
   if (!bar.classList.contains("player-controls")) continue;
 
+  // The help both players share, written once
+  for (const slot of bar.querySelectorAll("template[data-help]")) {
+    const shared = document.querySelector(
+      `template#help-${slot.getAttribute("data-help") ?? ""}`,
+    );
+
+    if (shared instanceof HTMLTemplateElement) {
+      slot.replaceWith(shared.content.cloneNode(true));
+    }
+  }
+
   const player = bar.closest(".playback-view, .live-stage");
 
   if (!(player instanceof HTMLElement)) continue;
