@@ -100,8 +100,8 @@ export const helpToggle = (
 };
 
 /**
- * A camera's settings panel, such as its picture or its moving setup: a
- * sheet, as it holds more than a popover's small form. It comes up from the
+ * A camera's settings panel that holds more than a popover's small form,
+ * such as its moving setup's presets, home and tracking. It comes up from the
  * bottom where Groundwork's popups become bottom sheets, a phone either way
  * up, and otherwise in from the end edge, beside the cameras rather than
  * over the picture being set.

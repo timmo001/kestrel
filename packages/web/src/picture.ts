@@ -1,6 +1,6 @@
 /**
  * A camera's picture settings on the Live page: hue, brightness, contrast,
- * saturation and sharpness as sliders in a panel opened beside Move, with
+ * saturation and sharpness as sliders in a popover by its button, with
  * Reset to put them back to the camera's defaults. A drag sends where it's
  * got to a few times a second, the newest replacing any change still
  * waiting, and the sliders then show what the camera says it's set to,
@@ -15,7 +15,7 @@ import {
 } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 import { cameraLabel } from "./cameras.ts";
-import { element, settingsSheet } from "./shared.ts";
+import { element } from "./shared.ts";
 
 /** How often a drag sends where it's got to, at most. */
 const sendEvery = 250;
@@ -55,10 +55,13 @@ export interface PicturePanel {
   readonly close: () => void;
 }
 
-/** Wires the picture settings panel to its button on the Live page. */
+/**
+ * Wires the picture settings to their button on the Live page: a popover
+ * beside it, a few sliders being a small form, and a bottom sheet on a phone.
+ */
 export const pictureSettings = (options: PictureOptions): PicturePanel => {
   const { button } = options;
-  const panel = settingsSheet("picture-panel");
+  const panel = element("gw-popover");
   const body = element("gw-stack");
   const reset = element("gw-button", "Reset");
   const message = element("p");
@@ -82,7 +85,17 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
   body.setAttribute("gap", "s");
   body.append(...sliders.values(), message);
   reset.slot = "actions";
+  panel.className = "picture-panel";
   panel.append(body, reset);
+  document.body.append(panel);
+
+  // Each change goes to the camera as it's made, so there's nothing to
+  // discard and closing never asks
+  for (const type of ["input", "change"]) {
+    panel.addEventListener(type, () => {
+      panel.dirty = false;
+    });
+  }
 
   /** The camera the panel is for, and what it last said it's set to. */
   let current:
@@ -293,7 +306,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     open = true;
     note("");
     fill();
-    panel.show();
+    panel.show(button ?? undefined);
     options.onChange();
     void refresh();
   };

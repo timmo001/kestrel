@@ -969,12 +969,17 @@ gw-table gw-sheet {
   }
 }
 
-/* The setup, opened from the gear, and the picture settings: sheets beside
-   the cameras, over a light backdrop so the picture being set stays clear */
-.ptz-panel,
-.picture-panel {
+/* The setup, opened from the gear: a sheet beside the cameras, as it holds
+   more than a popover fits, over a light backdrop so the picture stays clear */
+.ptz-panel {
   --gw-sheet-width: 22rem;
   --gw-sheet-backdrop: rgb(0 0 0 / 15%);
+}
+
+/* The picture settings, by their button; on a phone a bottom sheet over a
+   light backdrop, so the picture being set stays clear */
+.picture-panel {
+  --gw-popover-backdrop: rgb(0 0 0 / 15%);
 }
 
 .picture-note {
