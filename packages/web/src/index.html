@@ -168,11 +168,7 @@
               <gw-row class="controls-end">
                 <!-- The picked camera's zoom on one pill: fit or fill, then
                      a step at a time from there -->
-                <gw-row
-                  class="control-pill zoom-pill"
-                  role="group"
-                  aria-label="Zoom"
-                >
+                <gw-control-group class="zoom-pill" label="Zoom">
                   <gw-segmented
                     class="live-fit"
                     label="Zoom"
@@ -190,7 +186,7 @@
                     >100%</gw-button
                   >
                   <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
-                </gw-row>
+                </gw-control-group>
                 <span class="controls-divider" aria-hidden="true"></span>
                 <!-- Steers the picked camera, where it moves -->
                 <gw-button
@@ -426,11 +422,7 @@
                   <span class="player-clock">--:--:--</span>
                   <span class="controls-divider" aria-hidden="true"></span>
                   <!-- The picked camera's zoom on one pill, as on Live -->
-                  <gw-row
-                    class="control-pill zoom-pill"
-                    role="group"
-                    aria-label="Zoom"
-                  >
+                  <gw-control-group class="zoom-pill" label="Zoom">
                     <gw-segmented
                       class="control-fit"
                       label="Zoom"
@@ -454,7 +446,7 @@
                       class="control-zoom-in"
                       label="Zoom in"
                     ></gw-button>
-                  </gw-row>
+                  </gw-control-group>
                   <!-- How several cameras tile, as on Live -->
                   <gw-menu-button
                     class="control-view"
@@ -572,11 +564,7 @@
               <div class="timeline-ticks" aria-hidden="true"></div>
               <gw-row class="timeline-foot">
                 <!-- The day the timeline shows -->
-                <gw-row
-                  class="control-pill day-picker"
-                  role="group"
-                  aria-label="Day"
-                >
+                <gw-control-group class="day-picker" label="Day">
                   <gw-button
                     class="day-previous"
                     label="Previous day"
@@ -595,7 +583,7 @@
                     label="Next day"
                     size="small"
                   ></gw-button>
-                </gw-row>
+                </gw-control-group>
                 <!-- How much of the day the timeline shows, and what its
                      colours mean, from a button rather than always there -->
                 <gw-row class="timeline-tools">
