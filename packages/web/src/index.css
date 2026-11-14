@@ -327,6 +327,8 @@ gw-table gw-sheet {
   overflow: hidden;
   background: #000;
   cursor: pointer;
+  /* Its name measures it, to keep out of a small picture's way */
+  container-type: inline-size;
 }
 
 /* A change of layout moves each camera to its new place, a little quicker
@@ -511,6 +513,31 @@ gw-table gw-sheet {
   /* The same size as the fields and controls around the player */
   font-size: 1rem;
   pointer-events: none;
+  transition: opacity var(--gw-motion-normal, 200ms)
+    var(--gw-motion-easing, ease);
+}
+
+/* On a small tile, the size Move goes solo from, the name is a small chip
+   tucked in the corner, on one line however long it is... */
+@container (width < 200px) {
+  .live-tile figcaption {
+    inset-block-start: var(--gw-space-1);
+    inset-inline-end: var(--gw-space-1);
+    max-inline-size: calc(100% - 2 * var(--gw-space-1));
+    padding: 0 var(--gw-space-1);
+    overflow: hidden;
+    font-size: 0.75rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ...and full screen, it goes with the controls, staying on the picked
+     camera and the one under the pointer */
+  [data-overlay]:has(> .player-controls[data-hidden])
+    .live-tile:not([data-picked], :hover)
+    figcaption {
+    opacity: 0;
+  }
 }
 
 /* A camera's other view, such as its telephoto lens, small at the bottom
