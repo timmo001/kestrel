@@ -1723,13 +1723,6 @@ gw-table gw-sheet {
     transparent
   );
   border-block-start: none;
-  /* The pills and fields on it, such as the layouts, the pager and the zoom,
-     are see-through too, so the picture shows behind them as behind the bar */
-  --gw-color-surface-lower: color-mix(
-    in oklab,
-    var(--gw-color-surface-low) 45%,
-    transparent
-  );
 }
 
 /* Over the picture, on a phone on its side or full screen, everything that

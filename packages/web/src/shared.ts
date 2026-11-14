@@ -10,11 +10,15 @@ import { phDownloadSimple, phPlay } from "./icons.ts";
 import { clipUrl, type Clip } from "./recording-player.ts";
 
 /**
- * What a drag on a player already moves, so a touch starting there is never
- * a swipe: a zoomed picture, a camera being steered, or a control.
+ * What a drag on a player already moves, so a touch starting there never
+ * pulls the bar over the picture down: a zoomed picture, a camera being
+ * steered, or a slider, popover or sheet.
  */
-export const swipeIgnore =
-  "[data-movable], [data-steering], .player-controls, .live-steer-dock, gw-range, gw-popover, gw-sheet";
+export const barDragIgnore =
+  "[data-movable], [data-steering], .live-steer-dock, gw-range, gw-popover, gw-sheet";
+
+/** The same, and the bar too, so a touch there never swipes between cameras. */
+export const swipeIgnore = `${barDragIgnore}, .player-controls`;
 
 /**
  * Wires a page's help popover to its button, both opening it when it's shut

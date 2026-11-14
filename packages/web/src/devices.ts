@@ -48,6 +48,8 @@ export const devicesPanel = (): DevicesPanel => {
   };
 
   if (table !== null) {
+    // Followed by id, so a device paired or removed slides the rest
+    table.setAttribute("row-key", "key");
     table.emptyLabel = "No devices are paired yet.";
     table.columns = [
       { id: "name", header: "Device", wide: true },

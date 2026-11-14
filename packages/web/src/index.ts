@@ -67,7 +67,7 @@ import { livePage } from "./live.ts";
 import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import { find, swipeIgnore } from "./shared.ts";
+import { barDragIgnore, find } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
 import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
@@ -201,7 +201,8 @@ for (const bar of document.querySelectorAll("gw-control-bar")) {
       ).startsWith("Play"),
     // A press on a camera picks, plays or pauses it
     pressable: ".live-tile, .player-tile, .player-video",
-    ignore: swipeIgnore,
+    // A pull down on the bar itself moves it
+    ignore: barDragIgnore,
   });
 }
 
