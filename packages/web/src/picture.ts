@@ -86,16 +86,11 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
   body.append(...sliders.values(), message);
   reset.slot = "actions";
   panel.className = "picture-panel";
+  // Each change goes to the camera as it's made: nothing to discard, and
+  // the picture shows through the backdrop
+  panel.live = true;
   panel.append(body, reset);
   document.body.append(panel);
-
-  // Each change goes to the camera as it's made, so there's nothing to
-  // discard and closing never asks
-  for (const type of ["input", "change"]) {
-    panel.addEventListener(type, () => {
-      panel.dirty = false;
-    });
-  }
 
   /** The camera the panel is for, and what it last said it's set to. */
   let current:

@@ -29,7 +29,12 @@ import {
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
 import { pageTheme } from "@timmo001/groundwork-tokens/page";
-import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
+import {
+  createIcon,
+  fillWindow,
+  on,
+  type MenuItem,
+} from "@timmo001/groundwork-ui";
 import { Equal, Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
@@ -62,7 +67,6 @@ import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
 import {
   compactWhenCrowded,
-  fillWindow,
   find,
   overflowMenu,
   overlayControls,
@@ -189,7 +193,11 @@ for (const bar of document.querySelectorAll(".player-controls")) {
 }
 
 // Both players fill the window under whatever shows above them
-fillWindow([find("div", "live-stage"), find("div", "playback-view")]);
+fillWindow(
+  ...[find("div", "live-stage"), find("div", "playback-view")].filter(
+    (found) => found !== null,
+  ),
+);
 
 // Each page is a module of its own
 const live = livePage();

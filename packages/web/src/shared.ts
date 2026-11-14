@@ -30,14 +30,6 @@ import { clipUrl, type Clip } from "./recording-player.ts";
 export const swipeIgnore =
   "[data-movable], [data-steering], .player-controls, .live-steer-dock, gw-range, gw-popover, gw-sheet";
 
-/** Fields that take text: a toggle's radios don't, so keys pass them by. */
-export const typingTargets =
-  "input:not([type=radio], [type=checkbox], [type=button], [type=range]), textarea, select, [contenteditable], gw-input, gw-select";
-
-/** Controls that move between their own parts with the arrow keys. */
-const ownsArrows =
-  "gw-segmented, gw-table, gw-menu-button, gw-range, [role=menu]";
-
 /**
  * Wires a page's help popover to its button, both opening it when it's shut
  * and shutting it when it's open. Returns its toggle, for the `?` key, and
@@ -116,52 +108,6 @@ export const settingsSheet = (className: string) => {
   document.body.append(sheet);
 
   return sheet;
-};
-
-/**
- * The key a page's keyboard controls act on, such as `k`, `F` lowered to
- * `f`, or `Shift+ArrowLeft`; or undefined where it belongs to what has the
- * focus: a field being typed in, a toggle's arrows, or Space on a button.
- */
-export const controlKey = (event: KeyboardEvent): string | undefined => {
-  if (
-    event.ctrlKey ||
-    event.metaKey ||
-    event.altKey ||
-    event.defaultPrevented
-  ) {
-    return undefined;
-  }
-
-  const path = event
-    .composedPath()
-    .filter((target) => target instanceof Element);
-
-  if (path.some((target) => target.matches(typingTargets))) return undefined;
-
-  // Keys in an open sheet or popover are its own, Esc closing it
-  if (path.some((target) => target.matches("gw-sheet, gw-popover"))) {
-    return undefined;
-  }
-
-  if (
-    event.key.startsWith("Arrow") &&
-    path.some((target) => target.matches(ownsArrows))
-  ) {
-    return undefined;
-  }
-
-  // Space on a focused button presses that button, as it should
-  if (
-    event.key === " " &&
-    path.some((target) => target.matches("button, a, gw-button, [role=radio]"))
-  ) {
-    return undefined;
-  }
-
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-
-  return event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key;
 };
 
 /**
@@ -701,37 +647,6 @@ export const overlayControls = (bar: HTMLElement) => {
   bar.append(tab);
   stage?.append(handle);
   place();
-};
-
-/**
- * Keeps each element's `--fill-top` at its distance from the top of the
- * page, which the styles take from the window's height so a player fills it
- * under whatever's above: the app bar, and banners and alerts that come and
- * go. It's measured again as the page's height changes, which they change,
- * and after full screen, where the element sits at the top.
- */
-export const fillWindow = (elements: ReadonlyArray<HTMLElement | null>) => {
-  const measure = () => {
-    for (const each of elements) {
-      // Hidden, or full screen, it has nowhere of its own to measure
-      if (
-        each === null ||
-        each.getClientRects().length === 0 ||
-        document.fullscreenElement === each
-      ) {
-        continue;
-      }
-
-      each.style.setProperty(
-        "--fill-top",
-        `${each.getBoundingClientRect().top + scrollY}px`,
-      );
-    }
-  };
-
-  new ResizeObserver(measure).observe(document.body);
-  document.addEventListener("fullscreenchange", measure);
-  measure();
 };
 
 /** The first `tag` element with `className`, or null. */

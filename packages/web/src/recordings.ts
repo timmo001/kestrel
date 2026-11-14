@@ -19,6 +19,8 @@ import {
 import {
   on,
   onSwipe,
+  shortcutKey,
+  typingTargets,
   type SwipeDirection,
   type TableRow,
 } from "@timmo001/groundwork-ui";
@@ -72,7 +74,6 @@ import {
   actionsColumn,
   clock,
   controlIcon,
-  controlKey,
   dayFormat,
   element,
   find,
@@ -85,7 +86,6 @@ import {
   seconds,
   timeFormat,
   swipeIgnore,
-  typingTargets,
 } from "./shared.ts";
 import {
   minimumSpan,
@@ -1817,10 +1817,12 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["o", () => setEventsOnly(!eventsOnly)],
   ]);
 
+  // The keys work the player while the focus is in its card, the picture,
+  // its controls or the timeline, so typing elsewhere never sets one off
   document.addEventListener("keydown", (event) => {
-    if (page?.hidden !== false) return;
+    if (page?.hidden !== false || view === null) return;
 
-    const key = controlKey(event);
+    const key = shortcutKey(event, { within: view });
     const action = keys.get(key ?? "");
 
     // Enter on a control presses it, and Esc and Backspace are left alone
@@ -1890,12 +1892,12 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
-  // A click on a control hands the focus back to the player, so the keys
-  // keep working rather than going to the button clicked. Fields keep it
-  // while they're typed in, and the keyboard's own Tab moves it as ever
+  // A click in the player's card hands the focus back to the player, so the
+  // keys keep working rather than going to the button clicked. Fields keep
+  // it while they're typed in, and the keyboard's own Tab moves it as ever
   const focusPlayer = () => stage?.focus({ preventScroll: true });
 
-  stage?.addEventListener("pointerup", (event) => {
+  view?.addEventListener("pointerup", (event) => {
     const path = event
       .composedPath()
       .filter((target) => target instanceof Element);

@@ -39,7 +39,9 @@ import {
 import {
   on,
   onSwipe,
+  shortcutKey,
   transitionName,
+  typingTargets,
   withViewTransition,
 } from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
@@ -47,12 +49,10 @@ import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
   controlIcon,
-  controlKey,
   element,
   find,
   helpToggle,
   swipeIgnore,
-  typingTargets,
 } from "./shared.ts";
 import {
   applyTiling,
@@ -1648,10 +1648,12 @@ export const livePage = (): LivePage => {
     key === "ArrowUp" ||
     key === "ArrowDown";
 
+  // The keys work the cameras while the focus is among them or their
+  // controls, so typing elsewhere never sets one off
   document.addEventListener("keydown", (event) => {
-    if (!shown()) return;
+    if (!shown() || stage === null) return;
 
-    const key = controlKey(event);
+    const key = shortcutKey(event, { within: stage });
 
     if (steer.on() && isArrow(key)) {
       event.preventDefault();

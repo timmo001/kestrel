@@ -159,12 +159,12 @@ gw-table gw-sheet {
 
 /* The players fill the window from where they start down to the page's
    bottom padding: under the app bar, and any banner or alert above them,
-   which the page measures into --fill-top as they come and go. Until it has,
-   they start under the app bar alone */
+   which the page measures into --gw-fill-top as they come and go. Until it
+   has, they start under the app bar alone */
 .live-stage,
 .playback-view {
   --fill-height: calc(
-    100dvh - var(--fill-top, var(--gw-app-bar-height, 3.5rem)) -
+    100dvh - var(--gw-fill-top, var(--gw-app-bar-height, 3.5rem)) -
       var(--gw-space-5)
   );
 }
@@ -183,8 +183,15 @@ gw-table gw-sheet {
   background: #000;
 }
 
+/* The cameras take the focus for the keys, which only work while they have
+   it. A ring shows when Tab brings it there, not after a click */
 .live-stage:focus {
   outline: none;
+}
+
+.live-stage:focus-visible {
+  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
+  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 .live-stage:fullscreen {
@@ -950,36 +957,11 @@ gw-table gw-sheet {
   display: none;
 }
 
-/* A press the camera hasn't answered yet: the button breathes until it does,
-   still taking another press */
-[data-pending] {
-  animation: ptz-pending 900ms var(--gw-motion-easing, ease) infinite alternate;
-}
-
-@keyframes ptz-pending {
-  to {
-    opacity: 0.55;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  [data-pending] {
-    animation: none;
-    opacity: 0.7;
-  }
-}
-
 /* The setup, opened from the gear: a sheet beside the cameras, as it holds
-   more than a popover fits, over a light backdrop so the picture stays clear */
+   more than a popover fits, over a light backdrop (live) so the picture
+   stays clear */
 .ptz-panel {
   --gw-sheet-width: 22rem;
-  --gw-sheet-backdrop: rgb(0 0 0 / 15%);
-}
-
-/* The picture settings, by their button; on a phone a bottom sheet over a
-   light backdrop, so the picture being set stays clear */
-.picture-panel {
-  --gw-popover-backdrop: rgb(0 0 0 / 15%);
 }
 
 .picture-note {
@@ -1010,7 +992,7 @@ gw-table gw-sheet {
   display: flex;
   flex-direction: column;
   height: calc(
-    100dvh - var(--fill-top, var(--gw-app-bar-height, 3.5rem)) -
+    100dvh - var(--gw-fill-top, var(--gw-app-bar-height, 3.5rem)) -
       var(--gw-space-4)
   );
   min-height: 28rem;
@@ -1106,9 +1088,15 @@ gw-table gw-sheet {
   }
 }
 
-/* It takes the focus for the keyboard controls, which needs no ring */
+/* It takes the focus for the keyboard controls, with a ring only when Tab
+   brings it there */
 .player-stage:focus {
   outline: none;
+}
+
+.player-stage:focus-visible {
+  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
+  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 /* Filled or zoomed past its tile, a drag moves around the picture */
