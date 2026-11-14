@@ -163,8 +163,14 @@ const outerWidth = (element: Element) => {
   );
 };
 
-/** What a group of controls needs to sit in one line: its showing controls and the gaps between. */
-const lineWidth = (group: Element) => {
+/**
+ * What a group of controls needs to sit in one line, its showing controls
+ * and the gaps between: with every one, and without those marked
+ * `data-optional`, which a tight bar leaves out.
+ */
+const lineWidths = (group: Element | null) => {
+  if (group === null) return { full: 0, tight: 0 };
+
   const shown = [...group.children].filter(
     (child) =>
       child.getBoundingClientRect().width > 0 &&
@@ -173,24 +179,32 @@ const lineWidth = (group: Element) => {
 
   const gap = Number.parseFloat(getComputedStyle(group).columnGap) || 0;
 
-  return (
-    shown.reduce((sum, child) => sum + outerWidth(child), 0) +
-    gap * Math.max(shown.length - 1, 0)
-  );
+  const width = (children: ReadonlyArray<Element>) =>
+    children.reduce((sum, child) => sum + outerWidth(child), 0) +
+    gap * Math.max(children.length - 1, 0);
+
+  return {
+    full: width(shown),
+    tight: width(shown.filter((child) => !child.hasAttribute("data-optional"))),
+  };
 };
 
 /**
- * Lays a player's control bar out in the most room it has, never letting
- * its controls wrap unevenly: in one row, with the transport in the middle
- * and the start and end either side; or in two, the transport over the start
- * and end; or else as on a phone. It's measured laid out in a row, as the
- * controls differ by page and by what the cameras can do, and again as the
- * bar or its controls change size.
+ * Lays a player's control bar out in the fewest rows its controls fit,
+ * never letting them wrap unevenly: in one row, the transport between the
+ * start and end, in the middle where the sides leave it room; else in two,
+ * the transport over the start and end; else as on a phone. Before taking
+ * another row it tries the bar tight, without the controls marked
+ * `data-optional`, such as Live's volume, which the device's own buttons
+ * stand in for. It's measured laid out in a row, as the controls differ by
+ * page and by what the cameras can do, and again as the bar or its
+ * controls change size.
  */
 export const compactWhenCrowded = (bar: HTMLElement) => {
   const fit = () => {
     bar.removeAttribute("data-compact");
     bar.removeAttribute("data-split");
+    bar.removeAttribute("data-tight");
 
     // A hidden page has nothing to measure
     if (bar.clientWidth === 0) return;
@@ -199,11 +213,7 @@ export const compactWhenCrowded = (bar: HTMLElement) => {
       "controls-start",
       "controls-transport",
       "controls-end",
-    ].map((name) => {
-      const group = bar.querySelector(`:scope > .${name}`);
-
-      return group === null ? 0 : lineWidth(group);
-    });
+    ].map((name) => lineWidths(bar.querySelector(`:scope > .${name}`)));
 
     const style = getComputedStyle(bar);
     const gap = Number.parseFloat(style.columnGap) || 0;
@@ -212,15 +222,36 @@ export const compactWhenCrowded = (bar: HTMLElement) => {
       Number.parseFloat(style.paddingLeft) +
       Number.parseFloat(style.paddingRight);
 
-    const sides = Math.max(start ?? 0, end ?? 0);
     const room = bar.clientWidth - padding;
-    const oneRow = 2 * sides + (transport ?? 0) + 2 * gap <= room;
 
-    const twoRows =
-      (start ?? 0) + (end ?? 0) + gap <= room && (transport ?? 0) <= room;
+    const fits = (size: "full" | "tight") => {
+      const [left = 0, middle = 0, right = 0] = [start, transport, end].map(
+        (group) => group?.[size] ?? 0,
+      );
 
-    bar.toggleAttribute("data-split", !oneRow && twoRows);
-    bar.toggleAttribute("data-compact", !oneRow && !twoRows);
+      return {
+        oneRow: left + middle + right + 2 * gap <= room,
+        twoRows: left + right + gap <= room && middle <= room,
+      };
+    };
+
+    const full = fits("full");
+    const tight = fits("tight");
+
+    // The fewest rows first, then every control where the rows are equal
+    const [split, compact, tightened] = full.oneRow
+      ? [false, false, false]
+      : tight.oneRow
+        ? [false, false, true]
+        : full.twoRows
+          ? [true, false, false]
+          : tight.twoRows
+            ? [true, false, true]
+            : [false, true, false];
+
+    bar.toggleAttribute("data-split", split);
+    bar.toggleAttribute("data-compact", compact);
+    bar.toggleAttribute("data-tight", tightened);
   };
 
   const observer = new ResizeObserver(fit);

@@ -144,8 +144,11 @@
                   hidden
                 ></span>
                 <gw-button class="live-sound" label="Unmute" hidden></gw-button>
+                <!-- Optional: a tight bar leaves it to the device's own
+                     volume rather than take another row -->
                 <gw-range
                   class="live-volume"
+                  data-optional
                   label="Volume"
                   label-hidden
                   unit="%"
@@ -196,9 +199,11 @@
                   hidden
                 ></gw-button>
                 <gw-button class="live-capture" label="Capture"></gw-button>
+                <!-- Optional, as ? opens it too -->
                 <gw-button
                   class="live-help"
                   label="Keyboard controls"
+                  data-optional
                 ></gw-button>
                 <gw-button
                   class="live-fullscreen"
@@ -312,13 +317,13 @@
                 <!-- As System Bridge's media controls: the speed first, the
                      transport in the middle, the rest at the end -->
                 <gw-row class="controls-start">
-                  <!-- In place, as the theme picker's modes are, with Custom
-                       last for any other speed, typed in its popover -->
-                  <gw-segmented
+                  <!-- The speed, as Live's Layout menu shows its count, with
+                       Custom last for any other speed, typed in its popover -->
+                  <gw-menu-button
                     class="control-speed"
-                    label="Speed"
-                    value="1"
-                  ></gw-segmented>
+                    heading="Speed"
+                    appearance="plain"
+                  ></gw-menu-button>
                   <gw-popover class="speed-custom" heading="Custom speed">
                     <gw-input
                       class="control-speed-other"
@@ -413,21 +418,16 @@
                     appearance="plain"
                     hidden
                   ></gw-menu-button>
+                  <!-- Optional, as ? opens it too -->
                   <gw-button
                     class="control-help"
                     label="Keyboard controls"
+                    data-optional
                   ></gw-button>
                   <gw-button
                     class="control-fullscreen"
                     label="Full screen"
                   ></gw-button>
-                  <!-- On a phone, the controls it leaves out of the bar -->
-                  <gw-menu-button
-                    class="control-more"
-                    label="More controls"
-                    labels="hide"
-                    appearance="plain"
-                  ></gw-menu-button>
                   <!-- The keys, opened from the help button -->
                   <gw-popover class="shortcuts" heading="Keyboard controls">
                     <dl class="shortcut-list">

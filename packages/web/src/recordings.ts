@@ -30,9 +30,9 @@ import {
   phCaretRight,
   phCornersIn,
   phCornersOut,
-  phDotsThreeVertical,
   phDownloadSimple,
   phFunnelSimple,
+  phGauge,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phQuestion,
@@ -104,10 +104,10 @@ const icons = {
   exitFullscreen: phCornersIn,
 };
 
-/** The speeds on the toggle; any other is typed in from its Custom option. */
+/** The speeds in the Speed menu; any other is typed in from its Custom item. */
 const speeds = ["0.5", "1", "2", "4", "8", "16", "24", "32"];
 
-/** The toggle's last option, which opens a field for any other speed. */
+/** The menu's last item, which opens a field for any other speed. */
 const customSpeed = "custom";
 
 const slowest = 0.1;
@@ -278,7 +278,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const nextButton = find("gw-button", "control-next");
   const nextEventButton = find("gw-button", "control-next-event");
   const eventsButton = find("gw-button", "control-events");
-  const speedToggle = find("gw-segmented", "control-speed");
+  const speedMenu = find("gw-menu-button", "control-speed");
   const speedCustom = find("gw-popover", "speed-custom");
   const speedOther = find("gw-input", "control-speed-other");
   const cutButton = find("gw-button", "control-cut");
@@ -290,7 +290,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const fitToggle = find("gw-segmented", "control-fit");
   const fullscreenButton = find("gw-button", "control-fullscreen");
   const helpButton = find("gw-button", "control-help");
-  const moreMenu = find("gw-menu-button", "control-more");
   const viewMenu = find("gw-menu-button", "control-view");
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
@@ -335,9 +334,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   /** The stream and speed-up playing, which the caption names. */
   let shownView = fullView;
-
-  /** What the toggle's Custom option says now, so it's only remade when that changes. */
-  let shownCustomLabel: string | undefined;
 
   /** All of them together, earliest first, for the table and the timeline's clicks. */
   let recordings: ReadonlyArray<Recording> = [];
@@ -569,65 +565,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     field?.addEventListener("input", showClip);
   }
 
-  /**
-   * On a phone, the controls left out of the bar, in the More menu, as they
-   * stand: Cut's item says which end of the clip a press marks.
-   */
-  const showMore = () => {
-    if (moreMenu === null) return;
-
-    const idle = player?.clip() === undefined;
-
-    moreMenu.items = [
-      {
-        value: "next-event",
-        label: "Next event",
-        icon: icons.nextEvent,
-        disabled: spans.length === 0,
-      },
-      {
-        value: "events",
-        label: "Events only",
-        icon: icons.eventsOnly,
-        checked: eventsOnly,
-      },
-      { value: "stop", label: "Stop", icon: icons.stop, disabled: idle },
-      {
-        value: "frame",
-        label: "Next frame",
-        icon: icons.frame,
-        disabled: idle,
-      },
-      {
-        value: "cut",
-        label: cutButton?.pressed === true ? "End the clip here" : "Cut a clip",
-        icon: icons.cut,
-        disabled: idle,
-      },
-      {
-        value: "download",
-        label: "Download this recording",
-        icon: icons.download,
-        disabled: idle,
-      },
-    ];
-  };
-
-  moreMenu?.setAttribute("icon", phDotsThreeVertical);
-
-  if (moreMenu !== null) {
-    on(moreMenu, "select", (event) => {
-      const href = downloadButton?.getAttribute("href");
-
-      if (event.detail.value === "stop") stopButton?.click();
-      else if (event.detail.value === "frame") frameButton?.click();
-      else if (event.detail.value === "next-event") nextEventButton?.click();
-      else if (event.detail.value === "events") eventsButton?.click();
-      else if (event.detail.value === "cut") cutButton?.click();
-      else if (event.detail.value === "download" && href) save(href);
-    });
-  }
-
   cutButton?.addEventListener("click", () => {
     const time = player?.time();
 
@@ -648,7 +585,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     }
 
     cutButton.pressed = !cutButton.pressed;
-    showMore();
   });
 
   // The controls
@@ -733,8 +669,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     }
 
     if (idle && playerClock !== null) playerClock.textContent = "--:--:--";
-
-    showMore();
   };
 
   playClip = (clip, from, autoplay = true) => {
@@ -879,7 +813,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (eventsButton !== null) eventsButton.pressed = on;
 
     followEvents();
-    showMore();
   };
 
   nextEventButton?.addEventListener("click", () => skipEvent(1));
@@ -910,32 +843,26 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     player?.view(view);
     showState();
 
-    // The toggle marks a preset, or Custom, named for the speed, for any
-    // other. The field shows the speed, unless it's being typed in
+    // The menu's trigger shows the speed, and its list ticks a preset, or
+    // Custom, named for any other. The field shows the speed, unless it's
+    // being typed in
     const preset = speeds.includes(speed);
-    const customLabel = preset ? "Custom" : speedLabel(speed);
 
-    if (speedToggle !== null) {
-      // Not while it's typed in, as new options would take the popover's
-      // anchor away; it's named once the popover closes
-      if (
-        customLabel !== shownCustomLabel &&
-        speedOther?.matches(":focus-within") !== true
-      ) {
-        const focused = speedToggle.matches(":focus-within");
-
-        speedToggle.options = [
-          ...speeds.map((value) => ({ value, label: speedLabel(value) })),
-          { value: customSpeed, label: customLabel },
-        ];
-        shownCustomLabel = customLabel;
-
-        if (focused) {
-          void speedToggle.updateComplete.then(() => speedToggle.focus());
-        }
-      }
-
-      speedToggle.value = preset ? speed : customSpeed;
+    if (speedMenu !== null) {
+      speedMenu.label = speedLabel(speed);
+      speedMenu.items = [
+        ...speeds.map((value) => ({
+          value,
+          label: speedLabel(value),
+          checked: value === speed,
+        })),
+        {
+          value: customSpeed,
+          label: preset ? "Custom…" : `Custom (${speedLabel(speed)})…`,
+          checked: !preset,
+          separator: true,
+        },
+      ];
     }
 
     if (speedOther !== null && !speedOther.matches(":focus-within")) {
@@ -949,15 +876,12 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     showSpeed();
   };
 
-  if (speedToggle !== null) {
-    on(speedToggle, "change", () => {
-      if (speedToggle.value !== customSpeed) setSpeed(speedToggle.value);
-    });
-    // Custom opens its field each time it's picked, beside it
-    on(speedToggle, "pick", (event) => {
-      if (event.detail.value === customSpeed) {
-        speedCustom?.show(speedToggle.optionFor(customSpeed));
-      }
+  if (speedMenu !== null) {
+    speedMenu.setAttribute("icon", phGauge);
+    // Custom opens its field, under the menu's trigger
+    on(speedMenu, "select", (event) => {
+      if (event.detail.value === customSpeed) speedCustom?.show(speedMenu);
+      else setSpeed(event.detail.value);
     });
   }
 

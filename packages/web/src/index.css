@@ -855,9 +855,12 @@ gw-table gw-sheet {
   position: relative;
   z-index: 1;
   /* Three parts, as System Bridge's media controls: the start, the
-     transport kept in the middle, and the end */
+     transport in the middle, and the end. Each side keeps its controls on
+     one line and they share what's left, so the transport sits in the
+     middle where the sides leave it room, and beside the wider one where
+     they don't */
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
   gap: var(--gw-space-1) var(--gw-space-3);
   align-items: center;
   padding: var(--gw-space-1) var(--gw-space-2);
@@ -888,6 +891,12 @@ gw-table gw-sheet {
   justify-content: space-between;
 }
 
+/* Tight, the controls the device or a key stands in for give up their room
+   before the bar takes another row */
+.player-controls[data-tight] [data-optional] {
+  display: none;
+}
+
 .player-controls[data-split] > .controls-transport {
   grid-column: 1 / -1;
   grid-row: 1;
@@ -896,9 +905,10 @@ gw-table gw-sheet {
 
 /* With less room, both players' controls take the same three rows on seven
    even columns, as on a phone, so each row lines up with the one above: the
-   transport in the middle with full screen at the end, the layouts or speeds
-   across, then the zoom and capture. The groups give their controls straight
-   to the grid, and Recordings' less used ones go in its More menu */
+   transport in the middle with full screen at the end, then Live's pager or
+   Recordings' speed with the rest of its transport, then the zoom and
+   capture. The groups give their controls straight to the grid, and every
+   control keeps a place of its own */
 .player-controls[data-compact] {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--gw-space-2) 0;
@@ -912,18 +922,10 @@ gw-table gw-sheet {
   display: contents;
 }
 
-/* The dividers and the keys' help have no place, the volume is the device's
-   own, and the rest are in the More menu */
+/* The dividers have no place, and the optional controls give theirs up: the
+   volume is the device's own, and a touch screen has no keys to help with */
 .player-controls[data-compact] .controls-divider,
-.player-controls[data-compact] .live-help,
-.player-controls[data-compact] .control-help,
-.player-controls[data-compact] .live-volume,
-.player-controls[data-compact] .control-stop,
-.player-controls[data-compact] .control-frame,
-.player-controls[data-compact] .control-cut,
-.player-controls[data-compact] .control-download,
-.player-controls[data-compact] .control-next-event,
-.player-controls[data-compact] .control-events {
+.player-controls[data-compact] [data-optional] {
   display: none;
 }
 
@@ -969,21 +971,39 @@ gw-table gw-sheet {
   grid-area: 1 / 7;
 }
 
-/* Then Live's pager or Recordings' speeds across, the speeds scrolling in
-   place where they're wider than the bar */
-.player-controls[data-compact] .live-pager,
-.player-controls[data-compact] .control-speed {
+/* Then Live's pager across, or Recordings' speed and the rest of its
+   transport: a frame on, stop, the next event, events only and Cut */
+.player-controls[data-compact] .live-pager {
   grid-area: 2 / 1 / auto / -1;
   max-width: 100%;
 }
 
 .player-controls[data-compact] .control-speed {
-  overflow-x: auto;
-  scrollbar-width: none;
+  grid-area: 2 / 1 / auto / 3;
 }
 
-/* Then the zoom, with camera moves and capture on Live, and capture and More
-   on Recordings */
+.player-controls[data-compact] .control-frame {
+  grid-area: 2 / 3;
+}
+
+.player-controls[data-compact] .control-stop {
+  grid-area: 2 / 4;
+}
+
+.player-controls[data-compact] .control-next-event {
+  grid-area: 2 / 5;
+}
+
+.player-controls[data-compact] .control-events {
+  grid-area: 2 / 6;
+}
+
+.player-controls[data-compact] .control-cut {
+  grid-area: 2 / 7;
+}
+
+/* Then the zoom, with camera moves and capture on Live, and capture and
+   Download on Recordings */
 .player-controls[data-compact] .live-fit,
 .player-controls[data-compact] .control-fit {
   grid-area: 3 / 1 / auto / 3;
@@ -1010,13 +1030,8 @@ gw-table gw-sheet {
 }
 
 .player-controls[data-compact] .live-capture,
-.player-controls[data-compact] .control-more {
+.player-controls[data-compact] .control-download {
   grid-area: 3 / 7;
-}
-
-/* In one row, every control has its own button */
-.player-controls:not([data-compact]) .control-more {
-  display: none;
 }
 
 /* The tab that opens the rows past the first, only on a phone on its side */
@@ -1025,11 +1040,6 @@ gw-table gw-sheet {
 }
 
 @media (width < 40rem) {
-  /* Eight speeds only fit across a phone a little smaller */
-  .control-speed {
-    --gw-segmented-scale: 0.8;
-  }
-
   /* The video at its own shape, with the timeline straight under it, rather
      than stretched to fill the window */
   .playback-view {
@@ -1523,6 +1533,12 @@ kbd {
     .control-speed,
     .live-fit,
     .control-fit,
+    .control-frame,
+    .control-stop,
+    .control-next-event,
+    .control-events,
+    .control-cut,
+    .control-download,
     .live-zoom-out,
     .control-zoom-out,
     .live-zoom-fit,
@@ -1531,8 +1547,7 @@ kbd {
     .control-zoom-in,
     .live-move,
     .control-capture,
-    .live-capture,
-    .control-more
+    .live-capture
   ) {
   display: none;
 }
