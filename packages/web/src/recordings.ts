@@ -1330,7 +1330,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
         playClip(clip);
         stage?.scrollIntoView({ behavior: "smooth", block: "start" });
         // The keys then work the player, not the row's button
-        stage?.focus({ preventScroll: true });
+        stage?.focus({ preventScroll: true, focusVisible: false });
       }),
       ...(ticked.length > 1 ? [{ id: "cameraLabel", header: "Camera" }] : []),
       { id: "begin", header: "Start" },
@@ -1895,7 +1895,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // A click in the player's card hands the focus back to the player, so the
   // keys keep working rather than going to the button clicked. Fields keep
   // it while they're typed in, and the keyboard's own Tab moves it as ever
-  const focusPlayer = () => stage?.focus({ preventScroll: true });
+  // A ring only when Tab brings it there, not when the page does
+  const focusPlayer = () =>
+    stage?.focus({ preventScroll: true, focusVisible: false });
 
   view?.addEventListener("pointerup", (event) => {
     const path = event

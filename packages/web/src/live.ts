@@ -1484,7 +1484,9 @@ export const livePage = (): LivePage => {
     onTiling: setTiling,
     onPage: (next) => {
       goTo(next);
-      requestAnimationFrame(() => stage?.focus({ preventScroll: true }));
+      requestAnimationFrame(() =>
+        stage?.focus({ preventScroll: true, focusVisible: false }),
+      );
     },
     onStep: step,
   });
@@ -1681,7 +1683,9 @@ export const livePage = (): LivePage => {
 
   // A click on a control hands the focus back to the cameras, so the keys
   // keep working; fields and the help keep it
-  const focus = () => stage?.focus({ preventScroll: true });
+  // A ring only when Tab brings it there, not when the page does
+  const focus = () =>
+    stage?.focus({ preventScroll: true, focusVisible: false });
 
   stage?.addEventListener("pointerup", (event) => {
     const path = event
