@@ -57,18 +57,31 @@ export const momentAt = (
   return { shown, driver: driver?.camera };
 };
 
-/** The first moment after `at` that any camera starts a recording, if there's one. */
-export const nextMoment = (tracks: ReadonlyArray<Track>, at: number) => {
+/**
+ * The nearest moment after `at` (`1`) or before it (`-1`) that any camera
+ * starts a recording, if there's one.
+ */
+const nearestMoment = (
+  tracks: ReadonlyArray<Track>,
+  at: number,
+  way: 1 | -1,
+) => {
   const starts = tracks.flatMap((track) =>
     track.recordings.flatMap((recording) => {
       const begin = toSeconds(recording.begin);
 
-      return begin > at ? [begin] : [];
+      return (begin - at) * way > 0 ? [begin] : [];
     }),
   );
 
-  return starts.length === 0 ? undefined : Math.min(...starts);
+  if (starts.length === 0) return undefined;
+
+  return way === 1 ? Math.min(...starts) : Math.max(...starts);
 };
+
+/** The first moment after `at` that any camera starts a recording, if there's one. */
+export const nextMoment = (tracks: ReadonlyArray<Track>, at: number) =>
+  nearestMoment(tracks, at, 1);
 
 /** A stretch of recorder seconds, from `start` up to `end`. */
 export interface Span {
@@ -149,14 +162,5 @@ export const previousSpan = (spans: ReadonlyArray<Span>, at: number) =>
   spans.findLast((span) => span.start < at - 3);
 
 /** The last moment before `at` that any camera started a recording, if there's one. */
-export const previousMoment = (tracks: ReadonlyArray<Track>, at: number) => {
-  const starts = tracks.flatMap((track) =>
-    track.recordings.flatMap((recording) => {
-      const begin = toSeconds(recording.begin);
-
-      return begin < at ? [begin] : [];
-    }),
-  );
-
-  return starts.length === 0 ? undefined : Math.max(...starts);
-};
+export const previousMoment = (tracks: ReadonlyArray<Track>, at: number) =>
+  nearestMoment(tracks, at, -1);
