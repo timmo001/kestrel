@@ -40,7 +40,7 @@ const names = [
   "magnifying-glass-plus",
   "pause",
   "play",
-  "question",
+  "question-mark",
   "scissors",
   "skip-back",
   "skip-forward",
