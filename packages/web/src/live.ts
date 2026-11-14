@@ -350,6 +350,7 @@ export const livePage = (): LivePage => {
   const stage = find("div", "live-stage");
   const grid = find("div", "live-grid");
   const layoutToggle = find("gw-segmented", "live-layout");
+  const layoutMore = find("gw-menu-button", "live-layout-more");
   const viewMenu = find("gw-menu-button", "live-view");
   const previousButton = find("gw-button", "live-previous");
   const playButton = find("gw-button", "live-play");
@@ -786,14 +787,40 @@ export const livePage = (): LivePage => {
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
+    const layouts = layoutsFor(count());
+
+    // Counts up to what a digit key picks sit in the row, with All; the
+    // rest go in a menu beside it, so the row stays short
+    const keyed = layouts.filter(
+      (each) => each === "all" || each <= keyedLayouts,
+    );
+
+    const more = layouts.filter(
+      (each): each is number => each !== "all" && each > keyedLayouts,
+    );
+
     if (layoutToggle !== null) {
       // The last is every camera, so it shows how many that is
-      layoutToggle.options = layoutsFor(count()).map((each) => ({
+      layoutToggle.options = keyed.map((each) => ({
         value: String(each),
         label: each === "all" ? `${count()}/All` : String(each),
         hint: layoutHint(each),
       }));
-      layoutToggle.value = String(layout);
+      layoutToggle.value = keyed.includes(layout) ? String(layout) : "";
+    }
+
+    if (layoutMore !== null) {
+      const isMore = layout !== "all" && layout > keyedLayouts;
+
+      layoutMore.hidden = more.length === 0;
+      layoutMore.label = isMore ? String(layout) : `${keyedLayouts + 1}+`;
+      layoutMore.active = isMore;
+      layoutMore.items = more.map((each) => ({
+        value: String(each),
+        label: String(each),
+        description: layoutHint(each),
+        checked: each === layout,
+      }));
     }
 
     if (viewMenu !== null) {
@@ -1489,6 +1516,10 @@ export const livePage = (): LivePage => {
         layoutToggle.value === "all" ? "all" : Number(layoutToggle.value),
       ),
     );
+  }
+
+  if (layoutMore !== null) {
+    on(layoutMore, "select", (event) => setLayout(Number(event.detail.value)));
   }
 
   if (viewMenu !== null) {
