@@ -490,6 +490,18 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
               playClip(hit, from);
             }
           },
+          // With Events only, a click goes to the nearest event, as only
+          // those play; else to the nearest recording
+          () => {
+            if (!eventsOnly) return undefined;
+
+            const dayStart = toSeconds(`${day}T00:00:00`);
+
+            return spans.map((span) => ({
+              start: span.start - dayStart,
+              end: span.end - dayStart,
+            }));
+          },
         );
 
   const spanOf = (recording: Recording): TimelineSpan => {

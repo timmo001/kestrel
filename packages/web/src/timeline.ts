@@ -55,9 +55,6 @@ const daySeconds = 24 * 60 * 60;
 /** How far a press moves before it's a drag rather than a click, in pixels. */
 const dragAfter = 4;
 
-/** How near a recording a press snaps to it, in pixels. */
-const snapWithin = 12;
-
 /** Seconds of the day as `HH:MM:SS`. */
 export const clockOf = (second: number) =>
   [second / 3600, (second / 60) % 60, second % 60]
@@ -77,10 +74,48 @@ const tickStep = (span: number, fit: number) =>
 const labelsAcross = (width: number) =>
   Math.min(8, Math.max(2, Math.floor(width / tickWidth)));
 
-/** A timeline over `elements`; `onPick` hears the second of the day clicked. */
+/** Where a press lands, in seconds of the day, and what it can snap to. */
+export interface Snap {
+  readonly start: number;
+  readonly end: number;
+}
+
+/**
+ * The second a press at `second` picks among `targets`: in one, that
+ * second; off every one, the nearest point of the nearest one, its start
+ * ahead or its last second behind, however far, so a press needn't be
+ * exact; with none, the second itself.
+ */
+export const snapTo = (second: number, targets: ReadonlyArray<Snap>) =>
+  targets
+    .map((target) => {
+      if (second < target.start) {
+        return { at: target.start, off: target.start - second };
+      }
+
+      if (second >= target.end) {
+        return {
+          at: Math.max(target.start, Math.ceil(target.end) - 1),
+          off: second - target.end,
+        };
+      }
+
+      return { at: second, off: 0 };
+    })
+    .reduce<{ at: number; off: number } | undefined>(
+      (best, one) => (best === undefined || one.off < best.off ? one : best),
+      undefined,
+    )?.at ?? second;
+
+/**
+ * A timeline over `elements`; `onPick` hears the second of the day clicked,
+ * snapped to the nearest of what `targets` gives, such as only the events
+ * with Events only, or else every recording that plays.
+ */
 export const timelineFor = (
   elements: TimelineElements,
   onPick: (second: number) => void,
+  targets?: () => ReadonlyArray<Snap> | undefined,
 ): Timeline => {
   let rows: ReadonlyArray<TimelineRow> = [];
   let span = daySeconds;
@@ -187,42 +222,13 @@ export const timelineFor = (
     return Math.min(Math.floor(start + share * span), daySeconds - 1);
   };
 
-  /**
-   * The second a press at `x` picks: off every recording, the nearest point
-   * of the closest one within reach, as a short clip is a sliver across a day.
-   */
-  const pickAt = (x: number) => {
-    const second = secondAt(x);
-    const width = elements.track.getBoundingClientRect().width;
-    const reach = width === 0 ? 0 : (snapWithin / width) * span;
-
-    const nearest = rows
-      .flatMap((row) => row.spans)
-      .map((recording) => {
-        if (second < recording.start) {
-          return { at: recording.start, off: recording.start - second };
-        }
-
-        // Past a sliver, its start; past a long one, its last second
-        if (second >= recording.end) {
-          return {
-            at:
-              recording.end - recording.start <= reach
-                ? recording.start
-                : Math.max(recording.start, Math.ceil(recording.end) - 1),
-            off: second - recording.end,
-          };
-        }
-
-        return { at: second, off: 0 };
-      })
-      .reduce<{ at: number; off: number } | undefined>(
-        (best, one) => (best === undefined || one.off < best.off ? one : best),
-        undefined,
-      );
-
-    return nearest !== undefined && nearest.off <= reach ? nearest.at : second;
-  };
+  /** The second a press at `x` picks, snapped to the nearest target. */
+  const pickAt = (x: number) =>
+    snapTo(
+      secondAt(x),
+      targets?.() ??
+        rows.flatMap((row) => row.spans.filter((each) => each.muted !== true)),
+    );
 
   let press: { x: number; start: number; dragged: boolean } | undefined;
 
