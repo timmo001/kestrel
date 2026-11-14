@@ -5,7 +5,8 @@
  * Saving sends them all to the server, which keeps them in the sources file
  * and restarts the sources that changed. Secrets never come back from the
  * server: a saved one shows as saved, and stays as it is unless you type a
- * new one.
+ * new one. A source whose cameras can send their clips to Kestrel has a
+ * switch for it, which changes the camera at once rather than on a save.
  */
 import {
   defaultClipHours,
@@ -20,6 +21,7 @@ import {
   type RecordingSettings,
   type SettingField,
   type Settings,
+  type UploadState,
 } from "@timmo001/kestrel-core";
 import { DirtyState, on, type MenuItem } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
@@ -202,6 +204,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   let drafts: Array<Draft> = [];
   let cameras: ReadonlyArray<Camera> = [];
 
+  /** The sources whose cameras can send their clips to Kestrel. */
+  let uploadable = new Set<string>();
+
   /** Each camera's name, by its id. */
   let labels = new Map<string, string>();
 
@@ -350,6 +355,78 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     ];
   };
 
+  /** A switch that points a source's cameras at Kestrel's own receiver, for a saved source whose cameras can send their clips. */
+  const uploadsGroup = (source: Draft) => {
+    if (!source.saved || !uploadable.has(source.id)) return [];
+
+    const send = element("gw-switch");
+    const result = element("gw-alert");
+    const params = { source: source.id };
+
+    const describe = (state: UploadState) => {
+      send.checked = state.on;
+      send.hint = state.on
+        ? state.last === null
+          ? "On. No clips have come yet."
+          : `On. The last clip came ${new Date(state.last).toLocaleString()}.`
+        : "When it sees motion, it sends each clip here as it records it, so a clip only on its card can be played.";
+    };
+
+    send.label = "Send clips to Kestrel";
+    send.disabled = true;
+    send.hint = "Asking the camera…";
+    result.hidden = true;
+
+    void call((api) => api.sources.uploads({ params }))
+      .then((state) => {
+        describe(state);
+        send.disabled = false;
+      })
+      .catch((error) => {
+        send.hint = `Can't ask the camera: ${error instanceof Error ? error.message : String(error)}`;
+      });
+
+    send.addEventListener("change", () => {
+      const on = send.checked;
+
+      send.disabled = true;
+      send.hint = on ? "Setting up the camera and testing it…" : "Stopping it…";
+      result.hidden = true;
+
+      void call((api) => api.sources.sendUploads({ params, payload: { on } }))
+        .then((check) => {
+          result.textContent = check.message;
+          result.setAttribute(
+            "tone",
+            check.tested === false ? "warning" : "success",
+          );
+          result.hidden = false;
+
+          return call((api) => api.sources.uploads({ params }));
+        })
+        .then(describe)
+        .catch((error) => {
+          send.checked = !on;
+          result.textContent =
+            error instanceof Error ? error.message : String(error);
+          result.setAttribute("tone", "danger");
+          result.hidden = false;
+        })
+        .finally(() => {
+          send.disabled = false;
+        });
+    });
+
+    return [
+      group(
+        "Clips",
+        "The camera sends its clips to Kestrel by FTP, and they're kept for the clip hours set under Recording. This changes the camera's FTP settings straight away.",
+        send,
+        result,
+      ),
+    ];
+  };
+
   const sourceCard = (source: Draft, index: number) => {
     const kind = kinds.find((each) => each.kind === source.kind);
     const card = element("gw-expansion");
@@ -440,7 +517,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       card.append(...cameraList(source, kind.cameraFields));
     }
 
-    card.append(...labelInputs(source));
+    card.append(...labelInputs(source), ...uploadsGroup(source));
 
     return card;
   };
@@ -683,6 +760,16 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   const loadCameras = () =>
     call((api) => api.cameras.list()).catch(() => cameras);
 
+  const loadUploadable = () =>
+    call((api) => api.sources.list())
+      .then(
+        (all) =>
+          new Set(
+            all.filter((source) => source.uploads).map((source) => source.id),
+          ),
+      )
+      .catch(() => uploadable);
+
   const save = async () => {
     const found = problems();
 
@@ -702,7 +789,10 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       show(stored);
       say("Saved. The sources you changed are starting again.", "success");
       await options.onSaved();
-      cameras = await loadCameras();
+      [cameras, uploadable] = await Promise.all([
+        loadCameras(),
+        loadUploadable(),
+      ]);
       render();
       dirty.start(payload());
     } catch (error) {
@@ -733,14 +823,16 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
 
   const start = async () => {
     try {
-      const [loadedKinds, settings, known] = await Promise.all([
+      const [loadedKinds, settings, known, sending] = await Promise.all([
         call((api) => api.sources.kinds()),
         call((api) => api.sources.settings()),
         loadCameras(),
+        loadUploadable(),
       ]);
 
       kinds = loadedKinds;
       cameras = known;
+      uploadable = sending;
       show(settings);
 
       if (addMenu !== null) {
