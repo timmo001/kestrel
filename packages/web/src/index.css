@@ -183,8 +183,15 @@ gw-table gw-sheet {
   background: #000;
 }
 
+/* The cameras take the focus for the keys, which only work while they have
+   it. A ring shows when Tab brings it there, not after a click */
 .live-stage:focus {
   outline: none;
+}
+
+.live-stage:focus-visible {
+  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
+  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 .live-stage:fullscreen {
@@ -329,12 +336,21 @@ gw-table gw-sheet {
   cursor: pointer;
   /* Its name measures it, to keep out of a small picture's way */
   container-type: inline-size;
+  /* A change of layout moves it to its new place, by the name Live gives it */
+  view-transition-class: gw-travel;
 }
 
-/* A change of layout moves each camera to its new place, a little quicker
-   than the browser's default, so the cameras are never long in motion */
-::view-transition-group(*) {
-  animation-duration: 250ms;
+/* Each page swaps as a page: along the line between the app bar's pages, in
+   their order, and fading through to one outside it */
+.page {
+  view-transition-name: page;
+  view-transition-class: gw-page;
+}
+
+/* What moves inside a page stays part of it while the page swaps. Live sets
+   its cameras' names inline, so only !important clears them */
+:root:active-view-transition-type(kestrel-page) .page * {
+  view-transition-name: none !important;
 }
 
 /* A press on a camera picks it rather than pressing a button: no flash from
@@ -661,31 +677,14 @@ gw-table gw-sheet {
   color: var(--gw-color-text-primary);
   cursor: default;
   view-transition-name: live-steer-dock;
-}
-
-/* It comes in from the edge it sits on as the cameras make room, and goes
-   back the same way */
-::view-transition-new(live-steer-dock):only-child {
-  animation: 250ms cubic-bezier(0.2, 0, 0, 1) both steer-dock-in;
-}
-
-::view-transition-old(live-steer-dock):only-child {
-  animation: 200ms cubic-bezier(0.3, 0, 1, 1) both steer-dock-in reverse;
-}
-
-@keyframes steer-dock-in {
-  from {
-    translate: 0 100%;
-    opacity: 0;
-  }
+  /* It comes in from the edge it sits on as the cameras make room, and goes
+     back the same way */
+  view-transition-class: gw-from-bottom;
 }
 
 @media (orientation: landscape) {
-  @keyframes steer-dock-in {
-    from {
-      translate: 100% 0;
-      opacity: 0;
-    }
+  .live-steer-dock {
+    view-transition-class: gw-from-end;
   }
 }
 
@@ -1079,9 +1078,15 @@ gw-table gw-sheet {
   }
 }
 
-/* It takes the focus for the keyboard controls, which needs no ring */
+/* It takes the focus for the keyboard controls, with a ring only when Tab
+   brings it there */
 .player-stage:focus {
   outline: none;
+}
+
+.player-stage:focus-visible {
+  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
+  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 /* Filled or zoomed past its tile, a drag moves around the picture */

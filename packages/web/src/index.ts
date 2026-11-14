@@ -34,6 +34,7 @@ import {
   fillWindow,
   on,
   overlayControls,
+  withViewTransition,
   type MenuItem,
 } from "@timmo001/groundwork-ui";
 import { Equal, Schema } from "effect";
@@ -377,10 +378,51 @@ const showPage = (location: Location) => {
 
   currentPage = page;
 
-  for (const section of pages) {
-    if (section instanceof HTMLElement) {
-      section.hidden = section.dataset.page !== page;
+  // After the old page is captured, so it leaves as it was
+  const swap = () => {
+    for (const section of pages) {
+      if (section instanceof HTMLElement) {
+        section.hidden = section.dataset.page !== page;
+      }
     }
+
+    if (left === "live") live.stop();
+
+    if (left === "recordings") recordings.pause();
+
+    if (left === "activity") activity.stop();
+
+    if (page === "activity") activity.start();
+
+    // Arriving at a player, the keyboard controls work straight away
+    if (page === "recordings") requestAnimationFrame(recordings.focus);
+
+    if (page === "live") requestAnimationFrame(live.focus);
+
+    if (page === "live" && cameras !== undefined) void live.show(cameras);
+
+    if (page === "pair") pair.open();
+  };
+
+  // Between the app bar's pages it slides along the line their links take,
+  // and to or from any other it fades through
+  const order = (name: Page | undefined) =>
+    navLinks.findIndex(
+      (link) => link instanceof HTMLElement && link.dataset.page === name,
+    );
+
+  const from = order(left);
+  const to = order(page);
+
+  if (left === undefined) {
+    swap();
+  } else {
+    void withViewTransition(swap, {
+      types:
+        from === -1 || to === -1
+          ? ["kestrel-page"]
+          : ["kestrel-page", to > from ? "gw-forward" : "gw-back"],
+    });
   }
 
   for (const link of navLinks) {
@@ -392,23 +434,6 @@ const showPage = (location: Location) => {
   }
 
   document.title = `${pageTitles[page]} · Kestrel`;
-
-  if (left === "live") live.stop();
-
-  if (left === "recordings") recordings.pause();
-
-  if (left === "activity") activity.stop();
-
-  if (page === "activity") activity.start();
-
-  // Arriving at a player, the keyboard controls work straight away
-  if (page === "recordings") requestAnimationFrame(recordings.focus);
-
-  if (page === "live") requestAnimationFrame(live.focus);
-
-  if (page === "live" && cameras !== undefined) void live.show(cameras);
-
-  if (page === "pair") pair.open();
 
   // A browser being paired gets on with that before it's offered the app
   install.hold(page === "pair");

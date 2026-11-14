@@ -1736,6 +1736,15 @@ export const livePage = (): LivePage => {
       keep(storageKey, { count: streams.length });
 
       paused = false;
+
+      // Arriving, the page's own swap brings the cameras in, and a second
+      // transition would skip it
+      if (tiles.length === 0) {
+        render();
+
+        return;
+      }
+
       // Cameras added or gone slide the rest to their new places
       void withViewTransition(render);
     },
