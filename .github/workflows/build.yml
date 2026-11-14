@@ -1,0 +1,498 @@
+---
+# Builds Kestrel and packages it, one stage at a time. The desktop app builds
+# on Linux (x86_64 and aarch64) and Windows, since Electrobun only builds for
+# the system it runs on, and each Linux build makes the kestrel-nvr archive
+# every Linux package is made from. From that archive come the .deb and .rpm
+# and the container images, each of which runs kestrel serve.
+#
+# On a published release the container images and the Home Assistant app ship
+# as soon as the Linux archives are built, without waiting for the other
+# packages. Once everything is built, the files and their attestation are
+# attached to the release, and the Arch package is made from them.
+name: Build and package application
+
+on:
+  # Every pull request, since the builds are required checks
+  pull_request: {}
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/build.yml
+      - .scripts/**
+      - Dockerfile
+      - home-assistant/**
+      - bun.lock
+      - docs/**
+      - mise.lock
+      - mise.toml
+      - packages/**
+  release:
+    types:
+      - published
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'release' }}
+
+permissions:
+  contents: read
+
+env:
+  # renovate: datasource=github-releases depName=goreleaser/nfpm
+  NFPM_VERSION: "2.49.0"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # The one version the server and every client share, in packages/core,
+  # which the Home Assistant app gives too
+  version:
+    name: Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Check Kestrel's version
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
+          app="$(sed -n 's/^version: //p' home-assistant/app/config.yaml)"
+          if [ "$app" != "$version" ]; then
+            echo "::error::The Home Assistant app's version is $app, but Kestrel's is $version"
+            exit 1
+          fi
+          if [ -n "$TAG" ] && [ "$version" != "$TAG" ]; then
+            echo "::error::Kestrel's version is $version, but the release is $TAG"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build-linux:
+    name: Build (${{ matrix.os }})
+    needs: version
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          # An always-on server is often ARM, such as a Home Assistant box
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the web client
+        run: bun run --filter @timmo001/kestrel-web build
+
+      - name: Build the docs
+        working-directory: docs
+        run: bun run build
+
+      - name: Build
+        working-directory: packages/desktop
+        run: bun run package
+
+      # The kestrel-nvr archive, which every Linux package is made from, and
+      # the Setup, which installs the app itself
+      - name: Make the kestrel-nvr archive
+        run: |
+          mkdir -p "$RUNNER_TEMP/artifacts/kestrel-desktop-Linux-$RUNNER_ARCH"
+          cp packages/desktop/artifacts/* "$RUNNER_TEMP/artifacts/kestrel-desktop-Linux-$RUNNER_ARCH/"
+          packages/desktop/scripts/release-archives.sh "$RUNNER_TEMP/artifacts" "$VERSION" dist
+
+      - name: Upload the kestrel-nvr archive
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kestrel-nvr-linux-${{ matrix.arch }}
+          path: dist/kestrel-nvr-*.tar.gz
+          if-no-files-found: error
+
+      - name: Upload the Setup
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kestrel-setup-linux-${{ matrix.arch }}
+          path: dist/Kestrel-Setup-*.tar.gz
+          if-no-files-found: error
+
+  # Archived on Linux by the release job, which has tar's zstd and zip
+  build-windows:
+    name: Build (windows-latest)
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up mise
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build the web client
+        run: bun run --filter @timmo001/kestrel-web build
+
+      - name: Build the docs
+        working-directory: docs
+        run: bun run build
+
+      - name: Build
+        working-directory: packages/desktop
+        run: bun run package
+
+      - name: Upload the build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kestrel-desktop-Windows-X64
+          path: packages/desktop/artifacts/
+          if-no-files-found: error
+
+  package-linux:
+    name: Package (${{ matrix.os }})
+    needs:
+      - version
+      - build-linux
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # Only nFPM is needed, which mise x installs
+      - name: Set up mise
+        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+        with:
+          install: false
+
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y librsvg2-bin
+
+      - name: Download the kestrel-nvr archive
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: kestrel-nvr-linux-${{ matrix.arch }}
+          path: archive
+
+      - name: Make the .deb and .rpm
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          mise x "nfpm@$NFPM_VERSION" -- .scripts/linux/package.sh \
+            "archive/kestrel-nvr-$VERSION-linux-$ARCH.tar.gz" "$VERSION" "$ARCH" dist
+
+      # As on a box with no desktop: without the recommended packages
+      - name: Install the .deb and run kestrel serve
+        run: |
+          sudo apt-get install -y --no-install-recommends ./dist/kestrel-nvr_*.deb
+          kestrel --version
+          /opt/kestrel-nvr/Resources/app/yt-dlp/yt-dlp --version
+          export KESTREL_CONFIG="$RUNNER_TEMP/config" KESTREL_STATE="$RUNNER_TEMP/state"
+          kestrel serve &
+          server=$!
+          for _ in $(seq 30); do
+            curl -fsS http://127.0.0.1:7380/api/health && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:7380/
+          curl -fsS http://127.0.0.1:7380/api/devices/server
+          kill "$server"
+
+      - name: Upload the packages
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: kestrel-packages-linux-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+
+  # The container images, from the Linux builds' archives: the server, and the
+  # Home Assistant app. Each runs kestrel serve before it's pushed, and only a
+  # release pushes.
+  image-server:
+    name: Container image (server)
+    needs:
+      - version
+      - build-linux
+    permissions:
+      contents: read
+      packages: write
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      image: ghcr.io/timmo001/kestrel
+      version: ${{ github.event_name == 'release' && needs.version.outputs.version || '' }}
+      target: server
+      build-args: VERSION=${{ needs.version.outputs.version }}
+      artifact-pattern: kestrel-nvr-linux-*
+      artifact-context: archive
+      push: ${{ github.event_name == 'release' }}
+      latest: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
+      smoke-test: |-
+        docker run --rm --entrypoint ffmpeg "$IMAGE" -hide_banner -version
+        docker run --rm --entrypoint /opt/kestrel-nvr/lib/kestrel-nvr/Resources/app/yt-dlp/yt-dlp "$IMAGE" --version
+        docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 "$IMAGE"
+        for _ in $(seq 30); do
+          curl -fsS http://127.0.0.1:7390/api/health && break
+          sleep 1
+        done
+        curl -fsS -o /dev/null http://127.0.0.1:7390/
+        # Paired devices only, once it listens on the network
+        [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7390/api/cameras)" = 401 ]
+        docker exec kestrel kestrel --version
+        docker logs kestrel
+        docker rm --force kestrel
+
+  image-app:
+    name: Container image (Home Assistant app)
+    needs:
+      - version
+      - build-linux
+    permissions:
+      contents: read
+      packages: write
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      image: ghcr.io/timmo001/kestrel-app
+      version: ${{ github.event_name == 'release' && needs.version.outputs.version || '' }}
+      target: app
+      build-args: VERSION=${{ needs.version.outputs.version }}
+      artifact-pattern: kestrel-nvr-linux-*
+      artifact-context: archive
+      home-assistant: true
+      push: ${{ github.event_name == 'release' }}
+      latest: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
+      smoke-test: |-
+        docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 "$IMAGE"
+        for _ in $(seq 30); do
+          curl -fsS http://127.0.0.1:7390/api/health && break
+          sleep 1
+        done
+        curl -fsS -o /dev/null http://127.0.0.1:7390/
+        docker exec kestrel kestrel --version
+        docker logs kestrel
+        docker rm --force kestrel
+
+  # The Supervisor shows the app's CHANGELOG.md from the default branch, so
+  # the release notes are copied there. The ruleset blocks GITHUB_TOKEN from
+  # pushing to main, so this pushes with an admin's token, which can bypass it.
+  app-changelog:
+    name: Home Assistant app changelog
+    if: github.event_name == 'release'
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-changelog.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      changelog-path: home-assistant/app/CHANGELOG.md
+    secrets:
+      token: ${{ secrets.RELEASE_COMMIT_TOKEN }}
+
+  # Asks timmo001/home-assistant-apps to copy this release's app folder, now
+  # its image is pushed
+  home-assistant-apps:
+    name: Home Assistant apps repository
+    if: github.event_name == 'release'
+    needs: image-app
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      repository: timmo001/home-assistant-apps
+    secrets:
+      token: ${{ secrets.RELEASE_COMMIT_TOKEN }}
+
+  # The kestrel-nvr archives are what mise, aqua, Arch and the container are
+  # made from; the Setup files install the app themselves
+  release:
+    name: Attach to the release
+    if: github.event_name == 'release'
+    needs:
+      - build-linux
+      - build-windows
+      - package-linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download the Windows build
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: kestrel-desktop-Windows-X64
+          path: artifacts/kestrel-desktop-Windows-X64
+
+      - name: Download the Linux archives, Setups and packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release
+          pattern: kestrel-{nvr,setup,packages}-linux-*
+          merge-multiple: true
+
+      - name: Package the release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          packages/desktop/scripts/release-archives.sh artifacts "$TAG" release
+          for file in \
+            "kestrel-nvr-$TAG-linux-x86_64.tar.gz" \
+            "kestrel-nvr-$TAG-linux-aarch64.tar.gz" \
+            "kestrel-nvr-$TAG-windows-x86_64.zip" \
+            "kestrel-nvr_$TAG-1_amd64.deb" \
+            "kestrel-nvr_$TAG-1_arm64.deb" \
+            "kestrel-nvr-$TAG-1.x86_64.rpm" \
+            "kestrel-nvr-$TAG-1.aarch64.rpm" \
+            "Kestrel-Setup-$TAG-linux-x86_64.tar.gz" \
+            "Kestrel-Setup-$TAG-linux-aarch64.tar.gz" \
+            "Kestrel-Setup-$TAG-windows-x86_64.zip"; do
+            [ -f "release/$file" ] || { echo "::error::$file is missing"; exit 1; }
+          done
+          (cd release && sha256sum -- * > SHA256SUMS)
+
+      # Verify with: gh attestation verify <file> -R timmo001/kestrel
+      - name: Attest and attach to the release
+        uses: timmo001/workflows/.github/actions/publish-release-assets@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+        with:
+          release-tag: ${{ github.event.release.tag_name }}
+          # One file each, as the action needs
+          subject-patterns: |
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-linux-aarch64.tar.gz
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-windows-x86_64.zip
+            release/kestrel-nvr_${{ github.event.release.tag_name }}-1_amd64.deb
+            release/kestrel-nvr_${{ github.event.release.tag_name }}-1_arm64.deb
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-1.x86_64.rpm
+            release/kestrel-nvr-${{ github.event.release.tag_name }}-1.aarch64.rpm
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-linux-x86_64.tar.gz
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-linux-aarch64.tar.gz
+            release/Kestrel-Setup-${{ github.event.release.tag_name }}-windows-x86_64.zip
+            release/SHA256SUMS
+          bundle-path: release/kestrel-nvr-${{ github.event.release.tag_name }}.sigstore.json
+          clobber: "true"
+
+  # The Arch package, from the release's archives: rendered here, then built
+  # into the timmo repository, attached to the release and published to the
+  # AUR. Only released versions are packaged, so there's no -git package.
+  prepare-arch-bin:
+    name: Prepare Arch package (kestrel-nvr-bin)
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ env.RELEASE_VERSION }}
+
+      - name: Render PKGBUILD
+        uses: timmo001/workflows/.github/actions/prepare-arch-bin@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+        with:
+          releaseVersion: ${{ env.RELEASE_VERSION }}
+          packageName: kestrel-nvr
+          pkgbuildTemplate: .scripts/linux/PKGBUILD.bin
+          outputDirectory: ${{ runner.temp }}/arch-bin
+          extraFiles: |-
+            .scripts/linux/kestrel-nvr.desktop
+            .scripts/linux/kestrel-nvr.user.service
+            .scripts/linux/kestrel-nvr.system.service
+            .scripts/linux/kestrel-nvr.sysusers
+            .scripts/linux/kestrel-nvr.install
+            packages/web/src/logo.svg
+
+      # Named by the run alone, so re-running a failed build finds it
+      - name: Upload package files
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: arch-kestrel-nvr-bin-${{ github.run_id }}
+          path: ${{ runner.temp }}/arch-bin
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
+
+  arch-bin:
+    name: Arch package (kestrel-nvr-bin)
+    needs: prepare-arch-bin
+    uses: timmo001/workflows/.github/workflows/build-arch-package.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      package-name: kestrel-nvr-bin
+      package-files-artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
+      pkgbuild-path: PKGBUILD
+    secrets:
+      ARCH_REPO_DISPATCH_TOKEN: ${{ secrets.ARCH_REPO_DISPATCH_TOKEN }}
+
+  attach-arch-bin:
+    name: Attach Arch package (kestrel-nvr-bin)
+    needs: arch-bin
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    uses: timmo001/workflows/.github/workflows/attach-release-arch-package.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      artifact-name: ${{ needs.arch-bin.outputs.artifact-name }}
+      release-tag: ${{ github.event.release.tag_name }}
+      package-name: kestrel-nvr-bin
+
+  aur-bin:
+    name: AUR (kestrel-nvr-bin)
+    needs: prepare-arch-bin
+    permissions:
+      contents: read
+    uses: timmo001/workflows/.github/workflows/publish-aur.yml@13dce11f125107b83ea662167f1091d070dcd359 # 20261114.0
+    with:
+      package-name: kestrel-nvr-bin
+      artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
+      pkgbuild-path: PKGBUILD
+      auxiliary-file-paths: |-
+        kestrel-nvr.desktop
+        kestrel-nvr.user.service
+        kestrel-nvr.system.service
+        kestrel-nvr.sysusers
+        kestrel-nvr.install
+        logo.svg
+    secrets:
+      AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

@@ -1,6 +1,6 @@
 ---
 name: kestrel-release
-description: Release Kestrel and roll it out, from the version bump and release notes to installing the Home Assistant app through the ha-bridge Code Mode tools. Use when a change needs to reach the server, web app, desktop app or CLI, when bumping the version, publishing a release, debugging the Desktop workflow's release jobs, or updating the installed app.
+description: Release Kestrel and roll it out, from the version bump and release notes to installing the Home Assistant app through the ha-bridge Code Mode tools. Use when a change needs to reach the server, web app, desktop app or CLI, when bumping the version, publishing a release, debugging the release jobs in the Build and package application workflow, or updating the installed app.
 license: Apache-2.0
 compatibility: Needs mise, Bun and the gh and ha-bridge Code Mode tools, from the kestrel repository root.
 ---
@@ -18,23 +18,26 @@ Releases are part of this repository's rollout and need no go-ahead.
 
 1. Set the version, with no `v`, in all three places:
    `packages/core/src/Version.ts`, `home-assistant/app/config.yaml` and
-   `pkgver` in `.scripts/linux/PKGBUILD.bin`. The Desktop workflow fails
+   `pkgver` in `.scripts/linux/PKGBUILD.bin`. The build workflow fails
    unless the first two match each other and the tag.
 2. Run `mise run check` and `mise run test`, commit
    `Bump the version to <version>` through `dot git commit` and push.
 3. Write the release notes in full from `git log <last tag>..HEAD`: a short
    opening on what's new, then a section per area and a `## Fixes` section,
    each entry saying what changed for someone running Kestrel. Never ship
-   generated or one-line notes. The Desktop workflow copies them into the
+   generated or one-line notes. The build workflow copies them into the
    Home Assistant app's `CHANGELOG.md`.
 4. Create the release with `gh.release_create`, tag and title the bare
    version, `target` the bump commit's full SHA.
-5. Watch the Desktop run for the release in a background shell with
-   `gh run watch <id> --exit-status`. It builds each platform, attaches the
-   archives, installers and their attestation, publishes the Arch package
-   and the AUR package, pushes the container images, commits the app's
-   changelog and dispatches to timmo001/home-assistant-apps. Check that
-   repository's Update app run succeeded before installing.
+5. Watch the Build and package application run for the release in a
+   background shell with `gh run watch <id> --exit-status`. It builds each
+   platform; from the Linux archives it pushes the container images and
+   dispatches to timmo001/home-assistant-apps straight away, without waiting
+   for the other packages. Once the .deb, .rpm and Windows builds are done
+   it attaches the archives, installers and their attestation, then
+   publishes the Arch package and the AUR package. It also commits the app's
+   changelog. Check timmo001/home-assistant-apps' Update app run succeeded
+   before installing; that can be before the whole run has finished.
 
 ## Install
 

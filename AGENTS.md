@@ -77,8 +77,9 @@ and work that depends on one waits for it.
 
 - `mise run check` runs lint, types and formatting; `mise run test` runs the
   tests. Run both before a push; CI runs them again, with the shared lints,
-  and the Desktop workflow builds the app on Linux and Windows. The hk
-  pre-push hook runs the shared lints and `mise run lint`.
+  and the Build and package application workflow builds the app on Linux
+  and Windows, packages it and runs it from each package and container
+  image. The hk pre-push hook runs the shared lints and `mise run lint`.
 
 ## Rollout
 
