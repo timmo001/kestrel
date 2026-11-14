@@ -205,6 +205,25 @@ const controlButton = (
 const tileButton = (label: string, icon?: string) =>
   controlButton(label, icon, "medium");
 
+/** How many of each button's presses the camera has still to answer. */
+const waiting = new WeakMap<HTMLElement, number>();
+
+/**
+ * Marks a press as waiting on the camera until it answers. Unlike `loading`,
+ * the button still takes another press, such as a second step of zoom.
+ */
+const pending = (button: HTMLElement, answered: Promise<unknown>) => {
+  waiting.set(button, (waiting.get(button) ?? 0) + 1);
+  button.toggleAttribute("data-pending", true);
+
+  void answered.finally(() => {
+    const left = (waiting.get(button) ?? 1) - 1;
+
+    waiting.set(button, left);
+    button.toggleAttribute("data-pending", left > 0);
+  });
+};
+
 /** Wires the controls of a camera that moves on the Live page's tiles. */
 export const steering = (options: SteeringOptions): Steering => {
   const { area } = options;
@@ -495,9 +514,11 @@ export const steering = (options: SteeringOptions): Steering => {
         button.setAttribute("appearance", "filled");
         button.setAttribute("variant", "neutral");
         button.setAttribute("label", `Go to ${preset.name}`);
-        button.addEventListener(
-          "click",
-          () => void send(PtzCommand.cases.Preset.make({ id: preset.id })),
+        button.addEventListener("click", () =>
+          pending(
+            button,
+            send(PtzCommand.cases.Preset.make({ id: preset.id })),
+          ),
         );
 
         return button;
@@ -570,9 +591,8 @@ export const steering = (options: SteeringOptions): Steering => {
     return taken;
   };
 
-  homeButton.addEventListener(
-    "click",
-    () => void send(PtzCommand.cases.Home.make({})),
+  homeButton.addEventListener("click", () =>
+    pending(homeButton, send(PtzCommand.cases.Home.make({}))),
   );
 
   /** A labelled pick of numbers, such as how long before it goes home. */
@@ -683,13 +703,14 @@ export const steering = (options: SteeringOptions): Steering => {
         () => void change(PtzCommand.cases.KeepHome.make({ on: keep.checked })),
       );
       goHome.disabled = !home.set;
-      goHome.addEventListener(
-        "click",
-        () => void send(PtzCommand.cases.Home.make({})),
+      goHome.addEventListener("click", () =>
+        pending(goHome, send(PtzCommand.cases.Home.make({}))),
       );
-      setHere.addEventListener(
-        "click",
-        () => void change(PtzCommand.cases.SetHome.make({})).then(fillPanel),
+      setHere.addEventListener("click", () =>
+        pending(
+          setHere,
+          change(PtzCommand.cases.SetHome.make({})).then(fillPanel),
+        ),
       );
       buttons.setAttribute("gap", "s");
       buttons.append(goHome, setHere);
