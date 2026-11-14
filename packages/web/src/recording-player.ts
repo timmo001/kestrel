@@ -141,6 +141,8 @@ export interface Player {
 export interface PlayerEvents {
   /** Why video stopped coming, such as the recorder dropping the download. */
   readonly onProblem: (message: string) => void;
+  /** The server answered a load with video, so any earlier problem is past. */
+  readonly onLoad: () => void;
   /** A clip played to its end. */
   readonly onEnded: (clip: Clip) => void;
 }
@@ -268,6 +270,8 @@ export const playerFor = (
       if (!response.ok || response.body === null) {
         throw new Error(`The server answered ${response.status}`);
       }
+
+      events.onLoad();
 
       const reader = response.body.getReader();
       let target: SourceBuffer | undefined;

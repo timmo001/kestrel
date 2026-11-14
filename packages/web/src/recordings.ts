@@ -317,9 +317,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (problem !== null) problem.hidden = true;
   };
 
-  const showProblem = (message: string) =>
-    showNote(`Video stopped: ${message}`);
-
   /** Set below: loads a recording from `from` seconds in, playing unless told not to. */
   let playClip: (clip: Clip, from?: number, autoplay?: boolean) => void = () =>
     undefined;
@@ -333,12 +330,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   let pickCamera: (picked: CameraId) => void = () => undefined;
 
   // A player per camera on one clock; it runs on into the next recording,
-  // as the recorder's client does
+  // as the recorder's client does. Each tile shows its own problems
   const player =
     grid === null
       ? undefined
       : playerGroup(grid, {
-          onProblem: showProblem,
           onTime: () => showTime(),
           onState: () => showState(),
           onPick: (picked) => pickCamera(picked),

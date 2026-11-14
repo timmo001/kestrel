@@ -429,11 +429,17 @@ gw-table gw-sheet {
 }
 
 /* Why the camera can't be seen, over its tile in place of the shimmer */
-.live-tile[data-problem] {
+.live-tile[data-problem],
+.player-tile[data-problem] {
   animation: none;
 }
 
-.live-problem {
+.player-tile:not([data-problem]) > .player-tile-problem {
+  display: none;
+}
+
+.live-problem,
+.player-tile-problem {
   position: absolute;
   inset: 0;
   display: grid;

@@ -7,7 +7,8 @@
  * else the first that did. The others are put back on its time when they
  * drift. With nothing recorded on any of them, it runs on to the next
  * recording on any. Between clips, a tile holds its last frame and fades it
- * out over the next. It answers what the page asks of one player, so the page
+ * out over the next. Why a camera's video stopped shows over its own tile.
+ * It answers what the page asks of one player, so the page
  * drives one camera or several the same way.
  */
 import type { CameraId } from "@timmo001/kestrel-core";
@@ -38,8 +39,6 @@ interface Tile extends GroupTile {
 }
 
 export interface GroupEvents {
-  /** Why video stopped coming, with the camera when several play. */
-  readonly onProblem: (message: string) => void;
   /** The time moved on. */
   readonly onTime: () => void;
   /** It played, paused or stopped, or another camera keeps the time. */
@@ -234,13 +233,35 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     video.playbackRate = playbackRate;
     hold.className = "player-hold";
     hold.ariaHidden = "true";
+    // Why video stopped coming, over the tile's picture, until it loads a
+    // clip again or the server answers with video
+    const problem = element("div");
+
+    problem.className = "player-tile-problem";
+    problem.role = "status";
+
+    const showProblem = (message: string | undefined) => {
+      problem.textContent =
+        message === undefined ? "" : `Video stopped: ${message}`;
+      figure.toggleAttribute("data-problem", message !== undefined);
+    };
+
+    for (const type of ["loadstart", "emptied"]) {
+      video.addEventListener(type, () => showProblem(undefined));
+    }
+
     // Each camera prints its own channel on the picture; an empty tile says
     // which it is
-    figure.append(video, hold, element("p", `${label}: nothing recorded`));
+    figure.append(
+      video,
+      hold,
+      element("p", `${label}: nothing recorded`),
+      problem,
+    );
 
     const player = playerFor(video, {
-      onProblem: (message) =>
-        events.onProblem(tiles.size > 1 ? `${label}: ${message}` : message),
+      onProblem: showProblem,
+      onLoad: () => showProblem(undefined),
       // The clock runs on from the end of the recording keeping it; a
       // follower's end only shows its placeholder
       onEnded: (ended) => {
