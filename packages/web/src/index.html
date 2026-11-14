@@ -211,7 +211,7 @@
                 ></gw-button>
                 <!-- The keys, opened from the help button -->
                 <gw-popover class="live-shortcuts" heading="Keyboard controls">
-                  <dl class="shortcut-list">
+                  <dl class="key-list">
                     <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
                     <dd>Pause or play</dd>
                     <dt><kbd>1</kbd> to <kbd>9</kbd></dt>
@@ -430,7 +430,7 @@
                   ></gw-button>
                   <!-- The keys, opened from the help button -->
                   <gw-popover class="shortcuts" heading="Keyboard controls">
-                    <dl class="shortcut-list">
+                    <dl class="key-list">
                       <dt><kbd>Space</kbd> or <kbd>K</kbd></dt>
                       <dd>Play or pause</dd>
                       <dt><kbd>←</kbd> <kbd>→</kbd></dt>
@@ -510,31 +510,72 @@
                   <gw-button
                     class="day-previous"
                     label="Previous day"
+                    size="small"
                   ></gw-button>
                   <!-- Days with recordings stand out; the rest can't be picked -->
                   <gw-date-picker
                     class="day"
                     label="Day"
                     label-hidden
+                    size="small"
                     unmarked="disabled"
                   ></gw-date-picker>
-                  <gw-button class="day-next" label="Next day"></gw-button>
+                  <gw-button
+                    class="day-next"
+                    label="Next day"
+                    size="small"
+                  ></gw-button>
                 </gw-row>
-                <gw-row class="timeline-legend" aria-hidden="true">
-                  <span data-tone="neutral">Normal</span>
-                  <span data-tone="warning">Motion or alarm</span>
-                  <span data-tone="important">PIR</span>
-                  <span data-tone="info">Manual</span>
-                  <span class="timeline-legend-camera" data-muted hidden
-                    >Only on the camera</span
-                  >
+                <!-- How much of the day the timeline shows, and what its
+                     colours mean, from a button rather than always there -->
+                <gw-row class="timeline-tools">
+                  <gw-segmented
+                    class="timeline-zoom"
+                    label="Timeline zoom"
+                    size="small"
+                    value="86400"
+                  ></gw-segmented>
+                  <gw-button
+                    class="timeline-key-button"
+                    label="What the colours mean"
+                  ></gw-button>
+                  <gw-popover class="timeline-key" heading="The timeline">
+                    <p class="key-intro">
+                      Each bar is a recording, coloured by why it was made. A
+                      click or tap plays from there.
+                    </p>
+                    <dl class="key-list timeline-legend">
+                      <div>
+                        <dt><span data-tone="neutral">Normal</span></dt>
+                        <dd>Recorded all the time, on a schedule</dd>
+                      </div>
+                      <div>
+                        <dt>
+                          <span data-tone="warning">Motion or alarm</span>
+                        </dt>
+                        <dd>
+                          The camera saw movement, or an alarm input was
+                          triggered
+                        </dd>
+                      </div>
+                      <div>
+                        <dt><span data-tone="important">PIR</span></dt>
+                        <dd>The camera's heat sensor saw a person or animal</dd>
+                      </div>
+                      <div>
+                        <dt><span data-tone="info">Manual</span></dt>
+                        <dd>Someone started it by hand</dd>
+                      </div>
+                      <div class="timeline-legend-camera" hidden>
+                        <dt><span data-muted>Only on the camera</span></dt>
+                        <dd>
+                          Listed by its source, which can't hand it over, so it
+                          can't be played here
+                        </dd>
+                      </div>
+                    </dl>
+                  </gw-popover>
                 </gw-row>
-                <gw-segmented
-                  class="timeline-zoom"
-                  label="Timeline zoom"
-                  size="small"
-                  value="86400"
-                ></gw-segmented>
               </gw-row>
             </div>
           </div>

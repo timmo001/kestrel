@@ -427,7 +427,13 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const timelineTicks = find("div", "timeline-ticks");
   const idleText = find("p", "player-idle");
   const pickText = idleText?.textContent.trim() ?? "";
-  const cameraOnlyKey = find("span", "timeline-legend-camera");
+  const cameraOnlyKey = find("div", "timeline-legend-camera");
+  const keyButton = find("gw-button", "timeline-key-button");
+
+  // What the timeline's colours mean, from the ? beside its zoom
+  controlIcon(keyButton, phQuestion);
+  keyButton?.setAttribute("size", "small");
+  helpToggle(find("gw-popover", "timeline-key"), keyButton);
 
   const timeline =
     timelineTrack === null ||
@@ -611,8 +617,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   setIcon(fullscreenButton, icons.fullscreen);
   setIcon(previousDay, phCaretLeft, "Previous day");
   setIcon(nextDay, phCaretRight, "Next day");
-  previousDay?.setAttribute("appearance", "outlined");
-  nextDay?.setAttribute("appearance", "outlined");
+  // Plain on the day picker's own track, small to sit inside it
+  previousDay?.setAttribute("size", "small");
+  nextDay?.setAttribute("size", "small");
 
   /** Shows what's playing, or the idle screen, on the controls. */
   showState = () => {

@@ -704,9 +704,31 @@ gw-table gw-sheet {
   align-items: end;
 }
 
+/* The day as one pill, the arrows and the date on the same track as the
+   timeline's zoom beside it, with no outline of their own */
 .day-picker {
-  gap: var(--gw-space-1);
+  flex-wrap: nowrap;
+  gap: 2px;
   align-items: center;
+  background: var(--gw-color-surface-lower);
+  border: max(var(--gw-border-width), 1px) solid var(--gw-color-border-normal);
+  border-radius: var(--gw-radius-pill);
+}
+
+/* Lines either side of the date part it from the arrows */
+.day-picker gw-date-picker {
+  padding-inline: 2px;
+  border-inline: 1px solid var(--gw-color-border-quiet);
+}
+
+.day-picker .gw-date-picker-trigger {
+  background: transparent;
+  border-color: transparent;
+  border-radius: var(--gw-radius-pill);
+}
+
+.day-picker .gw-date-picker-trigger:hover {
+  background: var(--gw-color-fill-neutral-hovered);
 }
 
 /* The top of the Recordings page fills the window under the app bar: the
@@ -1163,13 +1185,15 @@ gw-table gw-sheet {
   white-space: nowrap;
 }
 
-/* The keyboard controls, key beside what it does */
+/* The keyboard controls and the timeline's colours, each key beside what it
+   means. A group of one key and its meaning can be shown or hidden whole */
 .shortcuts,
-.live-shortcuts {
+.live-shortcuts,
+.timeline-key {
   --gw-popover-width: 24rem;
 }
 
-.shortcut-list {
+.key-list {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--gw-space-2) var(--gw-space-4);
@@ -1177,12 +1201,21 @@ gw-table gw-sheet {
   margin: 0;
 }
 
-.shortcut-list dt {
+.key-list > div {
+  display: contents;
+}
+
+.key-list dt {
   white-space: nowrap;
 }
 
-.shortcut-list dd {
+.key-list dd {
   margin: 0;
+  color: var(--gw-color-text-secondary);
+}
+
+.key-intro {
+  margin: 0 0 var(--gw-space-3);
   color: var(--gw-color-text-secondary);
 }
 
@@ -1439,17 +1472,18 @@ kbd {
   translate: -100% 0;
 }
 
+/* The day at the start and the zoom with the colours' key at the end, on
+   one line wherever they fit */
 .timeline-foot {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
 }
 
-.timeline-legend {
-  flex-wrap: wrap;
-  gap: var(--gw-space-3);
-  color: var(--gw-color-text-secondary);
-  font-size: 0.8125rem;
+.timeline-tools {
+  flex-wrap: nowrap;
+  gap: var(--gw-space-1);
+  align-items: center;
 }
 
 .timeline-legend span {
