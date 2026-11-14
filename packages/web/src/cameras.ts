@@ -47,6 +47,14 @@ export const loadCameras = async () => {
 };
 
 /**
+ * The cameras whose recordings and events the pages offer: those with
+ * recordings that are on. One you've turned off still has its recordings on
+ * the server, but stays out of the pages' pickers.
+ */
+export const recordedCameras = (cameras: ReadonlyArray<Camera>) =>
+  cameras.filter((camera) => camera.recordings && camera.enabled);
+
+/**
  * A camera's own short name: its source's name for it, such as "Garden",
  * with a recorder's generic "Channel 3" shortened to "Ch 3".
  */

@@ -35,7 +35,12 @@ import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
 import { aboutPanel } from "./about.ts";
 import { call, onMismatched, onUnpaired } from "./api.ts";
-import { forgetCameras, keptCameras, loadCameras } from "./cameras.ts";
+import {
+  forgetCameras,
+  keptCameras,
+  loadCameras,
+  recordedCameras,
+} from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
 import { homeAssistantSidebar } from "./home-assistant.ts";
@@ -216,10 +221,7 @@ const reloadCameras = async () => {
   const known = await loadCameras().catch(() => cameras ?? []);
 
   cameras = known;
-  recordings.start(
-    today,
-    known.filter((camera) => camera.recordings),
-  );
+  recordings.start(today, recordedCameras(known));
 
   const list = await showConnection();
 
@@ -565,10 +567,7 @@ const watchConnection = (connected: string) => {
 
     if (next !== null && connectedIds(next) !== connected) {
       await reloadCameras();
-      await events.start(
-        (cameras ?? []).filter((camera) => camera.recordings),
-        today,
-      );
+      await events.start(recordedCameras(cameras ?? []), today);
 
       return watchConnection(connectedIds(next));
     }
@@ -595,7 +594,7 @@ const start = async () => {
   // The cameras first, so every page labels them, such as "Ch 3", and a
   // source's problem can go over its cameras
   const known = await loadCameras();
-  const recorded = known.filter((camera) => camera.recordings);
+  const recorded = recordedCameras(known);
 
   cameras = known;
 
