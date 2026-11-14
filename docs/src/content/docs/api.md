@@ -253,7 +253,8 @@ now, as `GET` on the same route does: `hue`, `brightness`, `contrast`,
   with `reset`.
 
 A change takes effect on the live picture at once and stays, as one made on
-the recorder itself would.
+the camera or recorder itself would. Raysharp recorders and Reolink cameras
+have picture settings, each Reolink camera where it says it has them.
 
 ## Push
 
