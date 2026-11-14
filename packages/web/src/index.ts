@@ -55,7 +55,12 @@ import { livePage } from "./live.ts";
 import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import { compactWhenCrowded, find, overlayControls } from "./shared.ts";
+import {
+  compactWhenCrowded,
+  fillWindow,
+  find,
+  overlayControls,
+} from "./shared.ts";
 import { settingsPage } from "./settings.ts";
 import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
@@ -175,6 +180,9 @@ for (const bar of document.querySelectorAll(".player-controls")) {
     overlayControls(bar);
   }
 }
+
+// Both players fill the window under whatever shows above them
+fillWindow([find("div", "live-stage"), find("div", "playback-view")]);
 
 // Each page is a module of its own
 const live = livePage();

@@ -372,6 +372,37 @@ export const overlayControls = (bar: HTMLElement) => {
   place();
 };
 
+/**
+ * Keeps each element's `--fill-top` at its distance from the top of the
+ * page, which the styles take from the window's height so a player fills it
+ * under whatever's above: the app bar, and banners and alerts that come and
+ * go. It's measured again as the page's height changes, which they change,
+ * and after full screen, where the element sits at the top.
+ */
+export const fillWindow = (elements: ReadonlyArray<HTMLElement | null>) => {
+  const measure = () => {
+    for (const each of elements) {
+      // Hidden, or full screen, it has nowhere of its own to measure
+      if (
+        each === null ||
+        each.getClientRects().length === 0 ||
+        document.fullscreenElement === each
+      ) {
+        continue;
+      }
+
+      each.style.setProperty(
+        "--fill-top",
+        `${each.getBoundingClientRect().top + scrollY}px`,
+      );
+    }
+  };
+
+  new ResizeObserver(measure).observe(document.body);
+  document.addEventListener("fullscreenchange", measure);
+  measure();
+};
+
 /** The first `tag` element with `className`, or null. */
 export const find = <K extends keyof HTMLElementTagNameMap>(
   tag: K,

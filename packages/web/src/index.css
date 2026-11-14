@@ -9,6 +9,13 @@ body {
   margin: 0;
 }
 
+/* Hidden means hidden, whatever display an element's own styles give it,
+   such as Groundwork's fields, which draw in the page rather than a shadow
+   root, so their display beats the browser's own [hidden] rule */
+[hidden] {
+  display: none !important;
+}
+
 .brand {
   display: inline-flex;
   gap: var(--gw-space-2);
@@ -77,7 +84,6 @@ body {
   font: inherit;
 }
 
-.ha-sidebar[hidden],
 gw-app-bar:not([collapsed]) .ha-sidebar {
   display: none;
 }
@@ -89,10 +95,6 @@ gw-app-bar[data-ha-sidebar]:not([collapsed])::part(menu) {
 /* The app bar sits straight above, so only the bottom needs room */
 gw-page {
   padding-block-end: var(--gw-space-5);
-}
-
-.page[hidden] {
-  display: none;
 }
 
 /* Events' two tables each scroll in their own frame, so neither runs the
@@ -156,14 +158,26 @@ gw-table gw-sheet {
   max-width: 32rem;
 }
 
+/* The players fill the window from where they start down to the page's
+   bottom padding: under the app bar, and any banner or alert above them,
+   which the page measures into --fill-top as they come and go. Until it has,
+   they start under the app bar alone */
+.live-stage,
+.playback-view {
+  --fill-height: calc(
+    100dvh - var(--fill-top, var(--gw-app-bar-height, 3.5rem)) -
+      var(--gw-space-5)
+  );
+}
+
 /* The cameras and their controls as one dark panel filling the window under
-   the app bar, as the Recordings player does, at its full size from the
+   what's above it, as the Recordings player does, at its full size from the
    first paint */
 .live-stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  height: calc(100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5));
+  height: var(--fill-height);
   min-height: 20rem;
   overflow: hidden;
   border-radius: var(--gw-radius-md, 8px);
@@ -602,10 +616,6 @@ gw-table gw-sheet {
   background: rgb(0 0 0 / 55%);
 }
 
-.live-steer-pad[hidden] {
-  display: none;
-}
-
 .live-arrow-pad {
   flex: 1;
   display: grid;
@@ -649,10 +659,6 @@ gw-table gw-sheet {
   gap: var(--gw-space-1);
 }
 
-.live-zoom-row[hidden] {
-  display: none;
-}
-
 .live-steer-bar {
   display: flex;
   flex-wrap: wrap;
@@ -684,11 +690,6 @@ gw-table gw-sheet {
   --gw-popover-width: 20rem;
 }
 
-/* A slider's own styles show it even when hidden, as for a camera without hue */
-.picture-panel [hidden] {
-  display: none;
-}
-
 .picture-note {
   margin: 0;
   color: var(--gw-color-text-secondary);
@@ -716,12 +717,9 @@ gw-table gw-sheet {
   display: flex;
   flex-direction: column;
   gap: var(--gw-space-2);
-  /* The app bar and the page's padding above, and the gap to the clip below,
-     which then starts at the window's bottom edge */
-  height: calc(
-    100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5) -
-      var(--gw-space-4)
-  );
+  /* Less the gap to the clip below, which then starts at the window's
+     bottom edge */
+  height: calc(var(--fill-height) - var(--gw-space-4));
   min-height: 28rem;
 }
 
@@ -1231,11 +1229,6 @@ kbd {
   min-width: 9rem;
 }
 
-/* Its own styles show it even when hidden, as with a single page */
-.live-page[hidden] {
-  display: none;
-}
-
 /* Full screen: the picture takes the screen, with the controls and the
    day's timeline under it, and the day and cameras left out */
 .playback-view:fullscreen {
@@ -1395,12 +1388,6 @@ kbd {
   background: var(--gw-color-text-secondary);
 }
 
-.timeline-clip[hidden],
-.timeline-playhead[hidden],
-.timeline-hover[hidden] {
-  display: none;
-}
-
 /* The time under the pointer, above the bar */
 .timeline-hover::after {
   content: attr(data-time);
@@ -1456,10 +1443,6 @@ kbd {
   display: inline-flex;
   gap: var(--gw-space-1);
   align-items: center;
-}
-
-.timeline-legend span[hidden] {
-  display: none;
 }
 
 .timeline-legend span::before {
@@ -1567,7 +1550,7 @@ kbd {
 
   .playback-view:not(:fullscreen) .player-stage {
     flex: none;
-    height: calc(100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5));
+    height: var(--fill-height);
   }
 
   .playback-view .playback-bar {
