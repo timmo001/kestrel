@@ -740,6 +740,7 @@ gw-table gw-sheet {
   display: flex;
   flex-direction: column;
   align-items: center;
+  align-self: stretch;
   gap: var(--gw-space-3);
   max-width: 100%;
 }
@@ -812,12 +813,14 @@ gw-table gw-sheet {
   }
 }
 
-/* The arrows, and the lens zoom under them */
+/* The arrows, and the lens zoom under them as wide as the panel lets it,
+   for fine control */
 .live-steer-pad {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--gw-space-2);
-  width: 12rem;
+  width: min(100%, 24rem);
 }
 
 .live-steer-pad[hidden] {
@@ -831,6 +834,7 @@ gw-table gw-sheet {
     "left . right" 3.5rem
     ". down ." 3.5rem / 1fr 1fr 1fr;
   place-items: center;
+  width: 12rem;
 }
 
 .live-arrow-pad [data-arrow="ArrowUp"] {
@@ -858,10 +862,11 @@ gw-table gw-sheet {
   min-width: 0;
 }
 
-/* − and + either side of the slider */
+/* − and + either side of the slider, across the pad */
 .live-zoom-row {
   display: flex;
   align-items: center;
+  align-self: stretch;
   gap: var(--gw-space-1);
 }
 
