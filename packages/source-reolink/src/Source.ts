@@ -15,7 +15,8 @@
  * a hub's disk, are listed from its `Search` command, one search per
  * request, as some firmware fails a batch. A hub or recorder hands its files
  * over by replaying them on its own protocol; a camera's are listed only, as
- * it cuts a download short and older firmware refuses a replay.
+ * it cuts a download short and older firmware refuses a replay, so a camera
+ * can instead send its clips to Kestrel by FTP as it records them.
  *
  * @module
  */
@@ -46,6 +47,7 @@ import {
   type SourcePtz,
   type SourceRecordings,
   type SourceSettings,
+  type SourceUploads,
   type StillPicture,
   type TrackMethod,
   type Tracking,
@@ -67,6 +69,15 @@ import {
   Stream,
 } from "effect";
 import { deviceReplays, type DeviceFile } from "./Replays.ts";
+import {
+  addressToward,
+  clipStart,
+  DeviceAbility,
+  Ftp,
+  pointedAt,
+  sendsTo,
+  stopped,
+} from "./Uploads.ts";
 
 /** How often each camera's motion and detection state is read. */
 const pollEvery = Duration.seconds(2);
@@ -1716,6 +1727,95 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     }),
   };
 
+  /** This machine's address as the camera reaches it. */
+  const ownAddress = addressToward(base.hostname).pipe(
+    Effect.mapError(() => unavailable("can't be reached from this machine")),
+  );
+
+  /** Sends one setting, failing with why it was refused. */
+  const set = (cmd: string, param: Param) =>
+    call([command(cmd, param)]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, Schema.Unknown)),
+    );
+
+  const uploads: SourceUploads = {
+    sending: Effect.fnUntraced(function* (target) {
+      const saved = yield* call([command("GetFtp", { channel: 0 })]).pipe(
+        Effect.flatMap((list) => valueOf(list, 0, Ftp)),
+      );
+
+      return sendsTo(saved, {
+        host: yield* ownAddress,
+        port: target.port,
+        user: target.user,
+      });
+    }),
+    send: Effect.fnUntraced(function* (target) {
+      if (target === null) {
+        yield* set("SetFtp", stopped);
+
+        return {
+          on: false,
+          tested: null,
+          message: `${name} has stopped sending clips`,
+        };
+      }
+
+      const host = yield* ownAddress;
+
+      const param = pointedAt({
+        host,
+        port: target.port,
+        user: target.user,
+        password: Redacted.value(target.password),
+      });
+
+      yield* set("SetFtp", param);
+
+      // Older firmware answers TestFtp without trying, so it's only asked where it says it can
+      const testable = yield* call([
+        command("GetAbility", { User: { userName: Redacted.value(username) } }),
+      ]).pipe(
+        Effect.flatMap((list) => valueOf(list, 0, DeviceAbility)),
+        Effect.map((value) => (value.Ability.ftpTest?.ver ?? 0) > 0),
+        Effect.orElseSucceed(() => false),
+      );
+
+      if (!testable) {
+        return {
+          on: true,
+          tested: null,
+          message: `${name} sends its clips to Kestrel at ${host} now. It has no test of its own, so its first clip shows it works.`,
+        };
+      }
+
+      const test = (yield* call([command("TestFtp", param)]))[0];
+
+      return test?.code === 0
+        ? {
+            on: true,
+            tested: true,
+            message: `${name} reached Kestrel at ${host}`,
+          }
+        : {
+            on: true,
+            tested: false,
+            message: `${name} couldn't reach Kestrel at ${host}${test?.error?.detail === undefined ? "" : `: ${test.error.detail}`}`,
+          };
+    }),
+    clip: (path) =>
+      opened.pipe(
+        Effect.map((device) => {
+          const begin = clipStart(path);
+          const channel = device.channels[0];
+
+          return begin === null || channel === undefined
+            ? null
+            : { camera: cameraOf(channel), begin };
+        }),
+      ),
+  };
+
   const source: Source = {
     id,
     kind: "reolink",
@@ -1760,6 +1860,10 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     ),
     get recordings(): SourceRecordings {
       return replaying ? { ...listing, video } : listing;
+    },
+    // A hub or recorder hands its files over itself
+    get uploads(): SourceUploads | undefined {
+      return replaying ? undefined : uploads;
     },
     live: opened.pipe(
       Effect.map((device) =>

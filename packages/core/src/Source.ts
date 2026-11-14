@@ -3,7 +3,7 @@
  * connection and what needs you about it, its cameras and where go2rtc
  * reads their live streams, and the capabilities only some sources have,
  * each optional: recordings, events, still pictures, moving and zooming,
- * picture settings and details. Cameras are named by their
+ * picture settings, sending clips to Kestrel and details. Cameras are named by their
  * full id, such as `swann/3`.
  *
  * @module
@@ -29,6 +29,7 @@ import type { CameraId, SourceId } from "./Ids.ts";
 import type { RecordedDay, Recording } from "./Recordings.ts";
 import type { Connection } from "./Sources.ts";
 import type { LocalTime } from "./Times.ts";
+import type { UploadCheck } from "./Uploads.ts";
 
 /** One frame of recorded H.264 or H.265 video. */
 export interface RecordedFrame {
@@ -214,6 +215,41 @@ export interface SourceEvents {
   readonly live: Stream.Stream<CameraEvent>;
 }
 
+/** Kestrel's own FTP receiver, and the login it made for a source. */
+export interface UploadTarget {
+  readonly port: number;
+  readonly user: string;
+  readonly password: Redacted.Redacted;
+}
+
+/** A clip a camera sent, as its source reads its name. */
+export interface UploadedClip {
+  readonly camera: CameraId;
+  readonly begin: LocalTime;
+}
+
+/** Sending clips to Kestrel, for a source with cameras that send them by FTP, such as when they see motion. */
+export interface SourceUploads {
+  /** Whether its cameras send their clips to Kestrel with this login now. */
+  readonly sending: (
+    target: UploadTarget,
+  ) => Effect.Effect<boolean, SourceUnavailable>;
+  /**
+   * Points its cameras at Kestrel, or with `null` stops them sending, and
+   * says how it went, with the camera's own test where it has one.
+   */
+  readonly send: (
+    target: UploadTarget | null,
+  ) => Effect.Effect<UploadCheck, SourceUnavailable>;
+  /**
+   * Which camera a file it sent is from and when it starts, from its path;
+   * `null` for one that isn't a clip, such as a picture or a test file.
+   */
+  readonly clip: (
+    path: string,
+  ) => Effect.Effect<UploadedClip | null, SourceUnavailable>;
+}
+
 export interface Source {
   readonly id: SourceId;
   /** Which kind of source, such as `raysharp`. */
@@ -231,6 +267,7 @@ export interface Source {
   readonly stills?: SourceStills;
   readonly ptz?: SourcePtz;
   readonly picture?: SourcePicture;
+  readonly uploads?: SourceUploads | undefined;
   /** What it shows about itself, such as a recorder's device, disks and channels. */
   readonly details?: Effect.Effect<Details, SourceUnavailable>;
 }

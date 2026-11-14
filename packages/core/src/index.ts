@@ -26,6 +26,8 @@ export * from "./Sources.ts";
 
 export * from "./Times.ts";
 
+export * from "./Uploads.ts";
+
 export * from "./Version.ts";
 
 export type {
@@ -40,5 +42,8 @@ export type {
   SourcePtz,
   SourceRecordings,
   SourceStills,
+  SourceUploads,
   StillPicture,
+  UploadedClip,
+  UploadTarget,
 } from "./Source.ts";
