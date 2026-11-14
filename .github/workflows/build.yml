@@ -48,35 +48,21 @@ defaults:
     shell: bash
 
 jobs:
-  # The one version the server and every client share, in packages/core,
-  # which the Home Assistant app gives too
+  # The one version the server and every client share: a release's tag, or
+  # 0.0.0 as the code keeps it. Each build sets it in packages/core before it
+  # builds, and timmo001/home-assistant-apps sets it in the Home Assistant
+  # app, so a release needs no version bump.
   version:
     name: Version
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          persist-credentials: false
-
-      - name: Check Kestrel's version
+      - name: Get Kestrel's version
         id: version
         env:
           TAG: ${{ github.event.release.tag_name }}
-        run: |
-          version="$(sed -n 's/^export const version = "\(.*\)";$/\1/p' packages/core/src/Version.ts)"
-          app="$(sed -n 's/^version: //p' home-assistant/app/config.yaml)"
-          if [ "$app" != "$version" ]; then
-            echo "::error::The Home Assistant app's version is $app, but Kestrel's is $version"
-            exit 1
-          fi
-          if [ -n "$TAG" ] && [ "$version" != "$TAG" ]; then
-            echo "::error::Kestrel's version is $version, but the release is $TAG"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+        run: echo "version=${TAG:-0.0.0}" >> "$GITHUB_OUTPUT"
 
   build-linux:
     name: Build (${{ matrix.os }})
@@ -96,6 +82,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set the version
+        run: .scripts/set-version.sh "$VERSION"
 
       - name: Set up mise
         uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
@@ -150,9 +139,14 @@ jobs:
     name: Build (windows-latest)
     needs: version
     runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set the version
+        run: .scripts/set-version.sh "$VERSION"
 
       - name: Set up mise
         uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8

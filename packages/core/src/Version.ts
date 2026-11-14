@@ -1,12 +1,13 @@
 /**
  * Kestrel's version, which the server and every client share: a client
  * only works with a server of the same version, so the two never disagree on
- * the API. A release's tag must match it, and only releases are packaged.
+ * the API. The code keeps 0.0.0, and a release's build sets its tag here
+ * with `.scripts/set-version.sh`, so only releases carry a real version.
  *
  * @module
  */
 
-export const version = "0.5.23";
+export const version = "0.0.0";
 
 /** The header a client sends its version in. */
 export const versionHeader = "x-kestrel-version";

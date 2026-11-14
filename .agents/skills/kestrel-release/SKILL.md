@@ -1,6 +1,6 @@
 ---
 name: kestrel-release
-description: Release Kestrel and roll it out, from the version bump and release notes to installing the Home Assistant app through the ha-bridge Code Mode tools. Use when a change needs to reach the server, web app, desktop app or CLI, when bumping the version, publishing a release, debugging the release jobs in the Build and package application workflow, or updating the installed app.
+description: Release Kestrel and roll it out, from the release notes and tag to installing the Home Assistant app through the ha-bridge Code Mode tools. Use when a change needs to reach the server, web app, desktop app or CLI, when picking the next version, publishing a release, debugging the release jobs in the Build and package application workflow, or updating the installed app.
 license: Apache-2.0
 compatibility: Needs mise, Bun and the gh and ha-bridge Code Mode tools, from the kestrel repository root.
 ---
@@ -16,19 +16,21 @@ Releases are part of this repository's rollout and need no go-ahead.
 
 ## Release
 
-1. Set the version, with no `v`, in all three places:
-   `packages/core/src/Version.ts`, `home-assistant/app/config.yaml` and
-   `pkgver` in `.scripts/linux/PKGBUILD.bin`. The build workflow fails
-   unless the first two match each other and the tag.
-2. Run `mise run check` and `mise run test`, commit
-   `Bump the version to <version>` through `dot git commit` and push.
+The release's tag is the version: the code keeps `0.0.0`, the build sets
+the tag in `packages/core/src/Version.ts` before it builds, and
+timmo001/home-assistant-apps sets it in the app's `config.yaml`. Never bump
+the version in code.
+
+1. Pick the next version, with no `v`, from the latest release.
+2. Make sure `main` holds everything for the release and is pushed, with
+   `mise run check` and `mise run test` passing.
 3. Write the release notes in full from `git log <last tag>..HEAD`: a short
    opening on what's new, then a section per area and a `## Fixes` section,
    each entry saying what changed for someone running Kestrel. Never ship
    generated or one-line notes. The build workflow copies them into the
    Home Assistant app's `CHANGELOG.md`.
 4. Create the release with `gh.release_create`, tag and title the bare
-   version, `target` the bump commit's full SHA.
+   version, `target` the full SHA of the commit to release.
 5. Watch the Build and package application run for the release in a
    background shell with `gh run watch <id> --exit-status`. It builds each
    platform; from the Linux archives it pushes the container images and
