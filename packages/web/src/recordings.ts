@@ -36,8 +36,8 @@ import {
   phCornersIn,
   phCornersOut,
   phDownloadSimple,
-  phFunnelSimple,
   phGauge,
+  phLightning,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phQuestionMark,
@@ -105,7 +105,7 @@ const icons = {
   previous: phSkipBack,
   next: phSkipForward,
   nextEvent: phBellRinging,
-  eventsOnly: phFunnelSimple,
+  eventsOnly: phLightning,
   cut: phScissors,
   capture: phCamera,
   download: phDownloadSimple,
@@ -310,19 +310,45 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const timelineZoomOut = find("gw-button", "timeline-zoom-out");
   const timelineZoomIn = find("gw-button", "timeline-zoom-in");
   const timelinePresets = find("gw-menu-button", "timeline-presets");
+  const timelineFoot = find("gw-row", "timeline-foot");
+
+  /** How much of the day the timeline shows. */
+  let timelineSpan = 0;
+
+  /**
+   * The zoom's menu: its presets, and Events only as a checkbox while the
+   * foot is too tight for its own button.
+   */
+  const showZoomMenu = () => {
+    if (timelinePresets === null) return;
+
+    timelinePresets.label = spanLabel(timelineSpan);
+    timelinePresets.items = [
+      ...timelineZooms.map((zoom) => ({
+        value: zoom.value,
+        label: zoom.label,
+        checked: Number(zoom.value) === timelineSpan,
+      })),
+      ...(timelineFoot?.hasAttribute("data-tight") === true
+        ? [
+            {
+              value: "events",
+              label: "Events only",
+              icon: icons.eventsOnly,
+              checkbox: true,
+              checked: eventsOnly,
+              separator: true,
+            },
+          ]
+        : []),
+    ];
+  };
 
   /** The timeline's zoom controls for how much it shows, kept for next time. */
   const showTimelineZoom = (seconds: number) => {
     keep(storageKey, { timelineZoom: seconds });
-
-    if (timelinePresets !== null) {
-      timelinePresets.label = spanLabel(seconds);
-      timelinePresets.items = timelineZooms.map((zoom) => ({
-        value: zoom.value,
-        label: zoom.label,
-        checked: Number(zoom.value) === seconds,
-      }));
-    }
+    timelineSpan = seconds;
+    showZoomMenu();
 
     if (timelineZoomOut !== null)
       timelineZoomOut.disabled = seconds >= daySeconds;
@@ -662,7 +688,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   setIcon(previousButton, icons.previous);
   setIcon(nextButton, icons.next);
   setIcon(nextEventButton, icons.nextEvent);
-  setIcon(eventsButton, icons.eventsOnly);
+  // Labelled, in the timeline's foot, as it changes what the timeline plays
+  eventsButton?.setAttribute("icon", icons.eventsOnly);
   setIcon(cutButton, icons.cut);
   setIcon(captureButton, icons.capture);
   setIcon(downloadButton, icons.download);
@@ -873,6 +900,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     if (eventsButton !== null) eventsButton.pressed = on;
 
+    showZoomMenu();
     followEvents();
   };
 
@@ -1256,6 +1284,36 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     on(timelinePresets, "select", (event) =>
       timeline?.zoom(Number(event.detail.value)),
     );
+    on(timelinePresets, "check", (event) => {
+      if (event.detail.value === "events") setEventsOnly(event.detail.checked);
+    });
+  }
+
+  // Events only gives up its own button to the zoom's menu when the foot
+  // can't hold the day, the toggle and the zoom on one line
+  if (timelineFoot !== null && eventsButton !== null) {
+    const fitFoot = () => {
+      const wasTight = timelineFoot.hasAttribute("data-tight");
+
+      // Measured with the toggle shown: wrapped onto a second line, or
+      // spilling out, it doesn't fit
+      timelineFoot.removeAttribute("data-tight");
+
+      const tops = [...timelineFoot.children].map(
+        (child) => child.getBoundingClientRect().top,
+      );
+
+      const tight =
+        timelineFoot.scrollWidth > timelineFoot.clientWidth + 1 ||
+        Math.max(...tops) - Math.min(...tops) > 4;
+
+      timelineFoot.toggleAttribute("data-tight", tight);
+
+      if (tight !== wasTight) showZoomMenu();
+    };
+
+    new ResizeObserver(fitFoot).observe(timelineFoot);
+    fitFoot();
   }
 
   showTimelineZoom(saved.timelineZoom);
@@ -1813,7 +1871,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     [previousButton, "P", "p"],
     [nextButton, "N", "n"],
     [nextEventButton, "E", "e"],
-    [eventsButton, "O", "o"],
     [cutButton, "C", "c"],
     [captureButton, "S", "s"],
     [zoomOutButton, "−", "-"],

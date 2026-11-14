@@ -34,6 +34,7 @@ const names = [
   "gauge",
   "gear",
   "house",
+  "lightning",
   "plus",
   "trash",
   "magnifying-glass-minus",

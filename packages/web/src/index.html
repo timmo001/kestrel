@@ -283,21 +283,14 @@
         <!-- Recordings: a day and cameras, the player with its controls and
              the day's timeline under it, and the day's recordings -->
         <section class="page" data-page="recordings" hidden>
-          <!-- The heading, the video and the timeline fill the window; the
-               clip and the day's recordings are below it -->
+          <!-- One card filling the window: the video, its controls and the
+               timeline with its day. The clip and the day's recordings are
+               below it -->
           <div class="playback-view">
             <!-- The app bar marks the page, so its name is only for screen
-                 readers; the day is picked on the timeline -->
+                 readers; the day is picked on the timeline, the cameras in
+                 the controls -->
             <h2 class="visually-hidden">Recordings</h2>
-            <div class="playback-bar">
-              <gw-row class="recording-filters">
-                <gw-select
-                  class="camera"
-                  label="Cameras"
-                  inline-label
-                ></gw-select>
-              </gw-row>
-            </div>
             <gw-alert class="player-problem" tone="warning" hidden></gw-alert>
             <!-- The video and its controls, which go full screen with the
                  timeline -->
@@ -312,9 +305,15 @@
                 <span class="player-caption" hidden></span>
               </div>
               <div class="player-controls" role="toolbar" aria-label="Playback">
-                <!-- As System Bridge's media controls: the speed first, the
-                     transport in the middle, the rest at the end -->
+                <!-- As System Bridge's media controls: the cameras and speed
+                     first, as Live's pager starts its bar, the transport in
+                     the middle, the rest at the end -->
                 <gw-row class="controls-start">
+                  <gw-select
+                    class="camera"
+                    label="Cameras"
+                    inline-label
+                  ></gw-select>
                   <!-- The speed, as Live's Layout menu shows its count, with
                        Custom last for any other speed, typed in its popover -->
                   <gw-menu-button
@@ -362,11 +361,6 @@
                   <gw-button
                     class="control-next-event"
                     label="Next event"
-                  ></gw-button>
-                  <gw-button
-                    class="control-events"
-                    label="Events only"
-                    toggle
                   ></gw-button>
                 </gw-row>
                 <gw-row class="controls-end">
@@ -553,6 +547,19 @@
                      or a preset from the menu, which names the span, and what
                      its colours mean, from a button rather than always there -->
                 <gw-row class="timeline-tools">
+                  <!-- What the timeline plays: only the events, skipping
+                       what's between. In the zoom's menu when the foot is
+                       tight -->
+                  <gw-button
+                    class="control-events"
+                    label="Events only"
+                    toggle
+                    size="small"
+                    appearance="plain"
+                    variant="neutral"
+                    >Events only</gw-button
+                  >
+                  <span class="controls-divider" aria-hidden="true"></span>
                   <gw-control-group class="timeline-zoom" label="Timeline zoom">
                     <gw-button
                       class="timeline-zoom-out"

@@ -991,11 +991,6 @@ gw-table gw-sheet {
   display: none;
 }
 
-.recording-filters {
-  flex-wrap: wrap;
-  align-items: end;
-}
-
 /* The zoom's pill parts fit or fill from its steps, which sit together
    without lines between them */
 .zoom-pill > gw-segmented ~ gw-button {
@@ -1006,22 +1001,30 @@ gw-table gw-sheet {
   --gw-control-group-separator: var(--gw-color-border-quiet);
 }
 
-/* The top of the Recordings page fills the window under the app bar: the
-   cameras, the video and its controls, and the timeline with its day. The video
-   takes whatever height is left, so the clip and the table start below the
-   window whatever its size */
+/* The top of the Recordings page is one card filling the window under the
+   app bar: the video, its controls and the timeline with its day. The video
+   takes whatever height is left. Its foot sits the page's gap above the
+   window's bottom edge, so the clip below starts at that edge, out of sight
+   until the page scrolls */
 .playback-view {
   display: flex;
   flex-direction: column;
-  gap: var(--gw-space-2);
-  /* Less the gap to the clip below, which then starts at the window's
-     bottom edge */
-  height: calc(var(--fill-height) - var(--gw-space-4));
+  height: calc(
+    100dvh - var(--fill-top, var(--gw-app-bar-height, 3.5rem)) -
+      var(--gw-space-4)
+  );
   min-height: 28rem;
+  overflow: clip;
+  background: var(--gw-color-surface-raised);
+  border: var(--gw-border-width, 1px) solid var(--gw-color-border-normal);
+  border-radius: var(--gw-radius-panel);
 }
 
-/* The video and its controls as one dark panel, as the recorder's own
-   client draws it */
+.playback-view > .player-problem {
+  margin: var(--gw-space-3) var(--gw-space-3) 0;
+}
+
+/* The video and its controls, dark, as the recorder's own client draws it */
 .player-stage {
   display: grid;
   flex: 1 1 auto;
@@ -1029,7 +1032,6 @@ gw-table gw-sheet {
   grid-template-rows: minmax(0, 1fr) auto;
   min-height: 12rem;
   overflow: hidden;
-  border-radius: var(--gw-radius-md, 8px);
   background: #000;
 }
 
@@ -1286,31 +1288,39 @@ gw-table gw-sheet {
   grid-area: 1 / 7;
 }
 
-/* Then Live's pager across, or Recordings' speed and the rest of its
-   transport: a frame on, stop, the next event and events only */
+/* Then Live's pager across, or Recordings' cameras and speed with the rest
+   of its transport: a frame on and the next event */
 .player-controls[data-compact] .live-pager {
   grid-area: 2 / 1 / auto / -1;
   max-width: 100%;
 }
 
+.player-controls[data-compact] gw-select.camera {
+  grid-area: 2 / 1 / auto / 4;
+  justify-self: start;
+  max-width: 100%;
+}
+
+/* There the cameras' names get the room, its label still read out */
+.player-controls[data-compact] gw-select.camera .gw-select-inline-label {
+  display: none;
+}
+
 .player-controls[data-compact] .control-speed {
-  grid-area: 2 / 1 / auto / 3;
+  grid-area: 2 / 4 / auto / 6;
 }
 
 .player-controls[data-compact] .control-frame {
-  grid-area: 2 / 3;
-}
-
-.player-controls[data-compact] .control-stop {
-  grid-area: 2 / 4;
+  grid-area: 2 / 6;
 }
 
 .player-controls[data-compact] .control-next-event {
-  grid-area: 2 / 5;
+  grid-area: 2 / 7;
 }
 
-.player-controls[data-compact] .control-events {
-  grid-area: 2 / 6;
+/* Stop beside the zoom, the row above being full */
+.player-controls[data-compact] .control-stop {
+  grid-area: 3 / 6;
 }
 
 /* Then the zoom's pill, and More, holding the seldom used, such as Capture */
@@ -1329,23 +1339,10 @@ gw-table gw-sheet {
 }
 
 @media (width < 40rem) {
-  /* The video at its own shape, with the timeline straight under it, rather
-     than stretched to fill the window */
+  /* The card still fills the window, so the clip never peeks in under it;
+     the picture takes the height, where several cameras stack */
   .playback-view {
-    height: auto;
-    min-height: 0;
-  }
-
-  .player-stage {
-    flex: none;
-  }
-
-  .player-screen {
-    aspect-ratio: 16 / 9;
-  }
-
-  .playback-view:fullscreen .player-screen {
-    aspect-ratio: auto;
+    min-height: 24rem;
   }
 }
 
@@ -1377,15 +1374,6 @@ gw-table gw-sheet {
    phone and the page scrolls through them */
 .live-area {
   touch-action: none;
-}
-
-/* The cameras playing, above them */
-.playback-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gw-space-2) var(--gw-space-4);
-  align-items: center;
-  justify-content: space-between;
 }
 
 /* The Sources heading on the Settings page, set apart from the panels above */
@@ -1553,17 +1541,13 @@ kbd {
   width: 8rem;
 }
 
-/* Full screen: the picture takes the screen, with the controls and the
-   day's timeline under it, and the day and cameras left out */
+/* Full screen: the card takes the screen edge to edge, the picture with the
+   controls and the day's timeline under it */
 .playback-view:fullscreen {
   height: 100dvh;
   min-height: 0;
-  padding: var(--gw-space-3);
-  background: var(--gw-color-surface-default);
-}
-
-.playback-view:fullscreen .playback-bar {
-  display: none;
+  border: 0;
+  border-radius: 0;
 }
 
 .playback-view:fullscreen .player-stage {
@@ -1580,6 +1564,7 @@ kbd {
 .timeline {
   display: grid;
   gap: var(--gw-space-1);
+  padding: var(--gw-space-2) var(--gw-space-3) var(--gw-space-3);
 }
 
 /* A track per channel when several play, each at least 1.25rem tall */
@@ -1803,6 +1788,13 @@ kbd {
   align-items: center;
 }
 
+/* Too tight for the day, Events only and the zoom on one line, Events only
+   goes into the zoom's menu */
+.timeline-foot[data-tight] .control-events,
+.timeline-foot[data-tight] .control-events + .controls-divider {
+  display: none;
+}
+
 .timeline-legend span {
   display: inline-flex;
   gap: var(--gw-space-1);
@@ -1942,11 +1934,11 @@ kbd {
   > .player-controls[data-compact]:not([data-expanded])
   :is(
     .live-pager,
+    gw-select.camera,
     .control-speed,
     .control-frame,
     .control-stop,
     .control-next-event,
-    .control-events,
     .zoom-pill,
     .controls-more
   ) {
@@ -1969,13 +1961,5 @@ kbd {
   .playback-view:not(:fullscreen) .player-stage {
     flex: none;
     height: var(--fill-height);
-  }
-
-  .playback-view .playback-bar {
-    order: 1;
-  }
-
-  .playback-view .timeline {
-    order: 2;
   }
 }
