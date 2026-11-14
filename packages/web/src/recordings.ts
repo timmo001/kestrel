@@ -39,6 +39,7 @@ import {
   phScissors,
   phSkipBack,
   phSkipForward,
+  phSquaresFour,
   phStop,
 } from "./icons.ts";
 import { mostCameras, playerGroup, type GroupTile } from "./player-group.ts";
@@ -69,6 +70,7 @@ import {
   typingTargets,
 } from "./shared.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
+import { tilingModes, type TilingMode } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 // Phosphor's regular icons, as Upkeep uses
@@ -186,6 +188,7 @@ const kept = () => {
   const positionCamera = position?.camera ?? position?.channel;
   const date = values?.["date"];
   const speed = values?.["speed"];
+  const tiling = values?.["tiling"];
   const timelineZoom = values?.["timelineZoom"];
 
   return {
@@ -193,6 +196,7 @@ const kept = () => {
     cameras: ticked !== undefined && ticked.length > 0 ? ticked : undefined,
     date: isDate(date) ? date : undefined,
     speed: isText(speed) && isSpeed(Number(speed)) ? speed : "1",
+    smart: tiling !== "fixed",
     timelineZoom:
       isText(timelineZoom) &&
       timelineZooms.some((zoom) => zoom.value === timelineZoom)
@@ -268,6 +272,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const fullscreenButton = find("gw-button", "control-fullscreen");
   const helpButton = find("gw-button", "control-help");
   const moreMenu = find("gw-menu-button", "control-more");
+  const viewMenu = find("gw-menu-button", "control-view");
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
   const clipDownload = find("gw-button", "clip-download");
@@ -284,6 +289,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   let ticked: ReadonlyArray<CameraId> = [];
   /** Whether the picked one shows alone, of several ticked. */
   let alone = false;
+  /** Smart tiling, sized to the space as on Live, or fixed layouts; kept in this browser. */
+  let smart = saved.smart;
   let speed = saved.speed;
 
   /** What the address asked for before the cameras were known. */
@@ -937,6 +944,51 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     showState();
   };
 
+  /** The View menu, as Live's: only with several cameras to tile. */
+  const showView = () => {
+    if (viewMenu === null) return;
+
+    viewMenu.hidden = ticked.length < 2;
+    viewMenu.items = tilingModes.map((each) => ({
+      ...each,
+      group: "Tiling",
+      checked: each.value === (smart ? "smart" : "fixed"),
+    }));
+  };
+
+  const setTiling = (next: TilingMode) => {
+    smart = next === "smart";
+    keep(storageKey, { tiling: next });
+    player?.tile(smart);
+    zoom.show();
+    showView();
+  };
+
+  viewMenu?.setAttribute("icon", phSquaresFour);
+
+  if (viewMenu !== null) {
+    on(viewMenu, "select", (event) => {
+      const chosen = tilingModes.find(
+        (each) => each.value === event.detail.value,
+      );
+
+      if (chosen !== undefined) setTiling(chosen.value);
+    });
+  }
+
+  player?.tile(smart);
+
+  // Smart tiling follows the space the cameras have, as the window's size
+  // changes or they go full screen
+  if (screen !== null) {
+    new ResizeObserver(() => {
+      if (!smart) return;
+
+      player?.tile(smart);
+      zoom.show();
+    }).observe(screen);
+  }
+
   /** Picks the camera `step` along the ticked ones, alone or not. */
   const stepCamera = (step: -1 | 1) => {
     const index = ticked.indexOf(camera);
@@ -1157,6 +1209,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     }
 
     player?.setCameras(tracks, camera);
+    showView();
     timeline?.show(
       lists.map((track) => ({
         label: cameraLabel(track.camera),
@@ -1485,6 +1538,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["Backspace", () => setAlone(false)],
     ["PageUp", () => stepCamera(-1)],
     ["PageDown", () => stepCamera(1)],
+    ["t", () => setTiling(smart ? "fixed" : "smart")],
   ]);
 
   document.addEventListener("keydown", (event) => {
@@ -1592,6 +1646,22 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       if (waiting !== undefined) void follow(waiting);
 
       waiting = undefined;
+
+      // Cameras that went, such as a source's once it's turned off, stop
+      // playing, and the address leaves them out
+      const left = ticked.filter((id) => placeOf(id) !== -1);
+
+      if (left.length < ticked.length && day !== "") {
+        const lead = left.includes(camera) ? camera : (left[0] ?? list[0]?.id);
+
+        if (lead !== undefined) {
+          options.onPick({
+            camera: lead,
+            ...(left.length > 1 && { cameras: left }),
+            date: day,
+          });
+        }
+      }
     },
     open: (search) => {
       if (cameras.length === 0) waiting = search;

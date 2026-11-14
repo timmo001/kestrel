@@ -26,6 +26,7 @@ import {
   type View,
 } from "./recording-player.ts";
 import { element } from "./shared.ts";
+import { applyTiling, clearTiling, tilingFor } from "./tiling.ts";
 
 /** A camera's tile, as the page sees it. */
 export interface GroupTile {
@@ -54,6 +55,11 @@ export interface Group extends Player {
   readonly setCameras: (tracks: ReadonlyArray<Track>, picked: CameraId) => void;
   /** Shows the picked camera alone, or every camera again, on the same clock. */
   readonly solo: (on: boolean) => void;
+  /**
+   * Tiles the cameras smartly, sized to the space they have as on Live, or
+   * in each count's fixed layout; and again as that space changes size.
+   */
+  readonly tile: (smart: boolean) => void;
   /** The video that keeps the time, for a still, a held frame and the frame step. */
   readonly video: () => HTMLVideoElement | undefined;
   /** The picked camera's video. */
@@ -121,6 +127,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   let view: View = fullView;
   /** Whether the picked camera shows alone. */
   let alone = false;
+  /** Whether the tiles are sized to the space, rather than in fixed layouts. */
+  let smart = true;
 
   /** The cameras showing: every one, or the picked one alone. */
   const shownTracks = () =>
@@ -414,8 +422,26 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
    * bandwidth to itself.
    */
   const arrange = () => {
+    const count = alone ? 1 : Math.max(tiles.size, 1);
+    const area = grid.parentElement;
+
+    // Hidden, the space measures nothing, so the last tiling stays until it
+    // shows again
+    const tiled =
+      smart && count > 1 && area !== null
+        ? tilingFor(count, area.clientWidth, area.clientHeight)
+        : undefined;
+
     grid.toggleAttribute("data-alone", alone);
-    grid.dataset.layout = String(alone ? 1 : Math.max(tiles.size, 1));
+
+    if (smart && count > 1) {
+      grid.dataset.layout = "smart";
+
+      if (tiled !== undefined) applyTiling(grid, tiled);
+    } else {
+      grid.dataset.layout = String(count);
+      clearTiling(grid);
+    }
 
     for (const tile of tiles.values()) {
       tile.figure.toggleAttribute("data-picked", tile.camera === picked);
@@ -480,6 +506,10 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       if (at !== undefined) void Promise.all(align(at, false));
 
       events.onState();
+    },
+    tile: (next) => {
+      smart = next;
+      arrange();
     },
     play: async (clip: Clip, from = 0, autoplay = true) => {
       playing = autoplay;

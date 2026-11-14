@@ -953,7 +953,8 @@ gw-table gw-sheet {
     grid-area: 1 / 5;
   }
 
-  .live-view {
+  .live-view,
+  .control-view {
     grid-area: 1 / 6;
   }
 

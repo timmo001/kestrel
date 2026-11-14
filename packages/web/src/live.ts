@@ -53,7 +53,13 @@ import {
   helpToggle,
   typingTargets,
 } from "./shared.ts";
-import { applyTiling, clearTiling, tilingFor } from "./tiling.ts";
+import {
+  applyTiling,
+  clearTiling,
+  tilingFor,
+  tilingModes as tilings,
+  type TilingMode as Tiling,
+} from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 /** go2rtc's player element, as far as the page uses it. */
@@ -128,29 +134,6 @@ const keyedLayouts = 9;
 
 /** A layout: how many cameras at once, or all of them. */
 type Layout = number | "all";
-
-/**
- * How a page's cameras are tiled: sized to the space they have, filling it,
- * or in each count's own fixed shape.
- */
-type Tiling = "smart" | "fixed";
-
-const tilings: ReadonlyArray<{
-  readonly value: Tiling;
-  readonly label: string;
-  readonly description: string;
-}> = [
-  {
-    value: "smart",
-    label: "Smart tiling",
-    description: "Tiles sized to the window, filling as much of it as they can",
-  },
-  {
-    value: "fixed",
-    label: "Fixed layouts",
-    description: "Each count of cameras in its own set shape",
-  },
-];
 
 /**
  * The layouts worth offering for this many cameras: every count from one up

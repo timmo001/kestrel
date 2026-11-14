@@ -6,6 +6,30 @@
  * three.
  */
 
+/**
+ * How a page's cameras are tiled: sized to the space they have, filling it,
+ * or in each count's own fixed shape.
+ */
+export type TilingMode = "smart" | "fixed";
+
+/** The modes, as the pages' View menus offer them. */
+export const tilingModes: ReadonlyArray<{
+  readonly value: TilingMode;
+  readonly label: string;
+  readonly description: string;
+}> = [
+  {
+    value: "smart",
+    label: "Smart tiling",
+    description: "Tiles sized to the window, filling as much of it as they can",
+  },
+  {
+    value: "fixed",
+    label: "Fixed layouts",
+    description: "Each count of cameras in its own set shape",
+  },
+];
+
 /** A layout of tiles, in pixels. */
 export interface Tiling {
   /** Rows across, or columns down. */
