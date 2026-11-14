@@ -6,7 +6,7 @@
  * @module
  */
 
-export const version = "0.5.18";
+export const version = "0.5.19";
 
 /** The header a client sends its version in. */
 export const versionHeader = "x-kestrel-version";
