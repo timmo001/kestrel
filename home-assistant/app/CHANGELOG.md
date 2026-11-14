@@ -1,34 +1,23 @@
-The players work better at every size, from a phone on its side in full screen to a wide desktop: the controls take the fewest rows they fit, the controls over the picture only come back when you ask, and touch screens get gestures.
+This release reworks how you steer a camera that moves, and makes the Live page fit phones better, in portrait, on their side and full screen.
 
 ## Live
 
-- One pager for the cameras: the Layout menu holds how many cameras show at once (every count, and All) and smart or fixed tiling, and beside it, while the layout pages them, Previous and Next either side of the page, which lists each page's cameras.
-- Cameras slide and resize to their new places when the layout, the page or the tiling changes, or cameras are added, where the browser has view transitions and you haven't asked for reduced motion.
-- Picking a camera no longer flashes like a button press: its ring fades in, and a double click doesn't select its name.
-- The bar over the picture stays while paused, as on Recordings.
+- A camera that moves has a **Move** button on its picture. Out of Move mode its picture works like any other camera's: tap to pick, double tap to see it alone, pinch, pan and swipe.
+- Pressing Move brings in the camera's panel, sliding in from below in portrait or from the side in landscape, as the cameras move up to make room. The panel says which camera is moving, with Done beside it, then the arrow pad, the lens zoom, Home, the setup gear and the presets. Done slides it all away again.
+- On a small tile, Move shows the camera alone first, and Done goes back to the others. The button shrinks to its icon on small pictures, so it covers little of them.
+- The bar's own Move button has gone. The M key still starts and ends Move mode.
+- Presets come after Home past a line, in a quieter filled style, and scroll sideways when there are more than fit.
+- The picture now fills the room beside the panel, with no black bands, on desktop and on phones.
+- Full screen on a phone held upright no longer squashes the picture: the panel sits under it, with the page's controls at its foot.
+- Popovers open as sheets from the bottom on phones, in both orientations.
+- On a phone on its side, the controls' handle sits under the cameras rather than over a camera's other view.
 
 ## Recordings
 
-- Speed is one menu showing the speed, such as 1×, with Custom for any other.
-- The day picker is one pill, the arrows and the date together.
-- The timeline's colours are explained behind a ? beside its zoom, rather than taking a line under it.
-- Cameras you've turned off are left out of the camera picker, and out of Events.
-
-## Both players
-
-- The controls take the fewest rows they fit: one row on most desktop windows, two on a tablet, and the phone's three only when needed. The volume slider and seldom used controls (Cut, Capture, Download and Help) step into a ⋮ menu before another row is taken.
-- The zoom is one pill: fit or fill, then a step at a time.
-- Every help button is a plain ?.
-- Over the picture, on a phone on its side or in full screen, the controls only come back from a tap where there's nothing to press, a swipe up, or a handle at the bottom, and a swipe down hides them. A tap on a camera, its own controls or Picture settings does its own thing, rather than only waking the controls.
-- Over the picture, the controls keep clear of a phone's rounded corners.
-- Touch gestures: on Live, a swipe across moves to the next or previous cameras; on Recordings, a swipe across goes on or back 10 seconds and two fingers the next or previous recording. Three fingers up or down open or close the help, which now lists the gestures on a touch screen.
+- A click on the timeline snaps to the nearest recording, or event.
+- The timeline zooms at the pointer, with the day and zoom in one control group.
 
 ## Fixes
 
-- A banner, such as the offer to install, or an alert above the page no longer pushes the players' controls off the bottom of the window.
-- Hidden controls stay hidden, such as the volume slider for cameras without sound.
-- Recordings' middle controls no longer wrap onto a second line when the bar only just fits.
-
-## Docs
-
-- Installing with mise now goes through the aqua registry.
+- Swipes and gestures now come from Groundwork, so they behave the same as in Kestrel's other apps.
+- The version shown now comes from the release itself.
