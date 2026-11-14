@@ -337,14 +337,9 @@
                 <span class="player-caption" hidden></span>
               </div>
               <div class="player-controls" role="toolbar" aria-label="Playback">
-                <!-- As System Bridge's media controls: the frame step and
-                     speed first, the transport in the middle, the rest at the
-                     end -->
+                <!-- As System Bridge's media controls: the speed first, the
+                     transport in the middle, the rest at the end -->
                 <gw-row class="controls-start">
-                  <gw-button
-                    class="control-frame"
-                    label="Next frame"
-                  ></gw-button>
                   <!-- In place, as the theme picker's modes are, with Custom
                        last for any other speed, typed in its popover -->
                   <gw-segmented
@@ -380,6 +375,11 @@
                   <gw-button
                     class="control-next"
                     label="Next recording"
+                  ></gw-button>
+                  <!-- A frame on, beside the rest of the transport -->
+                  <gw-button
+                    class="control-frame"
+                    label="Next frame"
                   ></gw-button>
                   <gw-button class="control-stop" label="Stop"></gw-button>
                   <!-- On to the next motion, PIR or alarm, a little ahead of

@@ -882,20 +882,32 @@ gw-table gw-sheet {
   justify-content: flex-end;
 }
 
-/* Once the controls no longer fit in one row, as on a phone, both players'
-   controls take the same three rows on seven even columns, so each row lines
-   up with the one above: the transport in the middle with full screen at the
-   end, the layouts or speeds across, then the zoom and capture. The groups
-   give their controls straight to the grid, and Recordings' less used ones
-   go in its More menu. The page measures when, as the controls differ by
-   page and by what the cameras can do */
+/* The page measures how the controls fit, as they differ by page and by what
+   the cameras can do, and lays them out in one row, or in two, or as on a
+   phone, never wrapping unevenly. In two, with room for the start and end
+   side by side but not the transport between them, the transport goes first,
+   across, and the start and end under it, at either side */
+.player-controls[data-split] {
+  grid-template-columns: auto auto;
+  justify-content: space-between;
+}
+
+.player-controls[data-split] > .controls-transport {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-content: center;
+}
+
+/* With less room, both players' controls take the same three rows on seven
+   even columns, as on a phone, so each row lines up with the one above: the
+   transport in the middle with full screen at the end, the layouts or speeds
+   across, then the zoom and capture. The groups give their controls straight
+   to the grid, and Recordings' less used ones go in its More menu */
 .player-controls[data-compact] {
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--gw-space-2) 0;
   justify-items: center;
-  /* Wider than a phone, the controls keep a phone's width in the middle of
-     the band, rather than spreading out across it */
-  padding: var(--gw-space-3) max(var(--gw-space-2), calc((100% - 40rem) / 2));
+  padding: var(--gw-space-3) var(--gw-space-2);
 }
 
 .player-controls[data-compact] > .controls-start,

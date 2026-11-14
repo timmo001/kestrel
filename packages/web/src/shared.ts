@@ -151,15 +151,17 @@ const lineWidth = (group: Element) => {
 };
 
 /**
- * Lays a player's control bar out as on a phone once its controls don't fit
- * in one row, rather than letting them wrap unevenly. It's measured laid out
- * in a row, with the transport in the middle and the start and end either
- * side, as the controls differ by page and by what the cameras can do, and
- * again as the bar or its controls change size.
+ * Lays a player's control bar out in the most room it has, never letting
+ * its controls wrap unevenly: in one row, with the transport in the middle
+ * and the start and end either side; or in two, the transport over the start
+ * and end; or else as on a phone. It's measured laid out in a row, as the
+ * controls differ by page and by what the cameras can do, and again as the
+ * bar or its controls change size.
  */
 export const compactWhenCrowded = (bar: HTMLElement) => {
   const fit = () => {
     bar.removeAttribute("data-compact");
+    bar.removeAttribute("data-split");
 
     // A hidden page has nothing to measure
     if (bar.clientWidth === 0) return;
@@ -177,19 +179,26 @@ export const compactWhenCrowded = (bar: HTMLElement) => {
     const style = getComputedStyle(bar);
     const gap = Number.parseFloat(style.columnGap) || 0;
 
-    const needed =
-      2 * Math.max(start ?? 0, end ?? 0) +
-      (transport ?? 0) +
-      2 * gap +
+    const padding =
       Number.parseFloat(style.paddingLeft) +
       Number.parseFloat(style.paddingRight);
 
-    bar.toggleAttribute("data-compact", needed > bar.clientWidth);
+    const sides = Math.max(start ?? 0, end ?? 0);
+    const room = bar.clientWidth - padding;
+    const oneRow = 2 * sides + (transport ?? 0) + 2 * gap <= room;
+
+    const twoRows =
+      (start ?? 0) + (end ?? 0) + gap <= room && (transport ?? 0) <= room;
+
+    bar.toggleAttribute("data-split", !oneRow && twoRows);
+    bar.toggleAttribute("data-compact", !oneRow && !twoRows);
   };
 
   const observer = new ResizeObserver(fit);
 
-  observer.observe(bar);
+  // Its border box: laid out as on a phone, its padding keeps the content
+  // a phone's width, so the content box doesn't change as the bar widens
+  observer.observe(bar, { box: "border-box" });
 
   // A control shown or hidden, such as Recordings' View menu, or a wider
   // label, changes what the row needs
