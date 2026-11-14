@@ -37,7 +37,7 @@ import {
   phPlus,
   phTrash,
 } from "./icons.ts";
-import { element, settingsSheet, showSheet } from "./shared.ts";
+import { element, settingsSheet } from "./shared.ts";
 
 /** How often a drag sends where it's steering, at most. */
 const sendEvery = 200;
@@ -828,7 +828,7 @@ export const steering = (options: SteeringOptions): Steering => {
 
   setupButton.addEventListener("click", () => {
     fillPanel();
-    showSheet(panel);
+    panel.show();
     void refresh().then(fillPanel);
   });
 

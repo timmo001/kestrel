@@ -35,11 +35,8 @@ import {
   phPlay,
   phQuestionMark,
   phSlidersHorizontal,
-  phSpeakerHigh,
-  phSpeakerLow,
-  phSpeakerSlash,
 } from "./icons.ts";
-import { onSwipe } from "@timmo001/groundwork-ui";
+import { on, onSwipe } from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
@@ -323,9 +320,8 @@ export const livePage = (): LivePage => {
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const pictureButton = find("gw-button", "live-picture");
-  const soundButton = find("gw-button", "live-sound");
   const soundDivider = find("span", "live-sound-divider");
-  const volumeRange = find("gw-range", "live-volume");
+  const volume = find("gw-volume", "live-volume");
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");
   const shortcutsPopover = find("gw-popover", "live-shortcuts");
@@ -586,7 +582,6 @@ export const livePage = (): LivePage => {
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
-  setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
   setIcon(helpButton, phQuestionMark, "Help (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
@@ -595,7 +590,7 @@ export const livePage = (): LivePage => {
   captureButton?.setAttribute("aria-keyshortcuts", "s");
   pictureButton?.setAttribute("aria-keyshortcuts", "p");
   pictureButton?.toggleAttribute("toggle", true);
-  soundButton?.setAttribute("aria-keyshortcuts", "u");
+  volume?.setAttribute("aria-keyshortcuts", "u");
   helpButton?.setAttribute("aria-keyshortcuts", "?");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
@@ -679,29 +674,21 @@ export const livePage = (): LivePage => {
 
     const any = streams.some(hasSound);
 
-    // The icon shows whether it's on, so the button stays plain, named for
-    // what a press does
-    setIcon(
-      soundButton,
-      !sound.on || sound.volume === 0
-        ? phSpeakerSlash
-        : sound.volume < 50
-          ? phSpeakerLow
-          : phSpeakerHigh,
-      sound.on ? "Mute (U)" : "Unmute (U)",
-    );
-
     if (soundDivider !== null) soundDivider.hidden = !any;
 
-    if (soundButton !== null) {
-      soundButton.hidden = !any;
-      soundButton.disabled = tile === undefined;
-    }
+    // Sound the browser holds back shows muted, so a press plays it
+    if (volume !== null) {
+      // Measured while hidden, it thinks it has no room; asking it to decide
+      // again once shown sets it inline where it fits
+      if (volume.hidden && any) {
+        volume.mode = "inline";
+        volume.mode = "auto";
+      }
 
-    if (volumeRange !== null) {
-      volumeRange.hidden = !any;
-      volumeRange.disabled = tile === undefined;
-      volumeRange.value = sound.volume;
+      volume.hidden = !any;
+      volume.disabled = tile === undefined;
+      volume.muted = !sound.on || soundHeld;
+      volume.value = sound.volume;
     }
   };
 
@@ -720,7 +707,13 @@ export const livePage = (): LivePage => {
       return;
     }
 
-    setSound(tile.stream, { ...sound, on: !sound.on });
+    // Turned on at 0, it comes back at half, as the volume control's own press does
+    setSound(
+      tile.stream,
+      sound.on && sound.volume > 0
+        ? { ...sound, on: false }
+        : { on: true, volume: sound.volume > 0 ? sound.volume : 50 },
+    );
   };
 
   // Sound held back until the page had a click or a key plays after the
@@ -790,21 +783,21 @@ export const livePage = (): LivePage => {
     onChange: showPicture,
   });
 
-  soundButton?.addEventListener("click", toggleSound);
+  if (volume !== null) {
+    /** Keeps the picked camera's sound as the control has it now. */
+    const takeSound = () => {
+      const tile = soundTile();
 
-  // Turning it up plays the sound, as it would on a speaker
-  volumeRange?.addEventListener("input", () => {
-    const tile = soundTile();
+      if (tile === undefined) return;
 
-    if (tile === undefined) return;
+      if (!volume.muted) soundHeld = false;
 
-    const volume = volumeRange.value;
+      setSound(tile.stream, { on: !volume.muted, volume: volume.value });
+    };
 
-    setSound(tile.stream, {
-      on: volume > 0 || soundOf(tile.stream).on,
-      volume,
-    });
-  });
+    on(volume, "mute", takeSound);
+    on(volume, "input", takeSound);
+  }
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {

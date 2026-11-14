@@ -137,26 +137,14 @@
                   </gw-row>
                 </gw-row>
                 <!-- The picked camera's sound, where any camera has it: on
-                     or off, and how loud -->
+                     or off, and how loud, its slider folding away when the
+                     bar is tight -->
                 <span
                   class="controls-divider live-sound-divider"
                   aria-hidden="true"
                   hidden
                 ></span>
-                <gw-button class="live-sound" label="Unmute" hidden></gw-button>
-                <!-- Optional: a tight bar leaves it to the device's own
-                     volume rather than take another row -->
-                <gw-range
-                  class="live-volume"
-                  data-optional
-                  label="Volume"
-                  label-hidden
-                  unit="%"
-                  step="5"
-                  readout
-                  value="100"
-                  hidden
-                ></gw-range>
+                <gw-volume class="live-volume" mute-key="U" hidden></gw-volume>
               </gw-row>
               <gw-row
                 class="controls-transport"

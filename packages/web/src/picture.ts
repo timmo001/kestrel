@@ -15,7 +15,7 @@ import {
 } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 import { cameraLabel } from "./cameras.ts";
-import { element, settingsSheet, showSheet } from "./shared.ts";
+import { element, settingsSheet } from "./shared.ts";
 
 /** How often a drag sends where it's got to, at most. */
 const sendEvery = 250;
@@ -293,7 +293,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     open = true;
     note("");
     fill();
-    showSheet(panel);
+    panel.show();
     options.onChange();
     void refresh();
   };

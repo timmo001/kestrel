@@ -4,9 +4,9 @@
  */
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import {
+  GwVolume,
   on,
   onSwipe,
-  opensAsSheet,
   type MenuItem,
   type TableColumn,
   type TableRow,
@@ -101,26 +101,20 @@ export const helpToggle = (
 
 /**
  * A camera's settings panel, such as its picture or its moving setup: a
- * sheet, as it holds more than a popover's small form. Opened with
- * `showSheet`.
+ * sheet, as it holds more than a popover's small form. It comes up from the
+ * bottom where Groundwork's popups become bottom sheets, a phone either way
+ * up, and otherwise in from the end edge, beside the cameras rather than
+ * over the picture being set.
  */
 export const settingsSheet = (className: string) => {
   const sheet = element("gw-sheet");
 
   sheet.classList.add(className);
+  sheet.side = "auto";
+  sheet.wideSide = "end";
   document.body.append(sheet);
 
   return sheet;
-};
-
-/**
- * Opens a settings sheet up from the bottom where Groundwork's popups become
- * bottom sheets, a phone either way up, and otherwise in from the end edge,
- * beside the cameras rather than over the picture being set.
- */
-export const showSheet = (sheet: HTMLElementTagNameMap["gw-sheet"]) => {
-  sheet.side = opensAsSheet() ? "bottom" : "end";
-  sheet.show();
 };
 
 /**
@@ -237,9 +231,10 @@ const outerWidth = (element: Element) => {
 
 /**
  * What a group of controls needs to sit in one line, its showing controls
- * and the gaps between: with every one, and tight, without those marked
- * `data-optional` and with those marked `data-overflow` folded into the
- * More menu, which takes one button's room in the group that has it.
+ * and the gaps between: with every one, and tight, with those marked
+ * `data-overflow` folded into the More menu, which takes one button's room
+ * in the group that has it, and a volume control as its button alone, its
+ * slider sliding out or in a popover.
  */
 const lineWidths = (group: Element | null) => {
   if (group === null) return { full: 0, tight: 0 };
@@ -252,17 +247,24 @@ const lineWidths = (group: Element | null) => {
 
   const gap = Number.parseFloat(getComputedStyle(group).columnGap) || 0;
 
-  const width = (children: ReadonlyArray<Element>) =>
-    children.reduce((sum, child) => sum + outerWidth(child), 0) +
+  // A volume control measures as it is now, so it says what it needs
+  const fullWidth = (child: Element) =>
+    child instanceof GwVolume ? child.inlineWidth : outerWidth(child);
+
+  const tightWidth = (child: Element) =>
+    child instanceof GwVolume
+      ? Number.parseFloat(getComputedStyle(child).minInlineSize)
+      : outerWidth(child);
+
+  const width = (
+    children: ReadonlyArray<Element>,
+    measure: (child: Element) => number,
+  ) =>
+    children.reduce((sum, child) => sum + measure(child), 0) +
     gap * Math.max(children.length - 1, 0);
 
   const folded = shown.filter((child) => child.hasAttribute("data-overflow"));
-
-  const kept = shown.filter(
-    (child) =>
-      !child.hasAttribute("data-optional") &&
-      !child.hasAttribute("data-overflow"),
-  );
+  const kept = shown.filter((child) => !child.hasAttribute("data-overflow"));
 
   const more =
     group.querySelector(":scope > .controls-more") === null ||
@@ -270,7 +272,10 @@ const lineWidths = (group: Element | null) => {
       ? 0
       : Math.max(...folded.map(outerWidth)) + gap;
 
-  return { full: width(shown), tight: width(kept) + more };
+  return {
+    full: width(shown, fullWidth),
+    tight: width(kept, tightWidth) + more,
+  };
 };
 
 /**
@@ -353,11 +358,10 @@ export const overflowMenu = (bar: HTMLElement) => {
  * never letting them wrap unevenly: in one row, the transport between the
  * start and end, in the middle where the sides leave it room; else in two,
  * the transport over the start and end; else as on a phone. Before taking
- * another row it tries the bar tight, without the controls marked
- * `data-optional`, such as Live's volume, which the device's own buttons
- * stand in for. It's measured laid out in a row, as the controls differ by
- * page and by what the cameras can do, and again as the bar or its
- * controls change size.
+ * another row it tries the bar tight, a volume control down to its button
+ * and the seldom used controls in More. It's measured laid out in a row, as
+ * the controls differ by page and by what the cameras can do, and again as
+ * the bar or its controls change size.
  */
 export const compactWhenCrowded = (bar: HTMLElement) => {
   const fit = () => {

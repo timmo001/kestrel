@@ -913,11 +913,6 @@ gw-table gw-sheet {
   min-width: 0;
 }
 
-/* Its ‹ and › stand in for a scrollbar */
-.live-presets::part(track) {
-  scrollbar-width: none;
-}
-
 .live-presets:empty {
   display: none;
 }
@@ -1182,10 +1177,14 @@ gw-table gw-sheet {
   justify-content: space-between;
 }
 
-/* Tight, the controls the device or a key stands in for give up their room
-   before the bar takes another row, and the seldom used fold into More,
-   which only shows then */
-.player-controls[data-tight] [data-optional],
+/* Tight, the volume gives up its slider, which slides out from its button
+   or opens over the bar, before the bar takes another row; its least width
+   is the button's, so no width at all leaves that. The seldom used fold
+   into More, which only shows then */
+.player-controls:is([data-tight], [data-compact]) gw-volume {
+  max-inline-size: 0;
+}
+
 .player-controls[data-tight] .control-download + .controls-divider,
 .player-controls:is([data-tight], [data-compact]) [data-overflow],
 .player-controls:not([data-tight], [data-compact]) .controls-more {
@@ -1217,10 +1216,8 @@ gw-table gw-sheet {
   display: contents;
 }
 
-/* The dividers have no place, and the optional controls give theirs up: the
-   volume is the device's own, and a touch screen has no keys to help with */
-.player-controls[data-compact] .controls-divider,
-.player-controls[data-compact] [data-optional] {
+/* The dividers have no place */
+.player-controls[data-compact] .controls-divider {
   display: none;
 }
 
@@ -1232,7 +1229,7 @@ gw-table gw-sheet {
 
 /* The first row: the sound or the time, the transport, Recordings' View menu
    and full screen */
-.player-controls[data-compact] .live-sound {
+.player-controls[data-compact] .live-volume {
   grid-area: 1 / 1;
 }
 
@@ -1513,17 +1510,6 @@ kbd {
   height: 1.25rem;
   margin-inline: var(--gw-space-1);
   background: var(--gw-color-border-normal);
-}
-
-/* The track, then its value close after it */
-.live-volume .gw-range-control {
-  flex: none;
-  width: 6rem;
-}
-
-.live-volume .gw-range-readout {
-  min-width: 4ch;
-  text-align: start;
 }
 
 .player-clock {
