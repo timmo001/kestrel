@@ -22,6 +22,7 @@
     "@timmo001/kestrel-core": "workspace:*",
     "@timmo001/kestrel-format-mp4": "workspace:*",
     "@timmo001/kestrel-nvr": "workspace:*",
+    "@timmo001/kestrel-protocol-ftp": "workspace:*",
     "@timmo001/kestrel-source-bambu": "workspace:*",
     "@timmo001/kestrel-source-raysharp": "workspace:*",
     "@timmo001/kestrel-source-reolink": "workspace:*",

@@ -24,6 +24,8 @@ export const SourceInfo = Schema.Struct({
   connection: Connection,
   /** Whether it has details to show, as a recorder does. */
   details: Schema.Boolean,
+  /** Whether its cameras can send their clips to Kestrel. */
+  uploads: Schema.Boolean,
 });
 
 export interface SourceInfo extends Schema.Schema.Type<typeof SourceInfo> {}

@@ -42,6 +42,7 @@ import { Push } from "./Push.ts";
 import * as Recording from "./Recording.ts";
 import { Sources } from "./Sources.ts";
 import * as Sync from "./Sync.ts";
+import { Uploads } from "./Uploads.ts";
 import { Usage } from "./Usage.ts";
 
 /** Home Assistant's ingress path, as the Supervisor sends it in `X-Ingress-Path`. */
@@ -424,6 +425,7 @@ export const layer = (options: ServeOptions) =>
       Library.layer,
       Jobs.layer,
       Usage.layer,
+      Uploads.layer,
     ]),
     Layer.provide(Push.layer),
     Layer.provide(ActivityLog.layer),

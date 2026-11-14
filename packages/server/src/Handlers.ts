@@ -35,6 +35,7 @@ import { streamNames, viewsOf } from "./go2rtc/Go2rtc.ts";
 import { Jobs } from "./Jobs.ts";
 import { Library } from "./Library.ts";
 import { capability, Sources } from "./Sources.ts";
+import { Uploads } from "./Uploads.ts";
 import { Usage } from "./Usage.ts";
 
 const SourcesHandlers = HttpApiBuilder.group(
@@ -42,6 +43,7 @@ const SourcesHandlers = HttpApiBuilder.group(
   "sources",
   Effect.fn(function* (handlers) {
     const sources = yield* Sources;
+    const uploads = yield* Uploads;
 
     return handlers
       .handle("list", () =>
@@ -55,6 +57,7 @@ const SourcesHandlers = HttpApiBuilder.group(
                   name: source.name,
                   connection,
                   details: source.details !== undefined,
+                  uploads: source.uploads !== undefined,
                 })),
               ),
             ),
@@ -64,6 +67,14 @@ const SourcesHandlers = HttpApiBuilder.group(
       .handle("kinds", () => Effect.succeed(sources.kinds))
       .handle("settings", () => sources.settings)
       .handle("save", ({ payload }) => sources.save(payload))
+      .handle("uploads", ({ params }) =>
+        sources.find(params.source).pipe(Effect.flatMap(uploads.state)),
+      )
+      .handle("sendUploads", ({ params, payload }) =>
+        sources
+          .find(params.source)
+          .pipe(Effect.flatMap((source) => uploads.change(source, payload.on))),
+      )
       .handle("details", ({ params }) =>
         sources.find(params.source).pipe(
           Effect.flatMap((source) =>

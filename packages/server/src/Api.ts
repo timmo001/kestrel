@@ -33,6 +33,9 @@ import {
   SourceUnavailable,
   UnknownCamera,
   UnknownSource,
+  UploadChange,
+  UploadCheck,
+  UploadState,
 } from "@timmo001/kestrel-core";
 import { Schema } from "effect";
 import {
@@ -87,6 +90,19 @@ export class SourcesGroup extends HttpApiGroup.make("sources")
       payload: Settings,
       success: Settings,
       error: InvalidSettings,
+    }),
+    /** Whether a source's cameras send their clips to Kestrel now. */
+    HttpApiEndpoint.get("uploads", "/:source/uploads", {
+      params: { source: SourceId },
+      success: UploadState,
+      error: [UnknownSource, NotSupported, SourceUnavailable],
+    }),
+    /** Points a source's cameras at Kestrel, or stops them sending, and says how it went. */
+    HttpApiEndpoint.put("sendUploads", "/:source/uploads", {
+      params: { source: SourceId },
+      payload: UploadChange,
+      success: UploadCheck,
+      error: [UnknownSource, NotSupported, SourceUnavailable],
     }),
   )
   .prefix("/api/sources") {}
