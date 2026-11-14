@@ -2,6 +2,8 @@
  * The sources the server serves, from the sources file, and finding one by
  * id. Each runs in a scope of its own, so a save from the Settings page
  * stops only the sources whose settings changed and starts their new ones.
+ * Each keeps what it answered for a while (see `SourceCache`), so a page
+ * loading again doesn't ask it all again.
  * A source you've turned off keeps its settings but isn't started, and a
  * camera you've turned off has no live stream and isn't recorded.
  * A source that can't start, such as one with no address, is listed as not
@@ -48,6 +50,7 @@ import {
   SubscriptionRef,
 } from "effect";
 import { configFolder } from "./Folders.ts";
+import { cached } from "./SourceCache.ts";
 import * as SourcesFile from "./SourcesFile.ts";
 
 /** Every kind of source the server can run. */
@@ -196,6 +199,7 @@ export class Sources extends Context.Service<
                 `there's no kind of source called ${settings.kind}`,
               )
             : yield* kind.make(settings).pipe(
+                Effect.flatMap(cached),
                 Scope.provide(own),
                 Effect.catch((error) =>
                   Effect.succeed(unstarted(settings, error.message)),
