@@ -329,13 +329,40 @@ gw-table gw-sheet {
   cursor: pointer;
 }
 
-/* The picked camera, which a still and Enter act on */
-.live-tile[data-picked]::after {
+/* A change of layout moves each camera to its new place, a little quicker
+   than the browser's default, so the cameras are never long in motion */
+::view-transition-group(*) {
+  animation-duration: 250ms;
+}
+
+/* A press on a camera picks it rather than pressing a button: no flash from
+   the browser, and no text picked up by a double click */
+.live-stage,
+.player-stage {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.live-tile,
+.player-tile {
+  user-select: none;
+}
+
+/* The picked camera, which a still and Enter act on: its ring fades in and
+   out rather than snapping, on both players */
+.live-tile::after,
+.player-grid:not([data-layout="1"]) .player-tile::after {
   position: absolute;
   inset: 0;
-  box-shadow: inset 0 0 0 2px var(--gw-color-accent, #4c8dff);
+  box-shadow: inset 0 0 0 2px transparent;
   pointer-events: none;
   content: "";
+  transition: box-shadow var(--gw-motion-normal, 200ms)
+    var(--gw-motion-easing, ease);
+}
+
+.live-tile[data-picked]::after,
+.player-grid:not([data-layout="1"]) .player-tile[data-picked]::after {
+  box-shadow: inset 0 0 0 2px var(--gw-color-accent, #4c8dff);
 }
 
 /* Filled or zoomed past its tile, a drag moves around the picture */
@@ -814,15 +841,7 @@ gw-table gw-sheet {
 }
 
 /* With several channels, the picked one, which the zoom, a still, Cut and
-   Download act on */
-.player-grid:not([data-layout="1"]) .player-tile[data-picked]::after {
-  position: absolute;
-  inset: 0;
-  box-shadow: inset 0 0 0 2px var(--gw-color-accent);
-  pointer-events: none;
-  content: "";
-}
-
+   Download act on, ringed as Live's is */
 .player-grid:not([data-layout="1"]) .player-tile:not([data-picked]) {
   cursor: pointer;
 }

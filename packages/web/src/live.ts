@@ -49,7 +49,9 @@ import {
   element,
   find,
   helpToggle,
+  transitionName,
   typingTargets,
+  withTransition,
 } from "./shared.ts";
 import {
   applyTiling,
@@ -1050,6 +1052,8 @@ export const livePage = (): LivePage => {
 
         figure.className = "live-tile";
         figure.dataset.loading = "";
+        // Its own name, so a change of layout moves it to its new place
+        figure.style.viewTransitionName = transitionName(stream.id);
         hold.className = "live-hold";
         hold.setAttribute("aria-hidden", "true");
 
@@ -1173,7 +1177,7 @@ export const livePage = (): LivePage => {
     layout = wanted;
     solo = undefined;
     keepPlace();
-    render();
+    withTransition(render);
   };
 
   /** Smart tiling or fixed layouts, kept in this browser. */
@@ -1183,9 +1187,11 @@ export const livePage = (): LivePage => {
     tiling = next;
     keep(storageKey, { tiling });
 
-    if (grid !== null) arrangeGrid(grid);
+    withTransition(() => {
+      if (grid !== null) arrangeGrid(grid);
 
-    showZoom();
+      showZoom();
+    });
     showControls();
   };
 
@@ -1195,7 +1201,7 @@ export const livePage = (): LivePage => {
 
     page = next;
     keepPlace();
-    render();
+    withTransition(render);
   };
 
   const step = (by: -1 | 1) => {
@@ -1213,7 +1219,7 @@ export const livePage = (): LivePage => {
       index === -1 || layout === "all" ? solo.page : Math.floor(index / layout);
     solo = undefined;
     keepPlace();
-    render();
+    withTransition(render);
   };
 
   /** The picked camera alone, or back to the layout it came from. */
@@ -1235,7 +1241,7 @@ export const livePage = (): LivePage => {
     layout = 1;
     page = at;
     keepPlace();
-    render();
+    withTransition(render);
   };
 
   /**
@@ -1621,7 +1627,8 @@ export const livePage = (): LivePage => {
       keep(storageKey, { count: streams.length });
 
       paused = false;
-      render();
+      // Cameras added or gone slide the rest to their new places
+      withTransition(render);
     },
     showProblems: (next) => {
       problems = next;

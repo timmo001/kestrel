@@ -163,6 +163,32 @@ export const controlIcon = (
   button.textContent = button.getAttribute("label") ?? "";
 };
 
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+/**
+ * Runs `update`, which moves things on the page, as a view transition where
+ * the browser has them, so what has a `view-transition-name` slides and
+ * resizes to its new place; at once without them, under reduced motion, or
+ * while the page is hidden.
+ */
+export const withTransition = (update: () => void) => {
+  if (
+    !("startViewTransition" in document) ||
+    reducedMotion.matches ||
+    document.hidden
+  ) {
+    update();
+
+    return;
+  }
+
+  document.startViewTransition(update);
+};
+
+/** A camera's view transition name, such as `camera-swann-3`. */
+export const transitionName = (id: string) =>
+  `camera-${id.replace(/[^a-zA-Z0-9-]/g, "-")}`;
+
 /** An element's width with its side margins. */
 const outerWidth = (element: Element) => {
   const style = getComputedStyle(element);
