@@ -15,7 +15,7 @@ import {
 } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 import { cameraLabel } from "./cameras.ts";
-import { element } from "./shared.ts";
+import { element, followFullscreen } from "./shared.ts";
 
 /** How often a drag sends where it's got to, at most. */
 const sendEvery = 250;
@@ -90,7 +90,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
   // the picture shows through the backdrop
   panel.live = true;
   panel.append(body, reset);
-  document.body.append(panel);
+  followFullscreen(panel);
 
   /** The camera the panel is for, and what it last said it's set to. */
   let current:

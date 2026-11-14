@@ -1953,7 +1953,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       .composedPath()
       .filter((target) => target instanceof Element);
 
-    if (path.some((target) => target.matches(`${typingTargets}, gw-popover`))) {
+    if (
+      path.some((target) =>
+        target.matches(`${typingTargets}, gw-popover, gw-sheet`),
+      )
+    ) {
       return;
     }
 

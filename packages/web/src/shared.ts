@@ -83,6 +83,20 @@ export const helpToggle = (
 };
 
 /**
+ * Puts an overlay that isn't inside a player in the page, and keeps it
+ * inside whatever goes full screen while something does: Chromium shows one
+ * outside the full screen element over it, but never lets it be pressed or
+ * scrolled.
+ */
+export const followFullscreen = (overlay: HTMLElement) => {
+  document.body.append(overlay);
+
+  document.addEventListener("fullscreenchange", () => {
+    (document.fullscreenElement ?? document.body).append(overlay);
+  });
+};
+
+/**
  * A camera's settings panel that holds more than a popover's small form,
  * such as its moving setup's presets, home and tracking. It comes up from the
  * bottom where Groundwork's popups become bottom sheets, a phone either way
@@ -95,7 +109,7 @@ export const settingsSheet = (className: string) => {
   sheet.classList.add(className);
   sheet.side = "auto";
   sheet.wideSide = "end";
-  document.body.append(sheet);
+  followFullscreen(sheet);
 
   return sheet;
 };
@@ -300,14 +314,9 @@ export const actionsColumn = (onPlay: (clip: Clip) => void): TableColumn => ({
       save.setAttribute("href", clipUrl(rowClip(row), true));
     }
 
-    // Side by side, however narrow the column. On a touch screen each 32px
-    // button's hit area reaches out to --gw-target-min, so the gap keeps
-    // Play's and Download's apart rather than overlapping
+    // Side by side, however narrow the column; gw-row keeps their touch hit
+    // areas apart
     actions.setAttribute("nowrap", "");
-    actions.style.setProperty(
-      "--gw-gap",
-      "max(var(--gw-space-1), calc(var(--gw-target-min, 0px) - 2rem))",
-    );
     actions.append(play, save);
 
     return actions;

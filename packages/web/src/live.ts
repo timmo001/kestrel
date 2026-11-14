@@ -1700,7 +1700,11 @@ export const livePage = (): LivePage => {
       .composedPath()
       .filter((target) => target instanceof Element);
 
-    if (path.some((target) => target.matches(`${typingTargets}, gw-popover`))) {
+    if (
+      path.some((target) =>
+        target.matches(`${typingTargets}, gw-popover, gw-sheet`),
+      )
+    ) {
       return;
     }
 
@@ -1717,7 +1721,9 @@ export const livePage = (): LivePage => {
       .some(
         (target) =>
           target instanceof Element &&
-          target.matches(".live-tile, .player-controls, .live-steer-dock"),
+          target.matches(
+            ".live-tile, .player-controls, .live-steer-dock, gw-popover, gw-sheet",
+          ),
       );
   });
 
