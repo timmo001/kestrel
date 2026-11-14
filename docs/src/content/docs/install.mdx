@@ -75,12 +75,20 @@ sudo dnf install ./kestrel-nvr-<version>-1.x86_64.rpm
 </Tab>
 <Tab title="mise">
 
-[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive and
+[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive
+through the [aqua registry](https://github.com/aquaproj/aqua-registry) and
 keeps it up to date:
 
 ```sh
-mise use -g github:timmo001/kestrel
+mise use -g aqua:timmo001/kestrel
 ```
+
+Pin a version with `aqua:timmo001/kestrel@<version>`; the archives start at
+0.3.0. mise checks the download against the release's
+[GitHub attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations).
+[aqua](https://aquaproj.github.io) itself works too, with
+`aqua g -i timmo001/kestrel` and then `aqua i`, and so does mise's
+`github:timmo001/kestrel`, straight from the releases.
 
 This puts the `kestrel` command on your path, without the menu entry or
 services. The app needs the desktop libraries listed under Arch Linux;
@@ -118,12 +126,20 @@ to match.
 </Tab>
 <Tab title="mise">
 
-[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive and
+[mise](https://mise.jdx.dev) installs the release's `kestrel-nvr` archive
+through the [aqua registry](https://github.com/aquaproj/aqua-registry) and
 keeps it up to date:
 
 ```powershell
-mise use -g github:timmo001/kestrel
+mise use -g aqua:timmo001/kestrel
 ```
+
+Pin a version with `aqua:timmo001/kestrel@<version>`; the archives start at
+0.3.0. mise checks the download against the release's
+[GitHub attestation](https://docs.github.com/actions/security-for-github-actions/using-artifact-attestations).
+[aqua](https://aquaproj.github.io) itself works too, with
+`aqua g -i timmo001/kestrel` and then `aqua i`, and so does mise's
+`github:timmo001/kestrel`, straight from the releases.
 
 This puts the `kestrel` command on your path.
 
