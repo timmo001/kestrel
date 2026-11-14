@@ -8,6 +8,7 @@
  * @module
  */
 import { createSocket } from "node:dgram";
+import { reverse } from "node:dns/promises";
 import { isIPv6 } from "node:net";
 import { Effect, Schema } from "effect";
 
@@ -57,16 +58,16 @@ export const pointedAt = (target: {
 /** Stops it sending, leaving the rest as it is, as reolink_aio turns it off. */
 export const stopped = { Ftp: { schedule: { enable: 0 } } };
 
-/** Whether its settings send to this receiver with this login now. */
+/** Whether its settings send to this receiver, by any of its `hosts`, with this login now. */
 export const sendsTo = (
   saved: Ftp,
   target: {
-    readonly host: string;
+    readonly hosts: ReadonlyArray<string>;
     readonly port: number;
     readonly user: string;
   },
 ) =>
-  saved.Ftp.server === target.host &&
+  target.hosts.includes(saved.Ftp.server) &&
   saved.Ftp.port === target.port &&
   saved.Ftp.userName === target.user &&
   saved.Ftp.schedule?.enable === 1;
@@ -112,3 +113,16 @@ export const addressToward = (host: string) =>
       resume(Effect.succeed(address));
     });
   });
+
+/**
+ * The network's DNS name for `address`, such as `homeassistant`, so a
+ * camera finds this machine by name after its address changes; `null` where
+ * there's none. It isn't looked up again forwards, since in a container
+ * that can give an address only the container has.
+ */
+export const nameOf = (address: string) =>
+  Effect.tryPromise(() => reverse(address)).pipe(
+    Effect.timeout("3 seconds"),
+    Effect.map((names) => names[0]?.replace(/\.$/, "") || null),
+    Effect.orElseSucceed(() => null),
+  );

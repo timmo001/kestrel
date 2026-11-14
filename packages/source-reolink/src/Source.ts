@@ -74,6 +74,7 @@ import {
   clipStart,
   DeviceAbility,
   Ftp,
+  nameOf,
   pointedAt,
   sendsTo,
   stopped,
@@ -1732,6 +1733,15 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     Effect.mapError(() => unavailable("can't be reached from this machine")),
   );
 
+  /** What the camera is given to find this machine: its DNS name where the network has one, or else its address. */
+  const ownHost = ownAddress.pipe(
+    Effect.flatMap((address) =>
+      nameOf(address).pipe(
+        Effect.map((named) => ({ address, host: named ?? address })),
+      ),
+    ),
+  );
+
   /** Sends one setting, failing with why it was refused. */
   const set = (cmd: string, param: Param) =>
     call([command(cmd, param)]).pipe(
@@ -1744,8 +1754,10 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         Effect.flatMap((list) => valueOf(list, 0, Ftp)),
       );
 
+      const own = yield* ownHost;
+
       return sendsTo(saved, {
-        host: yield* ownAddress,
+        hosts: [own.host, own.address],
         port: target.port,
         user: target.user,
       });
@@ -1761,7 +1773,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         };
       }
 
-      const host = yield* ownAddress;
+      const { host } = yield* ownHost;
 
       const param = pointedAt({
         host,
