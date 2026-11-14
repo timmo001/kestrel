@@ -202,10 +202,12 @@ gw-table gw-sheet {
   height: min(100cqh, 100cqw / var(--live-ratio));
 }
 
-/* Recordings' sub stream carries the same 16:9 picture squeezed into
+/* A recorder's sub stream carries the same 16:9 picture squeezed into
    352×288, so it's drawn stretched back out to its cell rather than at its
-   own shape */
-.camera-grid[data-stream="sub"] video {
+   own shape. Only video that really is squeezed: Kestrel's own copies are
+   the main stream, whichever is asked for, at their own shape */
+.player-tile[data-squeezed] > video,
+.player-tile[data-squeezed] > .player-hold {
   object-fit: fill;
 }
 

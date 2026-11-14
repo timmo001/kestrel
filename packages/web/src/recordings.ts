@@ -126,11 +126,14 @@ const fullStreamBudget = 14;
  * rate the browser can play. The full stream is shared, though: with
  * several cameras past about 14 times in all, every camera plays the
  * small sub stream, which comes 100 to 200 times faster than real time.
+ * That's only from the recorder: Kestrel's own copies are the main stream
+ * whichever is asked for, so with none of what's playing still only on its
+ * source, the full stream it is.
  */
-const viewFor = (speed: number, count: number): View => {
+const viewFor = (speed: number, count: number, remote: boolean): View => {
   const speedUp = Math.ceil(speed / browserFastest);
 
-  if (count > 1 && speed * count > fullStreamBudget) {
+  if (remote && count > 1 && speed * count > fullStreamBudget) {
     return { stream: "sub", speedUp };
   }
 
@@ -901,7 +904,14 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   const showSpeed = () => {
     // Alone, the picked camera has the recorder's full stream to itself
-    const view = viewFor(Number(speed), alone ? 1 : ticked.length);
+    const view = viewFor(
+      Number(speed),
+      alone ? 1 : ticked.length,
+      tracks.some((track) =>
+        track.recordings.some((recording) => recording.remote === true),
+      ),
+    );
+
     // What's left of the speed after the server's part
     const rate = Number(speed) / view.speedUp;
 
@@ -1044,9 +1054,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     id: tile.camera,
     figure: tile.figure,
     parts: [tile.video],
-    // The sub stream's squeezed picture is stretched to fill its tile
+    // A squeezed sub stream's picture is stretched to fill its tile
     size: () =>
-      grid?.dataset.stream === "sub"
+      tile.figure.hasAttribute("data-squeezed")
         ? tile.figure.getBoundingClientRect()
         : { width: tile.video.videoWidth, height: tile.video.videoHeight },
   });

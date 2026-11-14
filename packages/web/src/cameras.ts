@@ -64,5 +64,13 @@ export const cameraLabel = (id: string) => {
   return camera.label ?? ownLabel(camera);
 };
 
+/**
+ * The width over height to draw a camera's sub stream at, when its frames
+ * squeeze the picture into another shape, as a recorder's 352×288 does; else
+ * `null`.
+ */
+export const subRatioOf = (id: string) =>
+  known.find((each) => each.id === id)?.live?.subRatio ?? null;
+
 /** A camera's id as a file name's part, such as `swann-3`. */
 export const fileName = (id: CameraId) => id.replace("/", "-");

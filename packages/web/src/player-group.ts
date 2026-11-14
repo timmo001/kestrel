@@ -14,7 +14,7 @@
  * drives one camera or several the same way.
  */
 import type { CameraId } from "@timmo001/kestrel-core";
-import { cameraLabel } from "./cameras.ts";
+import { cameraLabel, subRatioOf } from "./cameras.ts";
 import { momentAt, nextMoment, type Track } from "./moments.ts";
 import {
   fullView,
@@ -88,6 +88,9 @@ export const mostCameras = 4;
 /** How long the cameras hold for one waiting for its video, in milliseconds. */
 const holdLimit = 10_000;
 
+/** Seconds of play a camera that held the others has loaded before they go on. */
+const resumeAhead = 2;
+
 const isPlaying = (video: HTMLVideoElement) =>
   !video.paused && video.readyState >= 3;
 
@@ -141,72 +144,6 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   const shownTracks = () =>
     alone ? tracks.filter((track) => track.camera === picked) : tracks;
 
-  /**
-   * Whether a tile should be showing video but has none to play yet, such
-   * as while its clip loads. A tile with a problem waits for nothing.
-   */
-  const isWaiting = (tile: Tile) =>
-    tile.player.clip() !== undefined &&
-    tile.figure.dataset.empty === undefined &&
-    !tile.figure.hasAttribute("data-problem") &&
-    !tile.video.ended &&
-    tile.video.readyState < 3;
-
-  /** When each tile waiting for video started to. */
-  const waitingSince = new Map<Tile, number>();
-
-  /** Whether a tile waiting holds the others: only for so long, so one whose video never comes doesn't stop them all. */
-  const isStalled = (tile: Tile) => {
-    if (!isWaiting(tile)) {
-      waitingSince.delete(tile);
-
-      return false;
-    }
-
-    const since = waitingSince.get(tile);
-
-    if (since === undefined) {
-      waitingSince.set(tile, Date.now());
-      // Looked again once it's held as long as it may
-      setTimeout(() => holdBack(), holdLimit);
-
-      return true;
-    }
-
-    return Date.now() - since < holdLimit;
-  };
-
-  const held = () => [...tiles.values()].some(isStalled);
-
-  /**
-   * Holds the tiles with video where they are while another waits for its
-   * own, then plays them on together. At speed the cameras load at
-   * different rates, and one left playing ran ahead, so the slow one was
-   * put back on its time with a seek that loaded again and fell further
-   * behind.
-   */
-  const holdBack = () => {
-    if (!playing) return;
-
-    const hold = held();
-
-    for (const tile of tiles.values()) {
-      if (
-        tile.player.clip() === undefined ||
-        tile.figure.dataset.empty !== undefined ||
-        tile.video.ended ||
-        isStalled(tile)
-      ) {
-        continue;
-      }
-
-      if (hold && !tile.video.paused) tile.video.pause();
-      else if (!hold && tile.video.paused) {
-        void tile.video.play().catch(() => undefined);
-      }
-    }
-  };
-
   /** The recorder second the clock is at, from the video keeping the time. */
   const now = () => {
     const clip = driver?.player.clip();
@@ -222,6 +159,225 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
    * quarter of a second's play at speed, as each seek can cost a reload
    */
   const tolerance = () => Math.max(0.5, playbackRate * view.speedUp * 0.25);
+
+  /** Seconds of the clip a follower has to play to catch up with the clock; 0 when it's level or ahead. */
+  const behindBy = (tile: Tile) => {
+    const at = now();
+    const clip = tile.player.clip();
+    const offset = tile.player.offset();
+
+    return tile === driver ||
+      at === undefined ||
+      clip === undefined ||
+      offset === undefined
+      ? 0
+      : Math.max(0, at - toSeconds(clip.begin) - offset);
+  };
+
+  /**
+   * Whether a follower is behind the clock where it has nothing loaded yet,
+   * but near enough to catch up. It's waited for, rather than put on the
+   * clock's time with a seek: that loads again from there, and at speed a
+   * camera that loads slowly fell further behind with each one. One with
+   * the whole clip loaded has nothing more coming to wait for.
+   */
+  const isLagging = (tile: Tile) => {
+    const gap = behindBy(tile);
+    const offset = tile.player.offset() ?? 0;
+
+    return (
+      gap > tolerance() &&
+      tile.player.ahead() !== Infinity &&
+      gap < Math.max(10, playbackRate * view.speedUp * 4) &&
+      !tile.player.loaded(offset + gap)
+    );
+  };
+
+  /** The tiles holding the others now. */
+  const holding = new Set<Tile>();
+
+  /**
+   * The tiles that have played some of the clip they're on. Every clip
+   * takes a moment to start, which says nothing of how fast the camera's
+   * video comes; running out partway through does.
+   */
+  const running = new Set<Tile>();
+
+  /**
+   * Whether a tile should be showing video but hasn't enough to play yet:
+   * with none at the playhead, or behind the clock and catching up. One that
+   * ran out partway through its clip goes on holding the others until it
+   * has a couple of seconds' play loaded, so they don't stop and start with
+   * each frame that comes; a clip just starting plays from its first. A
+   * tile with a problem waits for nothing.
+   */
+  const isWaiting = (tile: Tile) =>
+    tile.player.clip() !== undefined &&
+    tile.figure.dataset.empty === undefined &&
+    !tile.figure.hasAttribute("data-problem") &&
+    !tile.video.ended &&
+    (tile.video.readyState < 3 ||
+      (holding.has(tile) &&
+        running.has(tile) &&
+        tile.player.ahead() < resumeAhead) ||
+      isLagging(tile));
+
+  /** When each tile waiting for video started to. */
+  const waitingSince = new Map<Tile, number>();
+
+  /** Whether a tile waiting holds the others: only for so long, so one whose video never comes doesn't stop them all. */
+  const isStalled = (tile: Tile) => {
+    if (!isWaiting(tile)) {
+      waitingSince.delete(tile);
+      holding.delete(tile);
+      tile.figure.removeAttribute("data-holding");
+
+      return false;
+    }
+
+    const since = waitingSince.get(tile) ?? Date.now();
+
+    waitingSince.set(tile, since);
+
+    const stalled = Date.now() - since < holdLimit;
+
+    if (stalled) holding.add(tile);
+    else holding.delete(tile);
+
+    tile.figure.toggleAttribute("data-holding", stalled);
+
+    return stalled;
+  };
+
+  const held = () => [...tiles.values()].filter(isStalled).length > 0;
+
+  /**
+   * Holds the tiles with video where they are while another waits for its
+   * own, then plays them on together. The one waited for waits too, so it
+   * loads ahead rather than playing each frame as it comes and running out
+   * again; only one behind the clock plays on meanwhile, to catch up.
+   */
+  const holdBack = () => {
+    if (!playing) return;
+
+    const hold = held();
+
+    for (const tile of tiles.values()) {
+      if (
+        tile.player.clip() === undefined ||
+        tile.figure.dataset.empty !== undefined ||
+        tile.video.ended
+      ) {
+        continue;
+      }
+
+      if (isStalled(tile)) {
+        const lagging = isLagging(tile);
+
+        if (tile.video.paused && lagging) {
+          void tile.video.play().catch(() => undefined);
+        } else if (!tile.video.paused && !lagging) {
+          tile.video.pause();
+        }
+
+        continue;
+      }
+
+      if (hold && !tile.video.paused) tile.video.pause();
+      else if (!hold && tile.video.paused) {
+        void tile.video.play().catch(() => undefined);
+      }
+    }
+  };
+
+  /**
+   * The tiles playing key frames only, as they couldn't load the whole
+   * stream as fast as it plays. A camera with a large picture, such as a
+   * 2560×1920 doorbell, comes from the server at only about six times real
+   * time, so at speed it held the others back most of the time; its key
+   * frames are a small part of that. Any other speed starts them all on the
+   * whole stream again.
+   */
+  const lean = new Set<Tile>();
+
+  /** When each tile held the others lately, at the moments it's looked at. */
+  const heldAt = new Map<Tile, Array<number>>();
+
+  /**
+   * The view a tile plays: the group's, or its key frames only. Those are
+   * one per second of recording, or fewer past 16 times, as about 16 a
+   * second is as many as show.
+   */
+  const viewOf = (tile: Tile): View =>
+    lean.has(tile) && view.every === undefined
+      ? {
+          ...view,
+          every: Math.max(1, Math.round((playbackRate * view.speedUp) / 16)),
+        }
+      : view;
+
+  const resetLean = () => {
+    const were = [...lean];
+
+    lean.clear();
+    heldAt.clear();
+
+    for (const tile of were) {
+      tile.figure.removeAttribute("data-lean");
+      tile.player.view(viewOf(tile));
+    }
+  };
+
+  /** How often holds are looked at, in milliseconds. */
+  const lookEvery = 250;
+
+  /**
+   * A tile that's held the others for a quarter of the last 12 seconds, at
+   * four times or faster, goes to key frames only. Only while another has
+   * video to play: when they all load at once, as after a change of speed,
+   * none is slower than the rest yet.
+   */
+  const watchLean = () => {
+    if (!playing || playbackRate * view.speedUp < 4) return;
+
+    const others = [...tiles.values()].some(
+      (tile) =>
+        tile.player.clip() !== undefined &&
+        tile.figure.dataset.empty === undefined &&
+        !holding.has(tile),
+    );
+
+    if (!others) return;
+
+    const since = Date.now() - 12_000;
+
+    for (const tile of holding) {
+      // Key frames make no clip start sooner
+      if (!running.has(tile)) continue;
+
+      const times = [...(heldAt.get(tile) ?? []), Date.now()].filter(
+        (time) => time > since,
+      );
+
+      heldAt.set(tile, times);
+
+      if (lean.has(tile) || times.length * lookEvery < 3000) continue;
+
+      lean.add(tile);
+      tile.figure.toggleAttribute("data-lean", true);
+      heldAt.delete(tile);
+      waitingSince.delete(tile);
+      holding.delete(tile);
+      tile.player.view(viewOf(tile));
+    }
+  };
+
+  // Video loading and catching up shows in no event of its own while the
+  // others are held, so it's looked at often while playing
+  setInterval(() => {
+    watchLean();
+    holdBack();
+  }, lookEvery);
 
   /** Puts every tile on the clock at `at`, in recorder seconds; returns the loads it started. */
   const align = (at: number, exact: boolean): Array<Promise<void>> => {
@@ -281,15 +437,20 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
         continue;
       }
 
-      // A tile still loading would only start loading again
+      // A tile still loading would only start loading again, and one behind
+      // and catching up is waited for
       const drift = Math.abs((tile.player.offset() ?? into) - into);
 
-      if (exact || (isPlaying(tile.video) && drift > tolerance())) {
+      if (
+        exact ||
+        (isPlaying(tile.video) && drift > tolerance() && !isStalled(tile))
+      ) {
         tile.player.seek(into);
       }
 
-      // A tile held for another loading plays on once that one can too
-      if (playing && tile.video.paused && !held()) {
+      // A tile held for another loading plays on once that one can too. One
+      // at the end of its clip stays there: playing it would start it again
+      if (playing && tile.video.paused && !tile.video.ended && !held()) {
         void tile.video.play().catch(() => undefined);
       } else if (!playing && !tile.video.paused) {
         tile.video.pause();
@@ -313,7 +474,10 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     // the picture fades in rather than popping in
     video.addEventListener("loadstart", () => {
       figure.dataset.loading = "";
+      running.delete(tile);
     });
+
+    video.addEventListener("playing", () => running.add(tile));
 
     for (const type of ["loadeddata", "emptied"]) {
       video.addEventListener(type, () => {
@@ -388,6 +552,24 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     for (const type of ["play", "pause", "emptied"]) {
       video.addEventListener(type, () => {
         if (tile === driver) events.onState();
+      });
+    }
+
+    // The sub stream from a recorder squeezes the picture into another
+    // shape, which is drawn stretched back out; anything else, such as a
+    // copy that's the main stream whatever's asked for, at its own shape
+    for (const type of ["loadedmetadata", "resize"]) {
+      video.addEventListener(type, () => {
+        const ratio = subRatioOf(camera);
+        const own = video.videoWidth / (video.videoHeight || 1);
+
+        figure.toggleAttribute(
+          "data-squeezed",
+          view.stream === "sub" &&
+            ratio !== null &&
+            video.videoWidth > 0 &&
+            Math.abs(own - ratio) > 0.05,
+        );
       });
     }
 
@@ -555,22 +737,29 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
         void Promise.all(align(toSeconds(clip.begin) + to, true));
     },
     view: (next) => {
-      // Another view loads each clip again, from the other stream
+      // Another view loads each clip again, from the other stream, and
+      // starts every camera on the whole of it
       if (!sameView(next, view)) {
+        lean.clear();
+        heldAt.clear();
+
         for (const tile of tiles.values()) {
+          tile.figure.removeAttribute("data-lean");
+
           if (tile.player.clip() !== undefined) holdFrame(tile);
         }
       }
 
       view = next;
-      // The sub stream's pictures are squeezed, which the styles undo
       grid.dataset.stream = next.stream;
 
-      for (const tile of tiles.values()) tile.player.view(next);
+      for (const tile of tiles.values()) tile.player.view(viewOf(tile));
     },
     clip: () => driver?.player.clip(),
     offset: () => driver?.player.offset(),
     time: () => driver?.player.time(),
+    loaded: (to) => driver?.player.loaded(to) ?? false,
+    ahead: () => driver?.player.ahead() ?? 0,
     video: () => driver?.video,
     lead: () => tiles.get(picked)?.video,
     tiles: () => [...tiles.values()],
@@ -596,6 +785,9 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       for (const tile of tiles.values()) tile.video.pause();
     },
     rate: (rate) => {
+      // Another speed tries every camera on the whole stream again
+      if (rate !== playbackRate) resetLean();
+
       playbackRate = rate;
 
       for (const tile of tiles.values()) {

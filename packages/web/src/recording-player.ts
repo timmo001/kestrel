@@ -136,6 +136,13 @@ export interface Player {
   readonly offset: () => number | undefined;
   /** The recorder time at the playhead. */
   readonly time: () => string | undefined;
+  /** Whether video is loaded at `to` seconds into the clip. */
+  readonly loaded: (to: number) => boolean;
+  /**
+   * Seconds of playing time loaded ahead of the playhead, at the video's
+   * rate; Infinity once the rest of the clip is in.
+   */
+  readonly ahead: () => number;
 }
 
 export interface PlayerEvents {
@@ -516,5 +523,20 @@ export const playerFor = (
       current === undefined
         ? undefined
         : fromSeconds(toSeconds(current.begin) + Math.floor(offset())),
+    loaded: (to) => to >= base && isLoaded((to - base) / view.speedUp),
+    ahead: () => {
+      // Without Media Source Extensions the browser loads it, so there's
+      // nothing to tell
+      if (current === undefined || buffer === undefined) return Infinity;
+
+      const total = toSeconds(current.end) - toSeconds(current.begin);
+      const until = loadedUntil();
+
+      if (until >= (total - 3) / view.speedUp && loading === undefined) {
+        return Infinity;
+      }
+
+      return (until - video.currentTime) / (video.playbackRate || 1);
+    },
   };
 };
