@@ -55,8 +55,8 @@ const localOrigin = `http://127.0.0.1:${port}`;
 const resources = join(import.meta.dir, "..");
 const web = process.env.KESTREL_WEB ?? join(resources, "web");
 
-// The go2rtc and yt-dlp built into the app, so they run where mise isn't on
-// the path, such as at login
+// The go2rtc, yt-dlp and Node.js built into the app, so they run where mise
+// isn't on the path, such as at login
 process.env.KESTREL_GO2RTC ??= join(
   resources,
   "go2rtc",
@@ -67,6 +67,12 @@ process.env.KESTREL_YT_DLP ??= join(
   resources,
   "yt-dlp",
   process.platform === "win32" ? "yt-dlp.exe" : "yt-dlp",
+);
+
+process.env.KESTREL_NODE ??= join(
+  resources,
+  "node",
+  process.platform === "win32" ? "node.exe" : "node",
 );
 
 // The recorder login `mise run auth:save` keeps, for a source in

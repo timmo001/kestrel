@@ -230,6 +230,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends ./dist/kestrel-nvr_*.deb
           kestrel --version
           /opt/kestrel-nvr/Resources/app/yt-dlp/yt-dlp --version
+          /opt/kestrel-nvr/Resources/app/node/node --version
           export KESTREL_CONFIG="$RUNNER_TEMP/config" KESTREL_STATE="$RUNNER_TEMP/state"
           kestrel serve &
           server=$!
@@ -272,6 +273,7 @@ jobs:
       smoke-test: |-
         docker run --rm --entrypoint ffmpeg "$IMAGE" -hide_banner -version
         docker run --rm --entrypoint /opt/kestrel-nvr/lib/kestrel-nvr/Resources/app/yt-dlp/yt-dlp "$IMAGE" --version
+        docker run --rm --entrypoint /opt/kestrel-nvr/lib/kestrel-nvr/Resources/app/node/node "$IMAGE" --version
         docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 "$IMAGE"
         for _ in $(seq 30); do
           curl -fsS http://127.0.0.1:7390/api/health && break
@@ -304,6 +306,7 @@ jobs:
       push: ${{ github.event_name == 'release' }}
       latest: ${{ github.event_name == 'release' && !github.event.release.prerelease }}
       smoke-test: |-
+        docker run --rm --entrypoint /opt/kestrel-nvr/lib/kestrel-nvr/Resources/app/node/node "$IMAGE" --version
         docker run --detach --name kestrel --publish 127.0.0.1:7390:7380 "$IMAGE"
         for _ in $(seq 30); do
           curl -fsS http://127.0.0.1:7390/api/health && break

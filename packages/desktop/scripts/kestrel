@@ -49,11 +49,12 @@ if [ "$#" -eq 0 ]; then
 fi
 
 if [ "$1" = "serve" ]; then
-  # The web client, go2rtc and yt-dlp built into the bundle
+  # The web client, go2rtc, yt-dlp and Node.js built into the bundle
   KESTREL_WEB="${KESTREL_WEB:-$app/web}"
   KESTREL_GO2RTC="${KESTREL_GO2RTC:-$app/go2rtc/go2rtc}"
   KESTREL_YT_DLP="${KESTREL_YT_DLP:-$app/yt-dlp/yt-dlp}"
-  export KESTREL_WEB KESTREL_GO2RTC KESTREL_YT_DLP
+  KESTREL_NODE="${KESTREL_NODE:-$app/node/node}"
+  export KESTREL_WEB KESTREL_GO2RTC KESTREL_YT_DLP KESTREL_NODE
 fi
 
 # Settings come from the config folder and the environment, never from a .env

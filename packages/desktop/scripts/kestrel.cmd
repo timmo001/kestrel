@@ -15,6 +15,7 @@ if /i "%~1"=="serve" (
   if not defined KESTREL_WEB set "KESTREL_WEB=%app%web"
   if not defined KESTREL_GO2RTC set "KESTREL_GO2RTC=%app%go2rtc\go2rtc.exe"
   if not defined KESTREL_YT_DLP set "KESTREL_YT_DLP=%app%yt-dlp\yt-dlp.exe"
+  if not defined KESTREL_NODE set "KESTREL_NODE=%app%node\node.exe"
 )
 
 rem Settings come from the config folder and the environment, never from a

@@ -12,7 +12,7 @@ pkgdesc="Your cameras, recordings and events in one place, with a server for eve
 arch=('x86_64' 'aarch64')
 url="https://github.com/timmo001/kestrel"
 license=('Apache-2.0' 'MIT')
-depends=('glibc')
+depends=('glibc' 'gcc-libs')
 optdepends=('webkit2gtk-4.1: the desktop app'
             'gtk3: the desktop app'
             'libayatana-appindicator: the desktop app in the tray'
@@ -46,4 +46,5 @@ package() {
   install -Dm644 "$bundle/Resources/app/go2rtc/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/go2rtc.LICENSE"
   install -Dm644 "$bundle/Resources/app/yt-dlp/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/yt-dlp.LICENSE"
   install -Dm644 "$bundle/Resources/app/yt-dlp/THIRD_PARTY_LICENSES" "$pkgdir/usr/share/licenses/$pkgname/yt-dlp.THIRD_PARTY_LICENSES"
+  install -Dm644 "$bundle/Resources/app/node/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/node.LICENSE"
 }

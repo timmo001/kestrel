@@ -47,6 +47,7 @@ cp "$linux/kestrel-nvr.desktop" "$linux/kestrel-nvr.user.service" \
   "$root/packages/desktop/licenses/go2rtc.LICENSE" \
   "$root/packages/desktop/licenses/yt-dlp.LICENSE" \
   "$root/packages/desktop/licenses/yt-dlp.THIRD_PARTY_LICENSES" "$stage/"
+cp "$stage/opt/kestrel-nvr/Resources/app/node/LICENSE" "$stage/node.LICENSE"
 
 # nFPM reads the files from where it runs
 cd "$stage"

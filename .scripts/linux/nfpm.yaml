@@ -21,6 +21,9 @@ overrides:
   deb:
     depends:
       - libc6
+      # Node.js, for yt-dlp
+      - libstdc++6
+      - libatomic1
     recommends:
       - ffmpeg
       - libwebkit2gtk-4.1-0
@@ -29,6 +32,8 @@ overrides:
   rpm:
     depends:
       - glibc
+      - libstdc++
+      - libatomic
     suggests:
       - ffmpeg
       - webkit2gtk4.1
@@ -60,5 +65,7 @@ contents:
     dst: /usr/share/licenses/kestrel-nvr/yt-dlp.LICENSE
   - src: yt-dlp.THIRD_PARTY_LICENSES
     dst: /usr/share/licenses/kestrel-nvr/yt-dlp.THIRD_PARTY_LICENSES
+  - src: node.LICENSE
+    dst: /usr/share/licenses/kestrel-nvr/node.LICENSE
 scripts:
   postinstall: postinstall.sh
