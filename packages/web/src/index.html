@@ -803,8 +803,12 @@
                   >Pair a device</gw-button
                 >
               </gw-row>
-              <gw-alert class="devices-code" hidden></gw-alert>
-              <div class="devices-qr" hidden></div>
+              <!-- A one-time code by the button, a bottom sheet on a phone -->
+              <gw-popover class="devices-pairing" heading="Pair a device" fit>
+                <gw-pairing
+                  instructions-label="Scan this with the other device's camera, or open Kestrel there and type the code."
+                ></gw-pairing>
+              </gw-popover>
               <gw-table class="devices-list"></gw-table>
             </gw-stack>
           </gw-expansion>

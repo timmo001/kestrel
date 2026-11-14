@@ -1,10 +1,14 @@
 /**
  * The Pair page: where a browser the server doesn't know yet lands. It pairs
- * with a code typed in, or straight away with one carried in the address
- * (`#code=`), as a link or QR code from Settings or `kestrel pair` opens it.
- * The server answers with a cookie this page can't read, then the app starts
- * again as a paired browser.
+ * with a code typed in, or a pairing link pasted in, or straight away with
+ * one carried in the address (`#pair=`), as a link or QR code from Settings
+ * or `kestrel pair` opens it. The server answers with a cookie this page
+ * can't read, then the app starts again as a paired browser.
  */
+import {
+  parsePairingInput,
+  takePairingLink,
+} from "@timmo001/groundwork-pwa/pairing";
 import { call } from "./api.ts";
 import { find } from "./shared.ts";
 
@@ -33,12 +37,15 @@ export const pairPage = (options: PairOptions): PairPage => {
     error.hidden = message === "";
   };
 
-  const pair = async (code: string) => {
-    if (code.trim() === "") {
+  /** Pairs with a typed code, or a whole pairing link pasted in. */
+  const pair = async (typed: string) => {
+    if (typed.trim() === "") {
       say("Type the code first.");
 
       return;
     }
+
+    const code = parsePairingInput(typed, location.href)?.code ?? typed;
 
     if (submit !== null) submit.disabled = true;
 
@@ -69,20 +76,18 @@ export const pairPage = (options: PairOptions): PairPage => {
 
   return {
     open: () => {
-      const code = new URLSearchParams(location.hash.slice(1)).get("code");
+      // Taken out of the address, so it isn't kept in the history or shared on
+      const link = takePairingLink();
 
-      if (code === null) {
+      if (link === undefined) {
         input?.focus();
 
         return;
       }
 
-      // Out of the address, so it isn't kept in the history or shared on
-      history.replaceState(null, "", `${location.pathname}${location.search}`);
+      if (input !== null) input.value = link.code;
 
-      if (input !== null) input.value = code;
-
-      void pair(code);
+      void pair(link.code);
     },
   };
 };

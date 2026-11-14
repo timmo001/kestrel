@@ -27,6 +27,7 @@ import {
   Schema,
 } from "effect";
 import type { Cookies, HttpServerRequest } from "effect/http";
+import { pairingUrl } from "@timmo001/groundwork-pwa/pairing";
 import {
   Device,
   PairingRefused,
@@ -289,11 +290,14 @@ export class Devices extends Context.Service<
         return {
           code: showCode(made),
           expires: new Date(expires).toISOString(),
+          // Groundwork's pairing link, the code in the fragment so it never
+          // reaches a request log
           link: Option.getOrUndefined(
-            Option.map(
-              identity.url,
-              (url) =>
-                `${url}/pair#code=${showCode(made)}&server=${identity.id}`,
+            Option.map(identity.url, (url) =>
+              pairingUrl(
+                { service: `${url}/pair`, code: showCode(made) },
+                "fragment",
+              ),
             ),
           ),
         };

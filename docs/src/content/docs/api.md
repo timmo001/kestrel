@@ -113,7 +113,8 @@ minutes cancel every open one. `POST /api/devices/pair` takes
 other kind gets its `token` in the reply, once, and sends it as
 `Authorization: Bearer <token>`. A wrong, used or late code returns 403
 with `PairingRefused`. The code's `link` is the page that pairs with it,
-`<server>/pair#code=…&server=<id>`, for a QR code; it's missing when the
+`<server>/pair#pair=…`, Groundwork's pairing link with the code in the
+fragment, for a QR code; it's missing when the
 server has no address other devices can reach (set `KESTREL_URL` to name
 one).
 
