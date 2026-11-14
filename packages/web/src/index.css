@@ -697,10 +697,6 @@ gw-table gw-sheet {
   grid-area: 1 / 2 / span 2;
 }
 
-.live-steer-head[hidden] {
-  display: none;
-}
-
 .live-steer-title {
   font-weight: 600;
 }
@@ -823,10 +819,6 @@ gw-table gw-sheet {
   width: min(100%, 24rem);
 }
 
-.live-steer-pad[hidden] {
-  display: none;
-}
-
 .live-arrow-pad {
   display: grid;
   grid-template:
@@ -899,20 +891,20 @@ gw-table gw-sheet {
   display: none;
 }
 
-/* In Move mode, Home and setup a row of their own over the presets, except
-   on a phone on its side, where there's no height to spare */
+/* Home and setup a row of their own over the presets, except on a phone on
+   its side, where there's no height to spare */
 @media not ((orientation: landscape) and (max-height: 30rem)) {
-  .live-steer-dock[data-moving] .live-steer-bar {
+  .live-steer-bar {
     flex-wrap: wrap;
   }
 
-  .live-steer-dock[data-moving] .live-presets {
+  .live-steer-bar > .live-presets {
     flex-basis: 100%;
     order: 1;
     justify-content: safe center;
   }
 
-  .live-steer-dock[data-moving] .live-steer-split {
+  .live-steer-split {
     display: none;
   }
 }

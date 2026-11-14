@@ -475,7 +475,6 @@ export const steering = (options: SteeringOptions): Steering => {
     }
 
     moveButton.hidden = on;
-    dock.toggleAttribute("data-moving", on);
     title.textContent = `Moving ${cameraLabel(current.tile.id)}`;
     zoomRow.hidden = !zooms;
     zoomSlider.value = Math.round((state?.zoom ?? 0) * 100);
