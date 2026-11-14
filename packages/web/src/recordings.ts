@@ -35,7 +35,7 @@ import {
   phGauge,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
-  phQuestion,
+  phQuestionMark,
   phPause,
   phPlay,
   phScissors,
@@ -431,7 +431,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const keyButton = find("gw-button", "timeline-key-button");
 
   // What the timeline's colours mean, from the ? beside its zoom
-  controlIcon(keyButton, phQuestion);
+  controlIcon(keyButton, phQuestionMark);
   keyButton?.setAttribute("size", "small");
   helpToggle(find("gw-popover", "timeline-key"), keyButton);
 
@@ -1785,7 +1785,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   });
 
   // The help button, or ?, opens the keys by the button and shuts them again
-  setIcon(helpButton, phQuestion);
+  setIcon(helpButton, phQuestionMark);
   helpToggle(find("gw-popover", "shortcuts"), helpButton);
 
   showState();

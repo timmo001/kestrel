@@ -3,10 +3,21 @@
  * browser's language, and recordings as table rows with Play and Download.
  */
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
-import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
+import {
+  on,
+  type MenuItem,
+  type TableColumn,
+  type TableRow,
+} from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
-import { phCaretDown, phCaretUp, phDownloadSimple, phPlay } from "./icons.ts";
+import {
+  phCaretDown,
+  phCaretUp,
+  phDotsThreeVertical,
+  phDownloadSimple,
+  phPlay,
+} from "./icons.ts";
 import { clipUrl, type Clip } from "./recording-player.ts";
 
 /** Fields that take text: a toggle's radios don't, so keys pass them by. */
@@ -165,8 +176,9 @@ const outerWidth = (element: Element) => {
 
 /**
  * What a group of controls needs to sit in one line, its showing controls
- * and the gaps between: with every one, and without those marked
- * `data-optional`, which a tight bar leaves out.
+ * and the gaps between: with every one, and tight, without those marked
+ * `data-optional` and with those marked `data-overflow` folded into the
+ * More menu, which takes one button's room in the group that has it.
  */
 const lineWidths = (group: Element | null) => {
   if (group === null) return { full: 0, tight: 0 };
@@ -183,10 +195,96 @@ const lineWidths = (group: Element | null) => {
     children.reduce((sum, child) => sum + outerWidth(child), 0) +
     gap * Math.max(children.length - 1, 0);
 
-  return {
-    full: width(shown),
-    tight: width(shown.filter((child) => !child.hasAttribute("data-optional"))),
+  const folded = shown.filter((child) => child.hasAttribute("data-overflow"));
+
+  const kept = shown.filter(
+    (child) =>
+      !child.hasAttribute("data-optional") &&
+      !child.hasAttribute("data-overflow"),
+  );
+
+  const more =
+    group.querySelector(":scope > .controls-more") === null ||
+    folded.length === 0
+      ? 0
+      : Math.max(...folded.map(outerWidth)) + gap;
+
+  return { full: width(shown), tight: width(kept) + more };
+};
+
+/**
+ * A player bar's More menu: the controls marked `data-overflow`, which are
+ * seldom used, such as Capture and Download, folded into it while the bar
+ * is tight or as on a phone. Each item mirrors its control, its label, icon
+ * and whether it's on or can be pressed, and choosing it presses it.
+ */
+export const overflowMenu = (bar: HTMLElement) => {
+  const more = [...bar.querySelectorAll("gw-menu-button")].find((each) =>
+    each.classList.contains("controls-more"),
+  );
+
+  if (more === undefined) return;
+
+  const controls = [...bar.querySelectorAll("gw-button")].filter((each) =>
+    each.hasAttribute("data-overflow"),
+  );
+
+  more.setAttribute("icon", phDotsThreeVertical);
+
+  /** A control as its item: a toggle's says whether it's on. */
+  const itemFor = (
+    control: HTMLElementTagNameMap["gw-button"],
+    index: number,
+  ): MenuItem => {
+    const item: MenuItem = {
+      value: String(index),
+      label: control.getAttribute("label") ?? "",
+      icon: control.getAttribute("icon") ?? "",
+      disabled: control.disabled,
+    };
+
+    return control.hasAttribute("toggle")
+      ? { ...item, checked: control.pressed }
+      : item;
   };
+
+  const show = () => {
+    more.items = controls.flatMap((control, index) =>
+      control.hidden ? [] : [itemFor(control, index)],
+    );
+  };
+
+  on(more, "select", (event) => {
+    const control = controls[Number(event.detail.value)];
+
+    if (control === undefined || control.disabled) return;
+
+    // A link, such as Download, is followed as its own would be
+    const href = control.getAttribute("href");
+
+    if (href === null) {
+      control.click();
+
+      return;
+    }
+
+    const link = element("a");
+
+    link.href = href;
+    link.download = "";
+    link.click();
+  });
+
+  const watcher = new MutationObserver(show);
+
+  for (const control of controls) {
+    watcher.observe(control, {
+      attributes: true,
+      attributeFilter: ["label", "icon", "disabled", "pressed", "hidden"],
+    });
+  }
+
+  show();
 };
 
 /**
@@ -222,7 +320,8 @@ export const compactWhenCrowded = (bar: HTMLElement) => {
       Number.parseFloat(style.paddingLeft) +
       Number.parseFloat(style.paddingRight);
 
-    const room = bar.clientWidth - padding;
+    // A little to spare, as the measures round and the grid's don't
+    const room = bar.clientWidth - padding - 16;
 
     const fits = (size: "full" | "tight") => {
       const [left = 0, middle = 0, right = 0] = [start, transport, end].map(

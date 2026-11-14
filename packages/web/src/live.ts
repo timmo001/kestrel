@@ -34,7 +34,7 @@ import {
   phMagnifyingGlassPlus,
   phPause,
   phPlay,
-  phQuestion,
+  phQuestionMark,
   phSlidersHorizontal,
   phSpeakerHigh,
   phSpeakerLow,
@@ -524,7 +524,7 @@ export const livePage = (): LivePage => {
   setIcon(moveButton, phJoystick, "Move the camera (M)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
-  setIcon(helpButton, phQuestion, "Keyboard controls (?)");
+  setIcon(helpButton, phQuestionMark, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");

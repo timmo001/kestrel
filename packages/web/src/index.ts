@@ -64,6 +64,7 @@ import {
   compactWhenCrowded,
   fillWindow,
   find,
+  overflowMenu,
   overlayControls,
 } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
@@ -181,6 +182,7 @@ const showAttention = (all: ReadonlyArray<Attention>) => {
 // row, and on a phone on its side over the picture, as a video player's
 for (const bar of document.querySelectorAll(".player-controls")) {
   if (bar instanceof HTMLElement) {
+    overflowMenu(bar);
     compactWhenCrowded(bar);
     overlayControls(bar);
   }

@@ -704,15 +704,27 @@ gw-table gw-sheet {
   align-items: end;
 }
 
-/* The day as one pill, the arrows and the date on the same track as the
-   timeline's zoom beside it, with no outline of their own */
-.day-picker {
+/* Controls that work together on one pill, as a segmented control's track:
+   the day with its arrows, and a picture's zoom with its steps. What's
+   inside has no outline or fill of its own, and lines part its sections */
+.control-pill {
   flex-wrap: nowrap;
   gap: 2px;
   align-items: center;
   background: var(--gw-color-surface-lower);
   border: max(var(--gw-border-width), 1px) solid var(--gw-color-border-normal);
   border-radius: var(--gw-radius-pill);
+}
+
+.control-pill gw-segmented::part(track) {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* The zoom's fit or fill, parted from its steps */
+.zoom-pill gw-segmented {
+  padding-inline-end: 2px;
+  border-inline-end: 1px solid var(--gw-color-border-quiet);
 }
 
 /* Lines either side of the date part it from the arrows */
@@ -891,10 +903,12 @@ gw-table gw-sheet {
   border-block-start: 1px solid var(--gw-color-border-quiet);
 }
 
+/* Each group stays on one line: the page picks the rows, so a group never
+   wraps on its own */
 .controls-start,
 .controls-transport,
 .controls-end {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--gw-space-1);
   align-items: center;
 }
@@ -914,8 +928,11 @@ gw-table gw-sheet {
 }
 
 /* Tight, the controls the device or a key stands in for give up their room
-   before the bar takes another row */
-.player-controls[data-tight] [data-optional] {
+   before the bar takes another row, and the seldom used fold into More,
+   which only shows then */
+.player-controls[data-tight] [data-optional],
+.player-controls:is([data-tight], [data-compact]) [data-overflow],
+.player-controls:not([data-tight], [data-compact]) .controls-more {
   display: none;
 }
 
@@ -994,7 +1011,7 @@ gw-table gw-sheet {
 }
 
 /* Then Live's pager across, or Recordings' speed and the rest of its
-   transport: a frame on, stop, the next event, events only and Cut */
+   transport: a frame on, stop, the next event and events only */
 .player-controls[data-compact] .live-pager {
   grid-area: 2 / 1 / auto / -1;
   max-width: 100%;
@@ -1020,39 +1037,18 @@ gw-table gw-sheet {
   grid-area: 2 / 6;
 }
 
-.player-controls[data-compact] .control-cut {
-  grid-area: 2 / 7;
+/* Then the zoom's pill, with camera moves on Live, and More, holding the
+   seldom used, such as Capture */
+.player-controls[data-compact] .zoom-pill {
+  grid-area: 3 / 1 / auto / 6;
+  justify-self: start;
 }
 
-/* Then the zoom, with camera moves and capture on Live, and capture and
-   Download on Recordings */
-.player-controls[data-compact] .live-fit,
-.player-controls[data-compact] .control-fit {
-  grid-area: 3 / 1 / auto / 3;
-}
-
-.player-controls[data-compact] .live-zoom-out,
-.player-controls[data-compact] .control-zoom-out {
-  grid-area: 3 / 3;
-}
-
-.player-controls[data-compact] .live-zoom-fit,
-.player-controls[data-compact] .control-zoom-fit {
-  grid-area: 3 / 4;
-}
-
-.player-controls[data-compact] .live-zoom-in,
-.player-controls[data-compact] .control-zoom-in {
-  grid-area: 3 / 5;
-}
-
-.player-controls[data-compact] .live-move,
-.player-controls[data-compact] .control-capture {
+.player-controls[data-compact] .live-move {
   grid-area: 3 / 6;
 }
 
-.player-controls[data-compact] .live-capture,
-.player-controls[data-compact] .control-download {
+.player-controls[data-compact] .controls-more {
   grid-area: 3 / 7;
 }
 
@@ -1565,23 +1561,13 @@ kbd {
   :is(
     .live-pager,
     .control-speed,
-    .live-fit,
-    .control-fit,
     .control-frame,
     .control-stop,
     .control-next-event,
     .control-events,
-    .control-cut,
-    .control-download,
-    .live-zoom-out,
-    .control-zoom-out,
-    .live-zoom-fit,
-    .control-zoom-fit,
-    .live-zoom-in,
-    .control-zoom-in,
+    .zoom-pill,
     .live-move,
-    .control-capture,
-    .live-capture
+    .controls-more
   ) {
   display: none;
 }

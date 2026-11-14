@@ -166,25 +166,31 @@
                 <gw-button class="live-play" label="Pause"></gw-button>
               </gw-row>
               <gw-row class="controls-end">
-                <!-- The picked camera's zoom: fit or fill, as the theme's
-                     mode switcher, then a step at a time from there -->
-                <gw-segmented
-                  class="live-fit"
-                  label="Zoom"
-                  labels="hide"
-                  value="fit"
-                ></gw-segmented>
-                <gw-button class="live-zoom-out" label="Zoom out"></gw-button>
-                <!-- The zoom, which goes back to the whole picture -->
-                <gw-button
-                  class="live-zoom-fit"
-                  label="Fit the picture (0)"
-                  appearance="plain"
-                  variant="neutral"
-                  >100%</gw-button
+                <!-- The picked camera's zoom on one pill: fit or fill, then
+                     a step at a time from there -->
+                <gw-row
+                  class="control-pill zoom-pill"
+                  role="group"
+                  aria-label="Zoom"
                 >
-                <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
-                <span class="controls-divider" aria-hidden="true"></span>
+                  <gw-segmented
+                    class="live-fit"
+                    label="Zoom"
+                    labels="hide"
+                    size="small"
+                    value="fit"
+                  ></gw-segmented>
+                  <gw-button class="live-zoom-out" label="Zoom out"></gw-button>
+                  <!-- The zoom, which goes back to the whole picture -->
+                  <gw-button
+                    class="live-zoom-fit"
+                    label="Fit the picture (0)"
+                    appearance="plain"
+                    variant="neutral"
+                    >100%</gw-button
+                  >
+                  <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
+                </gw-row>
                 <!-- Steers the picked camera, where it moves -->
                 <gw-button
                   class="live-move"
@@ -198,13 +204,24 @@
                   label="Picture settings"
                   hidden
                 ></gw-button>
-                <gw-button class="live-capture" label="Capture"></gw-button>
+                <!-- Seldom used, so in the More menu when the bar is tight -->
+                <gw-button
+                  class="live-capture"
+                  label="Capture"
+                  data-overflow
+                ></gw-button>
                 <!-- Optional, as ? opens it too -->
                 <gw-button
                   class="live-help"
                   label="Keyboard controls"
                   data-optional
                 ></gw-button>
+                <gw-menu-button
+                  class="controls-more"
+                  label="More"
+                  labels="hide"
+                  appearance="plain"
+                ></gw-menu-button>
                 <gw-button
                   class="live-fullscreen"
                   label="Full screen"
@@ -372,44 +389,55 @@
                   ></gw-button>
                 </gw-row>
                 <gw-row class="controls-end">
+                  <!-- Seldom used, so in the More menu when the bar is tight -->
                   <gw-button
                     class="control-cut"
                     label="Cut a clip"
                     toggle
+                    data-overflow
                   ></gw-button>
                   <gw-button
                     class="control-capture"
                     label="Capture"
+                    data-overflow
                   ></gw-button>
                   <gw-button
                     class="control-download"
                     label="Download this recording"
+                    data-overflow
                   ></gw-button>
                   <span class="controls-divider" aria-hidden="true"></span>
                   <span class="player-clock">--:--:--</span>
-                  <!-- The picked camera's zoom, as on the Live page -->
-                  <gw-segmented
-                    class="control-fit"
-                    label="Zoom"
-                    labels="hide"
-                    value="fit"
-                  ></gw-segmented>
-                  <gw-button
-                    class="control-zoom-out"
-                    label="Zoom out"
-                  ></gw-button>
-                  <!-- The zoom, which goes back to the whole picture -->
-                  <gw-button
-                    class="control-zoom-fit"
-                    label="Fit the picture"
-                    appearance="plain"
-                    variant="neutral"
-                    >100%</gw-button
+                  <!-- The picked camera's zoom on one pill, as on Live -->
+                  <gw-row
+                    class="control-pill zoom-pill"
+                    role="group"
+                    aria-label="Zoom"
                   >
-                  <gw-button
-                    class="control-zoom-in"
-                    label="Zoom in"
-                  ></gw-button>
+                    <gw-segmented
+                      class="control-fit"
+                      label="Zoom"
+                      labels="hide"
+                      size="small"
+                      value="fit"
+                    ></gw-segmented>
+                    <gw-button
+                      class="control-zoom-out"
+                      label="Zoom out"
+                    ></gw-button>
+                    <!-- The zoom, which goes back to the whole picture -->
+                    <gw-button
+                      class="control-zoom-fit"
+                      label="Fit the picture"
+                      appearance="plain"
+                      variant="neutral"
+                      >100%</gw-button
+                    >
+                    <gw-button
+                      class="control-zoom-in"
+                      label="Zoom in"
+                    ></gw-button>
+                  </gw-row>
                   <!-- How several cameras tile, as on Live -->
                   <gw-menu-button
                     class="control-view"
@@ -424,6 +452,12 @@
                     label="Keyboard controls"
                     data-optional
                   ></gw-button>
+                  <gw-menu-button
+                    class="controls-more"
+                    label="More"
+                    labels="hide"
+                    appearance="plain"
+                  ></gw-menu-button>
                   <gw-button
                     class="control-fullscreen"
                     label="Full screen"
@@ -506,7 +540,11 @@
               <div class="timeline-ticks" aria-hidden="true"></div>
               <gw-row class="timeline-foot">
                 <!-- The day the timeline shows -->
-                <gw-row class="day-picker" role="group" aria-label="Day">
+                <gw-row
+                  class="control-pill day-picker"
+                  role="group"
+                  aria-label="Day"
+                >
                   <gw-button
                     class="day-previous"
                     label="Previous day"
