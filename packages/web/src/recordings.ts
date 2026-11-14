@@ -1339,9 +1339,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     if (idleText !== null) {
       idleText.textContent =
-        recordings.length === 0 && listed.length > 0
-          ? "These recordings are only on the camera's SD card, and this camera doesn't share those"
-          : pickText;
+        ticked.length === 0
+          ? "Pick cameras to watch their recordings"
+          : recordings.length === 0 && listed.length > 0
+            ? "These recordings are only on the camera's SD card, and this camera doesn't share those"
+            : pickText;
     }
 
     if (cameraOnlyKey !== null) {
@@ -1365,12 +1367,15 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     showState();
   };
 
-  /** The address for a day, on the cameras playing, with `lead` picked. */
-  const searchFor = (date: string, lead = camera): RecordingsSearch => ({
-    camera: lead,
-    ...(ticked.length > 1 && { cameras: ticked }),
-    date,
-  });
+  /** The address for a day, on the cameras playing, with `lead` picked; or none. */
+  const searchFor = (date: string, lead = camera): RecordingsSearch =>
+    lead === ""
+      ? { cameras: [], date }
+      : {
+          camera: lead,
+          ...(ticked.length > 1 && { cameras: ticked }),
+          date,
+        };
 
   /** Asks the address for the picked day, on these cameras. */
   const pick = (date: string) => options.onPick(searchFor(date));
@@ -1564,17 +1569,47 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   // Ticking cameras plays them together; the picked one stays picked while
   // it's ticked. The layouts stop at four, so a fifth unticks the first
-  // ticked, and the last can't be unticked
+  // ticked. Clear, or unticking the last, leaves none
   if (cameraSelect !== null) {
     cameraSelect.multiple = true;
 
+    // Ctrl, Alt or Cmd with a click or Enter picks that camera alone, the
+    // rest unticked, as a file list's own picking goes
+    let alonePick = false;
+
+    for (const type of ["pointerdown", "keydown"] as const) {
+      cameraSelect.addEventListener(
+        type,
+        (event) => {
+          alonePick = event.ctrlKey || event.altKey || event.metaKey;
+        },
+        true,
+      );
+    }
+
     on(cameraSelect, "change", () => {
+      const toggled = [
+        ...cameraSelect.values.filter((value) => !ticked.includes(value)),
+        ...ticked.filter((value) => !cameraSelect.values.includes(value)),
+      ];
+
+      const only = alonePick && toggled.length === 1 ? toggled[0] : undefined;
+
+      alonePick = false;
+
+      if (only !== undefined && placeOf(only) !== -1) {
+        cameraSelect.close();
+        options.onPick({ camera: only, date: day });
+
+        return;
+      }
+
       const picks = cameraSelect.values
         .filter((value) => placeOf(value) !== -1)
         .slice(-mostCameras);
 
       if (picks.length === 0) {
-        cameraSelect.values = [...ticked];
+        options.onPick({ cameras: [], date: day });
 
         return;
       }
@@ -1593,6 +1628,17 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const follow = async (search: RecordingsSearch) => {
     const known = (id: CameraId | undefined): id is CameraId =>
       id !== undefined && placeOf(id) !== -1;
+
+    // An address with no cameras at all, as Clear leaves, plays none
+    if (search.camera === undefined && search.cameras?.length === 0) {
+      const date = search.date ?? day;
+
+      if (date !== day || ticked.length > 0) {
+        await show({ camera: "", cameras: [], date });
+      }
+
+      return;
+    }
 
     // The address's camera, or the kept one, or the first with recordings
     const lead = [search.camera, saved.camera].find(known) ?? cameras[0]?.id;

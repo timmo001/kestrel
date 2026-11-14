@@ -38,12 +38,18 @@ const route = <P, S>(
   search: Schema.Codec<S, SearchEncoded>,
 ): RouteDefinition<P, S> => ({ path, params, search });
 
-/** Cameras as a comma list, such as `swann/1,swann/3`. */
+/**
+ * Cameras as a comma list, such as `swann/1,swann/3`, or `none` for none, as
+ * a link leaves empty values out. A camera's id always has a slash, so none
+ * is called `none`.
+ */
 const CameraList = Schema.String.pipe(
   Schema.decodeTo(Schema.Array(CameraId), {
-    decode: SchemaGetter.transform((text: string) => text.split(",")),
+    decode: SchemaGetter.transform((text: string) =>
+      text === "none" ? [] : text.split(","),
+    ),
     encode: SchemaGetter.transform((parts: ReadonlyArray<string>) =>
-      parts.join(","),
+      parts.length === 0 ? "none" : parts.join(","),
     ),
   }),
 );
@@ -51,7 +57,7 @@ const CameraList = Schema.String.pipe(
 /**
  * The Recordings page: the picked camera and the others played with it, a
  * day, and a time to play from. Without `cameras`, the picked camera plays
- * alone.
+ * alone; with them empty, and no camera, none plays.
  */
 export const RecordingsSearch = Schema.Struct({
   camera: Schema.optional(CameraId),
