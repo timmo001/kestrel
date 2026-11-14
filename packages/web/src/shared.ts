@@ -123,6 +123,81 @@ export const controlKey = (event: KeyboardEvent): string | undefined => {
   return event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key;
 };
 
+/** An element's width with its side margins. */
+const outerWidth = (element: Element) => {
+  const style = getComputedStyle(element);
+
+  return (
+    element.getBoundingClientRect().width +
+    Number.parseFloat(style.marginLeft) +
+    Number.parseFloat(style.marginRight)
+  );
+};
+
+/** What a group of controls needs to sit in one line: its showing controls and the gaps between. */
+const lineWidth = (group: Element) => {
+  const shown = [...group.children].filter(
+    (child) =>
+      child.getBoundingClientRect().width > 0 &&
+      !["absolute", "fixed"].includes(getComputedStyle(child).position),
+  );
+
+  const gap = Number.parseFloat(getComputedStyle(group).columnGap) || 0;
+
+  return (
+    shown.reduce((sum, child) => sum + outerWidth(child), 0) +
+    gap * Math.max(shown.length - 1, 0)
+  );
+};
+
+/**
+ * Lays a player's control bar out as on a phone once its controls don't fit
+ * in one row, rather than letting them wrap unevenly. It's measured laid out
+ * in a row, with the transport in the middle and the start and end either
+ * side, as the controls differ by page and by what the cameras can do, and
+ * again as the bar or its controls change size.
+ */
+export const compactWhenCrowded = (bar: HTMLElement) => {
+  const fit = () => {
+    bar.removeAttribute("data-compact");
+
+    // A hidden page has nothing to measure
+    if (bar.clientWidth === 0) return;
+
+    const [start, transport, end] = [
+      "controls-start",
+      "controls-transport",
+      "controls-end",
+    ].map((name) => {
+      const group = bar.querySelector(`:scope > .${name}`);
+
+      return group === null ? 0 : lineWidth(group);
+    });
+
+    const style = getComputedStyle(bar);
+    const gap = Number.parseFloat(style.columnGap) || 0;
+
+    const needed =
+      2 * Math.max(start ?? 0, end ?? 0) +
+      (transport ?? 0) +
+      2 * gap +
+      Number.parseFloat(style.paddingLeft) +
+      Number.parseFloat(style.paddingRight);
+
+    bar.toggleAttribute("data-compact", needed > bar.clientWidth);
+  };
+
+  const observer = new ResizeObserver(fit);
+
+  observer.observe(bar);
+
+  // A control shown or hidden, such as Recordings' View menu, or a wider
+  // label, changes what the row needs
+  for (const control of bar.querySelectorAll(":scope > * > *")) {
+    observer.observe(control);
+  }
+};
+
 /** The first `tag` element with `className`, or null. */
 export const find = <K extends keyof HTMLElementTagNameMap>(
   tag: K,

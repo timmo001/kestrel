@@ -55,7 +55,7 @@ import { livePage } from "./live.ts";
 import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import { find } from "./shared.ts";
+import { compactWhenCrowded, find } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
 import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
@@ -166,6 +166,11 @@ const showAttention = (all: ReadonlyArray<Attention>) => {
       .map(attentionAlert),
   );
 };
+
+// Both players' controls go to the phone's layout once they don't fit in a row
+for (const bar of document.querySelectorAll(".player-controls")) {
+  if (bar instanceof HTMLElement) compactWhenCrowded(bar);
+}
 
 // Each page is a module of its own
 const live = livePage();

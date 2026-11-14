@@ -882,149 +882,145 @@ gw-table gw-sheet {
   justify-content: flex-end;
 }
 
-/* Narrow, the transport goes first, across, and the rest under it */
-@media (width < 60rem) {
-  .player-controls {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .controls-transport {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-content: center;
-  }
+/* Once the controls no longer fit in one row, as on a phone, both players'
+   controls take the same three rows on seven even columns, so each row lines
+   up with the one above: the transport in the middle with full screen at the
+   end, the layouts or speeds across, then the zoom and capture. The groups
+   give their controls straight to the grid, and Recordings' less used ones
+   go in its More menu. The page measures when, as the controls differ by
+   page and by what the cameras can do */
+.player-controls[data-compact] {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--gw-space-2) 0;
+  justify-items: center;
+  /* Wider than a phone, the controls keep a phone's width in the middle of
+     the band, rather than spreading out across it */
+  padding: var(--gw-space-3) max(var(--gw-space-2), calc((100% - 40rem) / 2));
 }
 
-/* On a phone, both players' controls take the same three rows on seven even
-   columns, so each row lines up with the one above: the transport in the
-   middle with full screen at the end, the layouts or speeds across, then
-   the zoom and capture. The groups give their controls straight to the grid,
-   and Recordings' less used ones go in its More menu */
+.player-controls[data-compact] > .controls-start,
+.player-controls[data-compact] > .controls-transport,
+.player-controls[data-compact] > .controls-end {
+  display: contents;
+}
+
+/* The dividers and the keys' help have no place, the volume is the device's
+   own, and the rest are in the More menu */
+.player-controls[data-compact] .controls-divider,
+.player-controls[data-compact] .live-help,
+.player-controls[data-compact] .control-help,
+.player-controls[data-compact] .live-volume,
+.player-controls[data-compact] .control-stop,
+.player-controls[data-compact] .control-frame,
+.player-controls[data-compact] .control-cut,
+.player-controls[data-compact] .control-download,
+.player-controls[data-compact] .control-next-event,
+.player-controls[data-compact] .control-events {
+  display: none;
+}
+
+.player-controls[data-compact] gw-popover {
+  position: absolute;
+}
+
+/* The first row: the sound or the time, the transport, the View menu and
+   full screen */
+.player-controls[data-compact] .live-sound {
+  grid-area: 1 / 1;
+}
+
+.player-controls[data-compact] .player-clock {
+  grid-area: 1 / 1 / auto / 3;
+  justify-self: start;
+}
+
+.player-controls[data-compact] .live-previous,
+.player-controls[data-compact] .control-previous {
+  grid-area: 1 / 3;
+}
+
+.player-controls[data-compact] .live-play,
+.player-controls[data-compact] .control-play {
+  grid-area: 1 / 4;
+}
+
+.player-controls[data-compact] .live-next,
+.player-controls[data-compact] .control-next {
+  grid-area: 1 / 5;
+}
+
+.player-controls[data-compact] .live-view,
+.player-controls[data-compact] .control-view {
+  grid-area: 1 / 6;
+}
+
+/* Picture settings, where a camera has them, beside the sound */
+.player-controls[data-compact] .live-picture {
+  grid-area: 1 / 2;
+}
+
+.player-controls[data-compact] .live-fullscreen,
+.player-controls[data-compact] .control-fullscreen {
+  grid-area: 1 / 7;
+}
+
+/* Then the layout or speeds across, scrolling in place where they're wider
+   than the bar */
+.player-controls[data-compact] .live-layout,
+.player-controls[data-compact] .control-speed {
+  grid-area: 2 / 1 / auto / -1;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+/* Live's page of cameras, when a layout pages them, goes last, so no empty
+   row is left when it's hidden */
+.player-controls[data-compact] .live-page {
+  grid-area: 4 / 1 / auto / -1;
+}
+
+/* Then the zoom, with camera moves and capture on Live, and capture and More
+   on Recordings */
+.player-controls[data-compact] .live-fit,
+.player-controls[data-compact] .control-fit {
+  grid-area: 3 / 1 / auto / 3;
+}
+
+.player-controls[data-compact] .live-zoom-out,
+.player-controls[data-compact] .control-zoom-out {
+  grid-area: 3 / 3;
+}
+
+.player-controls[data-compact] .live-zoom-fit,
+.player-controls[data-compact] .control-zoom-fit {
+  grid-area: 3 / 4;
+}
+
+.player-controls[data-compact] .live-zoom-in,
+.player-controls[data-compact] .control-zoom-in {
+  grid-area: 3 / 5;
+}
+
+.player-controls[data-compact] .live-move,
+.player-controls[data-compact] .control-capture {
+  grid-area: 3 / 6;
+}
+
+.player-controls[data-compact] .live-capture,
+.player-controls[data-compact] .control-more {
+  grid-area: 3 / 7;
+}
+
+/* In one row, every control has its own button */
+.player-controls:not([data-compact]) .control-more {
+  display: none;
+}
+
 @media (width < 40rem) {
-  .player-controls {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: var(--gw-space-2) 0;
-    justify-items: center;
-    padding: var(--gw-space-3) var(--gw-space-2);
-  }
-
-  .controls-start,
-  .controls-transport,
-  .controls-end {
-    display: contents;
-  }
-
-  /* The dividers and the keys' help have no place, the volume is the
-     phone's own, and the rest are in the More menu */
-  .player-controls .controls-divider,
-  .live-help,
-  .control-help,
-  .live-volume,
-  .control-stop,
-  .control-frame,
-  .control-cut,
-  .control-download,
-  .control-next-event,
-  .control-events {
-    display: none;
-  }
-
-  .player-controls gw-popover {
-    position: absolute;
-  }
-
-  /* The first row: the sound or the time, the transport, Live's View menu
-     and full screen */
-  .live-sound {
-    grid-area: 1 / 1;
-  }
-
-  .player-clock {
-    grid-area: 1 / 1 / auto / 3;
-    justify-self: start;
-  }
-
-  .live-previous,
-  .control-previous {
-    grid-area: 1 / 3;
-  }
-
-  .live-play,
-  .control-play {
-    grid-area: 1 / 4;
-  }
-
-  .live-next,
-  .control-next {
-    grid-area: 1 / 5;
-  }
-
-  .live-view,
-  .control-view {
-    grid-area: 1 / 6;
-  }
-
-  /* Picture settings, where a camera has them, beside the sound */
-  .live-picture {
-    grid-area: 1 / 2;
-  }
-
-  .live-fullscreen,
-  .control-fullscreen {
-    grid-area: 1 / 7;
-  }
-
-  /* Then the layout or speeds across, scrolling in place where they're
-     wider than the screen */
-  .live-layout,
-  .control-speed {
-    grid-area: 2 / 1 / auto / -1;
-    max-width: 100%;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
   /* Eight speeds only fit across a phone a little smaller */
   .control-speed {
     --gw-segmented-scale: 0.8;
-  }
-
-  /* Live's page of cameras, when a layout pages them, goes last, so no empty
-     row is left when it's hidden */
-  .live-page {
-    grid-area: 4 / 1 / auto / -1;
-  }
-
-  /* Then the zoom, with camera moves and capture on Live, and capture and
-     More on Recordings */
-  .live-fit,
-  .control-fit {
-    grid-area: 3 / 1 / auto / 3;
-  }
-
-  .live-zoom-out,
-  .control-zoom-out {
-    grid-area: 3 / 3;
-  }
-
-  .live-zoom-fit,
-  .control-zoom-fit {
-    grid-area: 3 / 4;
-  }
-
-  .live-zoom-in,
-  .control-zoom-in {
-    grid-area: 3 / 5;
-  }
-
-  .live-move,
-  .control-capture {
-    grid-area: 3 / 6;
-  }
-
-  .live-capture,
-  .control-more {
-    grid-area: 3 / 7;
   }
 
   /* The video at its own shape, with the timeline straight under it, rather
@@ -1051,13 +1047,6 @@ gw-table gw-sheet {
 @media (hover: none) and (pointer: coarse) {
   .live-help,
   .control-help {
-    display: none;
-  }
-}
-
-/* Wider than a phone, every control has its own button */
-@media (width >= 40rem) {
-  .control-more {
     display: none;
   }
 }
