@@ -30,11 +30,12 @@ test("takes only http and https pages", async () => {
 test("puts the page after -- with no spaces or fragment", () => {
   const address = echoAddress(
     "C:\\Program Files\\Kestrel\\yt-dlp.exe",
+    "C:\\Program Files\\Kestrel\\node.exe",
     "https://www.example.com/watch?v=a b&x='--exec'#t=1",
     "b/bv",
   );
 
   expect(address).toBe(
-    `echo:"C:\\Program Files\\Kestrel\\yt-dlp.exe" --ignore-config --quiet --no-warnings --js-runtimes node --format b/bv --print ffmpeg:%(url)s#video=copy#audio=copy -- https://www.example.com/watch?v=a%20b&x=%27--exec%27`,
+    `echo:"C:\\Program Files\\Kestrel\\yt-dlp.exe" --ignore-config --quiet --no-warnings --js-runtimes "node:C:\\Program Files\\Kestrel\\node.exe" --format b/bv --print ffmpeg:%(url)s#video=copy#audio=copy -- https://www.example.com/watch?v=a%20b&x=%27--exec%27`,
   );
 });

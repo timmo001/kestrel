@@ -205,15 +205,12 @@ to start than one on your network, a few seconds or more. They have live
 view only: no recordings, events or stills.
 
 The desktop app, the release archives, the Linux packages and the Home
-Assistant app have their own yt-dlp; elsewhere, set `KESTREL_YT_DLP` for one
-that isn't on the path. go2rtc copies each stream through ffmpeg, the one
-`KESTREL_FFMPEG` names or the one on the path. Sites change, and yt-dlp
-catches up in its releases, so a page that stops playing may need a newer
-one. YouTube's live streams play without anything else today, but yt-dlp
-reads YouTube's other pages with a JavaScript runtime, and may come to need
-one for live streams too. If YouTube pages stop playing, put
-[Deno](https://deno.com) or Node.js on the server's path; Kestrel doesn't
-bring one.
+Assistant app have their own yt-dlp, and Node.js for the sites yt-dlp reads
+with JavaScript, such as YouTube; elsewhere, set `KESTREL_YT_DLP` and
+`KESTREL_NODE` for ones that aren't on the path. go2rtc copies each stream
+through ffmpeg, the one `KESTREL_FFMPEG` names or the one on the path. Sites
+change, and yt-dlp catches up in its releases, so a page that stops playing
+may need a newer one.
 
 Keep to each site's terms. Some don't allow their streams to be shown
 elsewhere, and Twitch's ads play in the stream as they would on its page.
@@ -442,21 +439,22 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 
 ## Settings
 
-| Variable                   | Default                          | What it sets                                                       |
-| -------------------------- | -------------------------------- | ------------------------------------------------------------------ |
-| `KESTREL_HOST`             | `::`                             | The address the server listens on; `serve:server` sets `127.0.0.1` |
-| `KESTREL_PORT`             | `7380`                           | The server's port (`PORT` too, for Pitchfork)                      |
-| `KESTREL_FTP_PORT`         | `7381`                           | The port cameras send their clips to, with data on 7390 to 7399    |
-| `KESTREL_GO2RTC_PORT`      | `1984`                           | go2rtc's port                                                      |
-| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                           | go2rtc's RTSP port, on 127.0.0.1 only                              |
-| `KESTREL_GO2RTC`           | `go2rtc`                         | The go2rtc binary; the desktop app uses its own                    |
-| `KESTREL_FFMPEG`           | `ffmpeg`                         | The ffmpeg binary, for recording cameras and web pages             |
-| `KESTREL_YT_DLP`           | `yt-dlp`                         | The yt-dlp binary, for web pages; the desktop app uses its own     |
-| `KESTREL_WEB`              | `packages/web/dist`              | The built web client; the desktop app uses its own                 |
-| `KESTREL_CONFIG`           | `~/.config/kestrel`              | Where `sources.json` is kept                                       |
-| `KESTREL_STATE`            | `~/.local/state/kestrel`         | Where paired devices, push subscriptions and recordings go         |
-| `KESTREL_RECORDINGS`       | `recordings` in the state folder | Where the server's own recordings go                               |
-| `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                 |
-| `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links           |
-| `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets            |
-| `KESTREL_APP_OPTIONS`      | None                             | The Home Assistant app's options file, which the app sets          |
+| Variable                   | Default                          | What it sets                                                        |
+| -------------------------- | -------------------------------- | ------------------------------------------------------------------- |
+| `KESTREL_HOST`             | `::`                             | The address the server listens on; `serve:server` sets `127.0.0.1`  |
+| `KESTREL_PORT`             | `7380`                           | The server's port (`PORT` too, for Pitchfork)                       |
+| `KESTREL_FTP_PORT`         | `7381`                           | The port cameras send their clips to, with data on 7390 to 7399     |
+| `KESTREL_GO2RTC_PORT`      | `1984`                           | go2rtc's port                                                       |
+| `KESTREL_GO2RTC_RTSP_PORT` | `1985`                           | go2rtc's RTSP port, on 127.0.0.1 only                               |
+| `KESTREL_GO2RTC`           | `go2rtc`                         | The go2rtc binary; the desktop app uses its own                     |
+| `KESTREL_FFMPEG`           | `ffmpeg`                         | The ffmpeg binary, for recording cameras and web pages              |
+| `KESTREL_YT_DLP`           | `yt-dlp`                         | The yt-dlp binary, for web pages; the desktop app uses its own      |
+| `KESTREL_NODE`             | `node`                           | The Node.js yt-dlp runs JavaScript on; the desktop app uses its own |
+| `KESTREL_WEB`              | `packages/web/dist`              | The built web client; the desktop app uses its own                  |
+| `KESTREL_CONFIG`           | `~/.config/kestrel`              | Where `sources.json` is kept                                        |
+| `KESTREL_STATE`            | `~/.local/state/kestrel`         | Where paired devices, push subscriptions and recordings go          |
+| `KESTREL_RECORDINGS`       | `recordings` in the state folder | Where the server's own recordings go                                |
+| `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                  |
+| `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links            |
+| `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets             |
+| `KESTREL_APP_OPTIONS`      | None                             | The Home Assistant app's options file, which the app sets           |
