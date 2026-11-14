@@ -34,7 +34,7 @@ import {
   phPlus,
   phTrash,
 } from "./icons.ts";
-import { element } from "./shared.ts";
+import { appliesAtOnce, element } from "./shared.ts";
 
 /** How often a drag sends where it's steering, at most. */
 const sendEvery = 200;
@@ -395,6 +395,7 @@ export const steering = (options: SteeringOptions): Steering => {
   const panel = element("gw-popover");
 
   panel.classList.add("ptz-panel");
+  appliesAtOnce(panel);
   document.body.append(panel);
 
   function note(text: string) {

@@ -15,7 +15,7 @@ import {
 } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 import { cameraLabel } from "./cameras.ts";
-import { element } from "./shared.ts";
+import { appliesAtOnce, element } from "./shared.ts";
 
 /** How often a drag sends where it's got to, at most. */
 const sendEvery = 250;
@@ -64,6 +64,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
   const message = element("p");
 
   panel.classList.add("picture-panel");
+  appliesAtOnce(panel);
   // Kept beside its button on a phone too, so the picture stays in sight
   panel.sheetBelow = 0;
   reset.setAttribute("size", "small");

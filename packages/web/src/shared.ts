@@ -70,6 +70,19 @@ export const helpToggle = (
 };
 
 /**
+ * Keeps a popover whose changes apply as they're made from holding them as
+ * unsaved, so it closes at once rather than asking to discard them. Its own
+ * listener marks them first, as it was added when the popover was made.
+ */
+export const appliesAtOnce = (popover: HTMLElementTagNameMap["gw-popover"]) => {
+  for (const type of ["input", "change"]) {
+    popover.addEventListener(type, () => {
+      popover.dirty = false;
+    });
+  }
+};
+
+/**
  * The key a page's keyboard controls act on, such as `k`, `F` lowered to
  * `f`, or `Shift+ArrowLeft`; or undefined where it belongs to what has the
  * focus: a field being typed in, a toggle's arrows, or Space on a button.
