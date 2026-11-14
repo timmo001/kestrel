@@ -1274,6 +1274,45 @@ gw-table gw-sheet {
   grid-area: 3 / 7;
 }
 
+/* Live has no Stop, so its zoom takes that column too */
+.player-controls:is(:state(compact), [data-over]:state(split)):not(
+    :has(> .control-stop)
+  )
+  .zoom-pill {
+  grid-area: 3 / 1 / auto / 7;
+}
+
+/* On the narrowest phones the zoom needs the whole row, and Stop and More
+   take a row of their own under it rather than clipping its last step */
+@media (width < 22rem) {
+  .player-controls:is(:state(compact), [data-over]:state(split)):has(
+      > .control-stop
+    )
+    .zoom-pill {
+    grid-area: 3 / 1 / auto / -1;
+  }
+
+  .player-controls:is(:state(compact), [data-over]:state(split)) .control-stop {
+    grid-area: 4 / 1;
+  }
+
+  .player-controls:is(:state(compact), [data-over]:state(split)):has(
+      > .control-stop
+    )::part(more) {
+    grid-area: 4 / 7;
+  }
+}
+
+@media (width < 19rem) {
+  .player-controls:is(:state(compact), [data-over]:state(split)) .zoom-pill {
+    grid-area: 3 / 1 / auto / -1;
+  }
+
+  .player-controls:is(:state(compact), [data-over]:state(split))::part(more) {
+    grid-area: 4 / 7;
+  }
+}
+
 @media (width < 40rem) {
   /* The card still fills the window, so the clip never peeks in under it;
      the picture takes the height, where several cameras stack */
