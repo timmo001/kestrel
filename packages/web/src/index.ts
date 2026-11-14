@@ -30,12 +30,12 @@ import {
 } from "@timmo001/groundwork-pwa/view";
 import { pageTheme } from "@timmo001/groundwork-tokens/page";
 import { createIcon, on, type MenuItem } from "@timmo001/groundwork-ui";
-import { Schema } from "effect";
+import { Equal, Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
 import { aboutPanel } from "./about.ts";
 import { call, onMismatched, onUnpaired } from "./api.ts";
-import { loadCameras } from "./cameras.ts";
+import { forgetCameras, keptCameras, loadCameras } from "./cameras.ts";
 import { devicesPanel } from "./devices.ts";
 import { eventsPage } from "./events.ts";
 import { homeAssistantSidebar } from "./home-assistant.ts";
@@ -253,6 +253,7 @@ onMismatched(() => {
 
 onUnpaired(() => {
   unpaired = true;
+  forgetCameras();
 
   if (offline !== null) offline.open = false;
 
@@ -581,16 +582,29 @@ const start = async () => {
 
   cameras = known;
 
-  await showSources(list);
-
-  recordings.start(today, recorded);
-
+  // Live doesn't wait on the sources' details, and starts its players again
+  // only where the cameras changed since they were kept
   await Promise.all([
-    currentPage === "live" ? live.show(known) : undefined,
-    events.start(recorded, today),
+    currentPage === "live" && !Equal.equals(known, kept)
+      ? live.show(known)
+      : undefined,
+    showSources(list).then(() => {
+      recordings.start(today, recorded);
+
+      return events.start(recorded, today);
+    }),
   ]);
 
   watchConnection(connectedIds(list));
 };
+
+// Live starts on the cameras kept from last time, before the server answers
+const kept = keptCameras();
+
+if (kept !== undefined) {
+  cameras = kept;
+
+  if (currentPage === "live") void live.show(kept);
+}
 
 void start();

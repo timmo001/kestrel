@@ -1,16 +1,47 @@
 /**
  * The cameras the server has, as the pages show them: loaded once the
  * sources are reachable, and labelled by the name you gave them, else by
- * their source's name for them, with "Channel 3" shortened to "Ch 3".
+ * their source's name for them, with "Channel 3" shortened to "Ch 3". The
+ * last list loaded is kept in the browser, so a page loading again can show
+ * the cameras before the server answers.
  */
-import type { Camera, CameraId } from "@timmo001/kestrel-core";
+import { Camera, type CameraId } from "@timmo001/kestrel-core";
+import { getStorage } from "@timmo001/groundwork-ui/storage.ts";
+import { Option, Schema } from "effect";
 import { call } from "./api.ts";
+
+const storageKey = "kestrel.cameras";
+
+const Cameras = Schema.fromJsonString(Schema.Array(Camera));
+
+const decodeCameras = Schema.decodeUnknownOption(Cameras);
+
+const encodeCameras = Schema.encodeSync(Cameras);
 
 let known: ReadonlyArray<Camera> = [];
 
-/** Fetches the cameras, keeping them for the labels. */
+/**
+ * The cameras loaded last time, checked, since anyone can edit what's kept,
+ * and used for the labels until the server answers; `undefined` when there
+ * are none.
+ */
+export const keptCameras = () => {
+  const kept = Option.getOrUndefined(
+    decodeCameras(getStorage().get(storageKey)),
+  );
+
+  if (kept !== undefined) known = kept;
+
+  return kept;
+};
+
+/** Forgets the cameras kept, such as once this browser isn't paired. */
+export const forgetCameras = () => getStorage().set(storageKey, undefined);
+
+/** Fetches the cameras, keeping them for the labels and for next time. */
 export const loadCameras = async () => {
   known = await call((api) => api.cameras.list());
+  getStorage().set(storageKey, encodeCameras(known));
 
   return known;
 };
