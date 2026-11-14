@@ -300,9 +300,14 @@ export const actionsColumn = (onPlay: (clip: Clip) => void): TableColumn => ({
       save.setAttribute("href", clipUrl(rowClip(row), true));
     }
 
-    // Side by side, however narrow the column
+    // Side by side, however narrow the column. On a touch screen each 32px
+    // button's hit area reaches out to --gw-target-min, so the gap keeps
+    // Play's and Download's apart rather than overlapping
     actions.setAttribute("nowrap", "");
-    actions.setAttribute("gap", "s");
+    actions.style.setProperty(
+      "--gw-gap",
+      "max(var(--gw-space-1), calc(var(--gw-target-min, 0px) - 2rem))",
+    );
     actions.append(play, save);
 
     return actions;
