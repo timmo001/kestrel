@@ -720,13 +720,22 @@ gw-table gw-sheet {
   }
 
   .live-steer-pad > .live-arrow-pad {
-    grid-template-rows: repeat(3, 3rem);
+    grid-template-rows: repeat(3, 2.75rem);
   }
 
-  /* ...and the presets scroll in a short row, leaving the picture the
-     width */
-  .live-stage .live-presets {
-    max-inline-size: 6.5rem;
+  .live-steer-dock,
+  .live-steer-body {
+    gap: var(--gw-space-2);
+  }
+
+  /* ...and the presets take what the row leaves between Home and setup,
+     scrolling past that */
+  .live-steer-bar {
+    align-self: stretch;
+  }
+
+  .live-steer-bar > .live-presets {
+    flex: 1 1 0;
   }
 }
 
@@ -751,9 +760,9 @@ gw-table gw-sheet {
     grid-template-rows: minmax(0, 1fr) auto;
   }
 
-  /* More presets than that scroll, rather than widening the panel */
-  .live-presets {
-    max-inline-size: 20rem;
+  /* More presets than fit scroll, rather than widening the panel */
+  .live-steer-dock {
+    max-inline-size: 24rem;
   }
 
   /* The page's controls stay the stage's full width under both, so their
@@ -874,17 +883,12 @@ gw-table gw-sheet {
 }
 
 .live-presets {
-  display: flex;
-  gap: var(--gw-space-2);
   min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  touch-action: pan-x;
 }
 
-.live-presets > * {
-  flex: none;
+/* Its ‹ and › stand in for a scrollbar */
+.live-presets::part(track) {
+  scrollbar-width: none;
 }
 
 .live-presets:empty {
@@ -901,7 +905,6 @@ gw-table gw-sheet {
   .live-steer-bar > .live-presets {
     flex-basis: 100%;
     order: 1;
-    justify-content: safe center;
   }
 
   .live-steer-split {
@@ -925,14 +928,12 @@ gw-table gw-sheet {
   display: none;
 }
 
-/* The setup, opened from the gear */
-.ptz-panel {
-  --gw-popover-width: 22rem;
-}
-
-/* The picture settings, opened from their button */
+/* The setup, opened from the gear, and the picture settings: sheets beside
+   the cameras, over a light backdrop so the picture being set stays clear */
+.ptz-panel,
 .picture-panel {
-  --gw-popover-width: 20rem;
+  --gw-sheet-width: 22rem;
+  --gw-sheet-backdrop: rgb(0 0 0 / 15%);
 }
 
 .picture-note {

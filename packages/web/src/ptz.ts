@@ -37,7 +37,7 @@ import {
   phPlus,
   phTrash,
 } from "./icons.ts";
-import { appliesAtOnce, element } from "./shared.ts";
+import { element, settingsSheet, showSheet } from "./shared.ts";
 
 /** How often a drag sends where it's steering, at most. */
 const sendEvery = 200;
@@ -345,7 +345,7 @@ export const steering = (options: SteeringOptions): Steering => {
   const zoomSlider = element("gw-range");
   const zoomIn = tileButton("Zoom in (+)", phMagnifyingGlassPlusBold);
   const bar = element("div");
-  const presets = element("div");
+  const presets = element("gw-row");
   const homeButton = tileButton("Send it home", phHouseBold);
   const split = element("span");
   const setupButton = tileButton("Presets, home and tracking", phGearBold);
@@ -374,6 +374,9 @@ export const steering = (options: SteeringOptions): Steering => {
   bar.setAttribute("role", "group");
   bar.setAttribute("aria-label", "Camera controls");
   presets.className = "live-presets";
+  // More presets than fit scroll sideways, with a ‹ or › while there's more
+  presets.setAttribute("scroll", "");
+  presets.setAttribute("justify", "center");
   homeButton.setAttribute("appearance", "accent");
   split.className = "live-steer-split";
   split.setAttribute("aria-hidden", "true");
@@ -443,11 +446,7 @@ export const steering = (options: SteeringOptions): Steering => {
   });
 
   /** The setup, opened from the gear: presets, home and tracking. */
-  const panel = element("gw-popover");
-
-  panel.classList.add("ptz-panel");
-  appliesAtOnce(panel);
-  document.body.append(panel);
+  const panel = settingsSheet("ptz-panel");
 
   function note(text: string) {
     message.textContent = text;
@@ -808,7 +807,7 @@ export const steering = (options: SteeringOptions): Steering => {
 
   setupButton.addEventListener("click", () => {
     fillPanel();
-    panel.show(setupButton);
+    showSheet(panel);
     void refresh().then(fillPanel);
   });
 

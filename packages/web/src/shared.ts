@@ -6,6 +6,7 @@ import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import {
   on,
   onSwipe,
+  opensAsSheet,
   type MenuItem,
   type TableColumn,
   type TableRow,
@@ -26,7 +27,7 @@ import { clipUrl, type Clip } from "./recording-player.ts";
  * a swipe: a zoomed picture, a camera being steered, or a control.
  */
 export const swipeIgnore =
-  "[data-movable], [data-steering], .player-controls, .live-steer-dock, gw-range, gw-popover";
+  "[data-movable], [data-steering], .player-controls, .live-steer-dock, gw-range, gw-popover, gw-sheet";
 
 /** Fields that take text: a toggle's radios don't, so keys pass them by. */
 export const typingTargets =
@@ -99,16 +100,27 @@ export const helpToggle = (
 };
 
 /**
- * Keeps a popover whose changes apply as they're made from holding them as
- * unsaved, so it closes at once rather than asking to discard them. Its own
- * listener marks them first, as it was added when the popover was made.
+ * A camera's settings panel, such as its picture or its moving setup: a
+ * sheet, as it holds more than a popover's small form. Opened with
+ * `showSheet`.
  */
-export const appliesAtOnce = (popover: HTMLElementTagNameMap["gw-popover"]) => {
-  for (const type of ["input", "change"]) {
-    popover.addEventListener(type, () => {
-      popover.dirty = false;
-    });
-  }
+export const settingsSheet = (className: string) => {
+  const sheet = element("gw-sheet");
+
+  sheet.classList.add(className);
+  document.body.append(sheet);
+
+  return sheet;
+};
+
+/**
+ * Opens a settings sheet up from the bottom where Groundwork's popups become
+ * bottom sheets, a phone either way up, and otherwise in from the end edge,
+ * beside the cameras rather than over the picture being set.
+ */
+export const showSheet = (sheet: HTMLElementTagNameMap["gw-sheet"]) => {
+  sheet.side = opensAsSheet() ? "bottom" : "end";
+  sheet.show();
 };
 
 /**
@@ -131,6 +143,11 @@ export const controlKey = (event: KeyboardEvent): string | undefined => {
     .filter((target) => target instanceof Element);
 
   if (path.some((target) => target.matches(typingTargets))) return undefined;
+
+  // Keys in an open sheet or popover are its own, Esc closing it
+  if (path.some((target) => target.matches("gw-sheet, gw-popover"))) {
+    return undefined;
+  }
 
   if (
     event.key.startsWith("Arrow") &&
@@ -443,6 +460,7 @@ const pressable = [
   "gw-range",
   "gw-input",
   "gw-popover",
+  "gw-sheet",
   ".live-tile",
   ".player-tile",
   ".player-video",

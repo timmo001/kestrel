@@ -15,7 +15,7 @@ import {
 } from "@timmo001/kestrel-core";
 import { call } from "./api.ts";
 import { cameraLabel } from "./cameras.ts";
-import { appliesAtOnce, element } from "./shared.ts";
+import { element, settingsSheet, showSheet } from "./shared.ts";
 
 /** How often a drag sends where it's got to, at most. */
 const sendEvery = 250;
@@ -58,13 +58,11 @@ export interface PicturePanel {
 /** Wires the picture settings panel to its button on the Live page. */
 export const pictureSettings = (options: PictureOptions): PicturePanel => {
   const { button } = options;
-  const panel = element("gw-popover");
+  const panel = settingsSheet("picture-panel");
   const body = element("gw-stack");
   const reset = element("gw-button", "Reset");
   const message = element("p");
 
-  panel.classList.add("picture-panel");
-  appliesAtOnce(panel);
   reset.setAttribute("size", "small");
   reset.setAttribute("label", "Put them back to the camera's defaults");
   message.className = "picture-note";
@@ -85,7 +83,6 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
   body.append(...sliders.values(), message);
   reset.slot = "actions";
   panel.append(body, reset);
-  document.body.append(panel);
 
   /** The camera the panel is for, and what it last said it's set to. */
   let current:
@@ -296,7 +293,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     open = true;
     note("");
     fill();
-    panel.show(button ?? undefined);
+    showSheet(panel);
     options.onChange();
     void refresh();
   };
