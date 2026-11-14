@@ -721,6 +721,13 @@ gw-table gw-sheet {
   border-color: transparent;
 }
 
+/* Icon options stay round, as on their own track */
+.control-pill gw-segmented[labels="hide"]::part(option) {
+  aspect-ratio: 1;
+  justify-content: center;
+  padding: 0;
+}
+
 /* The zoom's fit or fill, parted from its steps */
 .zoom-pill gw-segmented {
   padding-inline-end: 2px;
@@ -931,6 +938,7 @@ gw-table gw-sheet {
    before the bar takes another row, and the seldom used fold into More,
    which only shows then */
 .player-controls[data-tight] [data-optional],
+.player-controls[data-tight] .control-download + .controls-divider,
 .player-controls:is([data-tight], [data-compact]) [data-overflow],
 .player-controls:not([data-tight], [data-compact]) .controls-more {
   display: none;
@@ -1527,11 +1535,77 @@ kbd {
   transition: opacity 0.25s ease;
 }
 
-/* Left alone while playing, as a video player's controls are; a tap on the
-   picture brings them back */
+/* Left alone while playing, as a video player's controls are; a tap where
+   there's nothing to press, a swipe up or the handle brings them back */
 [data-overlay] > .player-controls[data-hidden] {
   opacity: 0;
   pointer-events: none;
+}
+
+/* The handle, a tab at the bottom in the middle while they're hidden: clear
+   of a phone's rounded corners and of the cameras' own controls in their
+   tiles' corners, and a full finger's width to press */
+.controls-handle {
+  display: none;
+}
+
+/* Over the picture, on a phone on its side or full screen, everything that
+   can be pressed keeps out of the screen's rounded corners and the middle of
+   its sides, where a punch hole or notch sits in landscape. The browser
+   keeps the page clear of the cutout itself, as Kestrel doesn't opt into
+   viewport-fit=cover, but nothing reports the corners, so it's a margin of
+   its own, or the safe area's where that's wider */
+[data-overlay] {
+  --safe-inline: max(
+    1.5rem,
+    env(safe-area-inset-left, 0px),
+    env(safe-area-inset-right, 0px)
+  );
+  --safe-bottom: max(var(--gw-space-2), env(safe-area-inset-bottom, 0px));
+
+  position: relative;
+}
+
+/* Full screen there's no page to scroll, so a swipe up or down is the
+   player's, to show or hide its controls; otherwise it scrolls the page */
+[data-overlay]:fullscreen,
+:fullscreen [data-overlay] {
+  touch-action: pinch-zoom;
+}
+
+[data-overlay] > .live-area,
+[data-overlay] > .player-screen {
+  box-sizing: border-box;
+  padding-inline: var(--safe-inline);
+}
+
+[data-overlay] > .player-controls {
+  padding-inline: var(--safe-inline);
+  padding-block-end: var(--safe-bottom);
+}
+
+[data-overlay]:has(> .player-controls[data-hidden]) > .controls-handle {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-start: 50%;
+  z-index: 2;
+  display: block;
+  padding-block-end: var(--safe-bottom);
+  translate: -50% 0;
+  background: color-mix(
+    in oklab,
+    var(--gw-color-surface-raised) 30%,
+    transparent
+  );
+  border-start-start-radius: var(--gw-radius-sm, 4px);
+  border-start-end-radius: var(--gw-radius-sm, 4px);
+  backdrop-filter: blur(4px);
+  opacity: 0.8;
+}
+
+.controls-handle::part(button) {
+  width: 4rem;
+  height: 2.75rem;
 }
 
 [data-overlay]:has(> .player-controls[data-hidden]) {
@@ -1548,7 +1622,7 @@ kbd {
 [data-overlay] > .player-controls[data-compact] > .controls-expand {
   position: absolute;
   inset-block-end: 100%;
-  inset-inline-end: var(--gw-space-2);
+  inset-inline-end: var(--safe-inline);
   display: block;
   background: inherit;
   border-start-start-radius: var(--gw-radius-sm, 4px);

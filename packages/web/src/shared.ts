@@ -378,10 +378,47 @@ const hideAfter = 3000;
 const touchScreen = matchMedia("(pointer: coarse)");
 
 /**
+ * What a press does something on in a player: a control, a camera's own
+ * controls on its tile, a popover, or a tile or video, which a press picks,
+ * plays or pauses. A press on one never wakes the bar over the picture.
+ */
+const pressable = [
+  "button",
+  "a[href]",
+  "input",
+  "select",
+  "textarea",
+  "[role=button]",
+  "[role=slider]",
+  "[role=menuitem]",
+  "[tabindex]:not([tabindex='-1'])",
+  "gw-button",
+  "gw-menu-button",
+  "gw-segmented",
+  "gw-select",
+  "gw-range",
+  "gw-input",
+  "gw-popover",
+  ".live-tile",
+  ".player-tile",
+  ".player-video",
+].join(", ");
+
+/** What a drag already moves: a zoomed picture, or a camera being steered. */
+const draggable = "[data-movable], [data-steering], .player-controls";
+
+/** How far a finger moves, in pixels, before a press is a swipe. */
+const swipeDistance = 40;
+
+/**
  * On a phone on its side, or full screen, a player's control bar goes over
  * its picture and acts as a video player's: it fades out once it's been left
- * alone a moment while playing, and a tap on the picture, or moving the
- * mouse, brings it back, the tap doing nothing else. It stays while paused or
+ * alone a moment while playing. It comes back, and goes, only from what
+ * doesn't do anything else: a tap where there's nothing to press, a swipe up
+ * (down hides it) where a drag doesn't already zoom or steer, a small handle
+ * at the bottom that stays while it's hidden, a key, or a mouse moving. A
+ * press on a control, a camera's own controls or a tile does its own thing,
+ * and never wakes the bar or is swallowed by it. It stays while paused or
  * while its rows past the first are open, from a tab on its top edge. Turning
  * a phone on its side takes the player full screen where the browser lets
  * it, and turning it back leaves.
@@ -392,9 +429,12 @@ export const overlayControls = (bar: HTMLElement) => {
   const around = bar.closest(".playback-view, .live-stage");
   const player = around instanceof HTMLElement ? around : null;
   const tab = element("gw-button");
+  const handle = element("gw-button");
   let timer: ReturnType<typeof setTimeout> | undefined;
-  /** Whether the press under way only woke the bar, so does nothing else. */
-  let waking = false;
+  /** Where a press that could toggle the bar began, or undefined. */
+  let press: { x: number; y: number; empty: boolean } | undefined;
+  /** Whether the press under way toggled the bar, so its click does nothing else. */
+  let toggled = false;
   /** Whether turning the phone on its side put the player full screen. */
   let turned = false;
 
@@ -443,6 +483,14 @@ export const overlayControls = (bar: HTMLElement) => {
     timer = isOver() ? setTimeout(sleep, hideAfter) : undefined;
   };
 
+  /** Hides the bar at once, unless it stays. */
+  const hide = () => {
+    clearTimeout(timer);
+    timer = undefined;
+
+    if (isOver() && !stays()) bar.toggleAttribute("data-hidden", true);
+  };
+
   /** Over the picture or under it, as the window and full screen have it. */
   const place = () => {
     stage?.toggleAttribute("data-overlay", isOver());
@@ -455,32 +503,93 @@ export const overlayControls = (bar: HTMLElement) => {
     wake();
   });
 
-  // Ahead of the picture's own presses, which play, pause or pick
+  // The handle that brings the bar back, at the bottom while it's hidden
+  handle.className = "controls-handle";
+  handle.setAttribute("icon", phCaretUp);
+  handle.setAttribute("label", "Show the controls");
+  handle.setAttribute("labels", "hide");
+  handle.setAttribute("appearance", "plain");
+  handle.setAttribute("variant", "neutral");
+  handle.setAttribute("size", "medium");
+  handle.addEventListener("click", wake);
+
+  const targets = (event: Event) =>
+    event.composedPath().filter((target) => target instanceof Element);
+
+  // Where a press begins says whether it can toggle the bar: on nothing to
+  // press, a tap can; anywhere a drag doesn't already move something, a
+  // swipe can
   stage?.addEventListener(
     "pointerdown",
     (event) => {
-      waking = isOver() && bar.hasAttribute("data-hidden");
+      toggled = false;
 
-      if (waking) event.stopPropagation();
+      const path = targets(event);
 
-      wake();
+      press =
+        !isOver() || path.some((target) => target.matches(draggable))
+          ? undefined
+          : {
+              x: event.clientX,
+              y: event.clientY,
+              empty: !path.some((target) => target.matches(pressable)),
+            };
     },
     true,
   );
 
-  for (const type of ["pointerup", "click", "dblclick"]) {
+  stage?.addEventListener(
+    "pointerup",
+    (event) => {
+      if (press === undefined) return;
+
+      const dx = event.clientX - press.x;
+      const dy = event.clientY - press.y;
+
+      const swipe =
+        Math.abs(dy) >= swipeDistance && Math.abs(dy) > 2 * Math.abs(dx);
+
+      const tap = Math.hypot(dx, dy) < 10 && press.empty;
+
+      press = undefined;
+
+      if (swipe) {
+        toggled = true;
+
+        if (dy < 0) wake();
+        else hide();
+      } else if (tap) {
+        toggled = true;
+
+        if (bar.hasAttribute("data-hidden")) wake();
+        else hide();
+      }
+    },
+    true,
+  );
+
+  // One the browser takes over, such as to scroll, toggles nothing
+  stage?.addEventListener("pointercancel", () => {
+    press = undefined;
+  });
+
+  // A press that toggled the bar does nothing else
+  for (const type of ["click", "dblclick"]) {
     stage?.addEventListener(
       type,
       (event) => {
-        if (!waking) return;
+        if (!toggled) return;
 
         event.stopPropagation();
 
-        if (type !== "pointerup") waking = false;
+        if (type === "click") toggled = false;
       },
       true,
     );
   }
+
+  // Using the bar keeps it up
+  bar.addEventListener("pointerdown", wake);
 
   // A mouse moving over the picture brings the bar back, as a video player's;
   // a finger's only moves once it's down, which has already
@@ -529,6 +638,7 @@ export const overlayControls = (bar: HTMLElement) => {
 
   showTab();
   bar.append(tab);
+  stage?.append(handle);
   place();
 };
 
