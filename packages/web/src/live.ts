@@ -1523,12 +1523,10 @@ export const livePage = (): LivePage => {
     onSwipe(
       stage,
       (swipe) => {
-        if (swipe.fingers === 1 && swipe.direction === "left") step(1);
-        else if (swipe.fingers === 1 && swipe.direction === "right") step(-1);
-        else if (swipe.fingers === 3 && swipe.direction === "up") help.show();
-        else if (swipe.fingers === 3 && swipe.direction === "down") {
-          help.close();
-        }
+        if (help.swipe(swipe) || swipe.fingers !== 1) return;
+
+        if (swipe.direction === "left") step(1);
+        else if (swipe.direction === "right") step(-1);
       },
       { ignore: swipeIgnore },
     );

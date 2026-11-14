@@ -4,6 +4,7 @@
  */
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import {
+  type Swipe,
   type TableColumn,
   type TableRow,
   typingTargets,
@@ -81,12 +82,17 @@ export const helpToggle = (
 
   return {
     toggle,
-    /** Opens it, such as for a three finger swipe up. */
-    show: () => {
-      if (!open) toggle();
-    },
-    close: () => {
-      if (open) toggle();
+    /**
+     * Opens it on a three finger swipe up and shuts it on one down. Returns
+     * whether the swipe was one of those, so the page's own swipes skip it.
+     */
+    swipe: (swipe: Swipe) => {
+      if (swipe.fingers !== 3) return false;
+
+      if (swipe.direction === "up" && !open) toggle();
+      else if (swipe.direction === "down" && open) toggle();
+
+      return swipe.direction === "up" || swipe.direction === "down";
     },
   };
 };

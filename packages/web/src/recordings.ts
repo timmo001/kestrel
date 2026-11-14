@@ -1938,6 +1938,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     onSwipe(
       stage,
       (swipe) => {
+        if (helpWired.swipe(swipe)) return;
+
         const ways: Record<SwipeDirection, -1 | 0 | 1> = {
           left: 1,
           right: -1,
@@ -1949,11 +1951,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
         if (swipe.fingers === 1 && across !== 0) seekBy(10 * across);
         else if (swipe.fingers === 2 && across !== 0) skip(across);
-        else if (swipe.fingers === 3 && swipe.direction === "up") {
-          helpWired.show();
-        } else if (swipe.fingers === 3 && swipe.direction === "down") {
-          helpWired.close();
-        }
       },
       { ignore: swipeIgnore },
     );
