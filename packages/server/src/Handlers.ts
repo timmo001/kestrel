@@ -8,6 +8,7 @@
 import {
   cameraId,
   type Camera,
+  type CameraId,
   type CameraLabel,
   type LiveFeed,
   type Source,
@@ -97,12 +98,14 @@ const AttentionHandlers = HttpApiBuilder.group(
 );
 
 /**
- * A source's cameras, with their stream names and labels, and whether the
- * library has recordings of each; a source that isn't ready yet has none.
+ * A source's cameras, with their stream names and labels, whether you've
+ * turned each off, and whether the library has recordings of each; a source
+ * that isn't ready yet has none.
  */
 const camerasOf = (
   source: Source,
   labels: ReadonlyArray<CameraLabel>,
+  off: ReadonlyArray<CameraId>,
   recorded: ReadonlyArray<string>,
 ) =>
   Effect.gen(function* () {
@@ -114,6 +117,7 @@ const camerasOf = (
 
     return cameras.map((camera): Camera => {
       const feed = feeds.find((each) => each.camera === camera.id);
+      const enabled = !off.includes(camera.id);
 
       return {
         id: camera.id,
@@ -122,6 +126,7 @@ const camerasOf = (
         label: labels.find((each) => each.camera === camera.id)?.label ?? null,
         channel: camera.channel,
         signal: camera.signal,
+        enabled,
         live: camera.live && feed !== undefined ? streamNames(feed) : null,
         views: camera.live && feed !== undefined ? viewsOf(feed) : [],
         controls: {
@@ -134,7 +139,7 @@ const camerasOf = (
               ? camera.picture
               : null,
         },
-        still: camera.still && source.stills !== undefined,
+        still: enabled && camera.still && source.stills !== undefined,
         recordings: recorded.includes(camera.id),
         events: camera.events && source.events !== undefined,
       };
@@ -153,11 +158,12 @@ const CamerasHandlers = HttpApiBuilder.group(
         Effect.gen(function* () {
           const labels = yield* sources.labels;
           const order = yield* sources.order;
+          const off = yield* sources.off;
           const recorded = yield* library.cameras;
 
           const lists = yield* Effect.forEach(
             yield* sources.all,
-            (source) => camerasOf(source, labels, recorded),
+            (source) => camerasOf(source, labels, off, recorded),
             { concurrency: "unbounded" },
           );
 

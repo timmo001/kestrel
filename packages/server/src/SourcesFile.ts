@@ -108,6 +108,8 @@ const forFile = (settings: Settings) => ({
   })),
   cameras: settings.cameras,
   order: settings.order,
+  // Only when a camera's off, so files with none off stay as they were
+  off: settings.off.length === 0 ? undefined : settings.off,
   recording: settings.recording,
 });
 
@@ -148,6 +150,7 @@ export const shown = (
   }),
   cameras: settings.cameras,
   order: settings.order,
+  off: settings.off,
   recording: settings.recording,
   revision: revisionOf(settings),
 });
@@ -196,6 +199,9 @@ export const restored = (
   ),
   order: incoming.order.filter(
     (camera, index) => incoming.order.indexOf(camera) === index,
+  ),
+  off: incoming.off.filter(
+    (camera, index) => incoming.off.indexOf(camera) === index,
   ),
   recording: {
     cameras: incoming.recording.cameras.filter(

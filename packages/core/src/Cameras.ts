@@ -4,7 +4,7 @@
  *
  * @module
  */
-import { Schema } from "effect";
+import { Effect, Schema } from "effect";
 import { CameraControls } from "./Controls.ts";
 import { CameraId, SourceId } from "./Ids.ts";
 
@@ -49,6 +49,13 @@ export const Camera = Schema.Struct({
   channel: Schema.NullOr(Schema.Number),
   /** Whether it has a picture now; `null` when its source can't tell. */
   signal: Schema.NullOr(Schema.Boolean),
+  /**
+   * Whether it's on. One you've turned off in Settings is still listed, with
+   * its recordings, but has no live video or still.
+   */
+  enabled: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(true)),
+  ),
   live: Schema.NullOr(LiveStreams),
   /** Its pictures, the main one first, for a camera with more than one; else empty. */
   views: Schema.Array(CameraView),

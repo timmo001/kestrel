@@ -2,7 +2,8 @@
  * The sources the server serves, from the sources file, and finding one by
  * id. Each runs in a scope of its own, so a save from the Settings page
  * stops only the sources whose settings changed and starts their new ones.
- * A source you've turned off keeps its settings but isn't started.
+ * A source you've turned off keeps its settings but isn't started, and a
+ * camera you've turned off has no live stream and isn't recorded.
  * A source that can't start, such as one with no address, is listed as not
  * connected with the reason, rather than stopping the server. Without a
  * sources file, it's the Raysharp recorder alone, as `swann`, from the
@@ -75,6 +76,7 @@ const firstSettings: Settings = {
   ],
   cameras: [],
   order: [],
+  off: [],
   recording: {
     cameras: [],
     folder: null,
@@ -87,6 +89,23 @@ const firstSettings: Settings = {
 
 /** Whether the server runs a source: you can turn one off without removing it. */
 const isOn = (settings: SourceSettings) => settings.enabled;
+
+/** A source without the live streams of the cameras you've turned off. */
+const withoutOff = (source: Source, off: ReadonlyArray<CameraId>): Source =>
+  off.length === 0
+    ? source
+    : {
+        ...source,
+        live: source.live.pipe(
+          Effect.map((feeds) =>
+            feeds.filter((feed) => !off.includes(feed.camera)),
+          ),
+        ),
+      };
+
+/** The sources running in a state, each without the cameras turned off. */
+const sourcesOf = ({ settings, running }: State) =>
+  running.map((each) => withoutOff(each.source, settings.off));
 
 /** A source that couldn't start, listed with the reason and nothing else. */
 const unstarted = (settings: SourceSettings, reason: string): Source => {
@@ -140,7 +159,9 @@ export class Sources extends Context.Service<
     readonly labels: Effect.Effect<ReadonlyArray<CameraLabel>>;
     /** The order you gave cameras, by id; those it leaves out follow. */
     readonly order: Effect.Effect<ReadonlyArray<CameraId>>;
-    /** What the server records itself, then again each time a save changes it. */
+    /** The cameras you've turned off, by id. */
+    readonly off: Effect.Effect<ReadonlyArray<CameraId>>;
+    /** What the server records itself, without the cameras turned off, then again each time a save changes it. */
     readonly recording: Stream.Stream<RecordingSettings>;
     /** The settings as they're read back, with secrets left out. */
     readonly settings: Effect.Effect<Settings>;
@@ -240,9 +261,7 @@ export class Sources extends Context.Service<
 
       const current = SubscriptionRef.get(state);
 
-      const all = current.pipe(
-        Effect.map(({ running }) => running.map((each) => each.source)),
-      );
+      const all = current.pipe(Effect.map(sourcesOf));
 
       const save = Effect.fn("Sources.save")(
         function* (incoming: Settings) {
@@ -288,9 +307,7 @@ export class Sources extends Context.Service<
 
       return Sources.of({
         all,
-        changes: SubscriptionRef.changes(state).pipe(
-          Stream.map(({ running }) => running.map((each) => each.source)),
-        ),
+        changes: SubscriptionRef.changes(state).pipe(Stream.map(sourcesOf)),
         find: (id) =>
           all.pipe(
             Effect.flatMap((sources) => {
@@ -306,8 +323,15 @@ export class Sources extends Context.Service<
         kinds: kindInfos,
         labels: current.pipe(Effect.map(({ settings }) => settings.cameras)),
         order: current.pipe(Effect.map(({ settings }) => settings.order)),
+        off: current.pipe(Effect.map(({ settings }) => settings.off)),
+        // A camera that's off isn't recorded, as it has no live stream
         recording: SubscriptionRef.changes(state).pipe(
-          Stream.map(({ settings }) => settings.recording),
+          Stream.map(({ settings }) => ({
+            ...settings.recording,
+            cameras: settings.recording.cameras.filter(
+              (camera) => !settings.off.includes(camera),
+            ),
+          })),
           Stream.changesWith((a, b) => Equal.equals(a, b)),
         ),
         settings: current.pipe(

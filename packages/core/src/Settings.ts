@@ -2,7 +2,7 @@
  * How sources are set up: each kind describes the settings it takes, so the
  * app can build its form, and each source is saved as its id, kind, name,
  * whether it's on and those settings, with a label for any camera you've
- * named.
+ * named and the cameras you've turned off.
  *
  * @module
  */
@@ -204,6 +204,13 @@ export const Settings = Schema.Struct({
    * the order their sources give them.
    */
   order: Schema.Array(CameraId).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed([])),
+  ),
+  /**
+   * The cameras you've turned off, by id. One that's off has no live video
+   * and isn't recorded, but keeps its name and its recordings.
+   */
+  off: Schema.Array(CameraId).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed([])),
   ),
   /** What the server records itself. */

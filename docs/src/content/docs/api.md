@@ -62,11 +62,14 @@ and is refused with `InvalidSettings` when the settings have changed since,
 such as from another tab, so a page left open can't undo a newer save.
 
 A camera's `name` is its source's name for it, such as `Channel 3`, and its
-`label` the name you gave it on the Settings page, or `null`.
+`label` the name you gave it on the Settings page, or `null`. `enabled` is
+`false` for a camera you've turned off there: it has no `live` streams or
+`still`, but keeps its `recordings`.
 
 The settings are what `sources.json` keeps: each source's `id`, `kind`,
-`name` and `settings`, its `cameras` for a kind you list cameras for
-yourself, and the camera `label`s. Each kind in `/api/sources/kinds` lists
+`name`, whether it's `enabled`, and `settings`, its `cameras` for a kind you
+list cameras for yourself, the camera `label`s, their `order`, and the
+cameras that are `off`. Each kind in `/api/sources/kinds` lists
 its fields, each `text`, `number`, `secret` or `address`. Reading them back
 leaves secret fields out, naming the ones that are set in `secrets`, and
 hides the password in an address as `********`. A save keeps each secret it

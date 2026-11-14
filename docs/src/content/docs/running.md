@@ -106,9 +106,13 @@ hand too; restart the server after a hand edit.
 The Settings page, in the app bar, lists each source as a panel that opens
 to the settings its kind takes; opening one closes the one open before. Add
 source picks a kind, Remove takes one out, and a `stream` source lists its
-cameras with their addresses. Under each source, name its cameras: the name
+cameras with their addresses. The switch on a source's panel turns it off
+without removing it: the server keeps its settings but doesn't start it.
+Under each source, name its cameras: the name
 shows across the app in place of the source's own name for it, such as
-"Garden", or "Ch 3" for a recorder's numbered channel. Camera order, below
+"Garden", or "Ch 3" for a recorder's numbered channel. The switch beside a
+camera's name turns that camera off: it keeps its name and recordings, but
+has no live video and isn't recorded. Camera order, below
 the sources, sets the order cameras show in across the app: drag one by its
 handle, or focus the handle and move it with the arrow keys, Home and End.
 Cameras left out of the order, such as a new source's, follow in the order
@@ -147,9 +151,13 @@ and make the change again.
     }
   ],
   "cameras": [{ "camera": "swann/1", "label": "Front door" }],
-  "order": ["garden/porch", "swann/1"]
+  "order": ["garden/porch", "swann/1"],
+  "off": ["garden/shed"]
 }
 ```
+
+A source that's off has `"enabled": false`, and `off` lists the cameras
+that are off; the file leaves both out while everything's on.
 
 A `raysharp` source is a Raysharp-made recorder, such as a Swann DVR, with
 live view, recordings, events and its disks; each channel is a camera. A

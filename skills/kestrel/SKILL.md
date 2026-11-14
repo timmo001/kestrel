@@ -33,9 +33,12 @@ for the recorder's channel 3.
 2. `cameras` lists each camera's id, name (or the `label` you gave it) and
    what it can do: `live`, `still`, `recordings` and `events`, and `signal`
    for whether it has a picture now (`null` when its source can't tell).
+   `enabled` is `false` for a camera turned off in Settings, which has no
+   live video or still but keeps its recordings.
    A camera with `still` has a picture at
    `<server>/api/cameras/<source>/<camera>/still`. `sources` gives each
-   source's kind and settings and the names given to cameras, as the
+   source's kind and settings, whether it's on, the names given to cameras
+   and the cameras turned off, as the
    Settings page shows them; secrets are left out, and `secrets` says which
    are set. Changing them is done on the Settings page, not here.
 3. For what was recorded, use `days` for a month, then `recordings` for a

@@ -1,8 +1,8 @@
 /**
  * The Settings page: each source with the settings its kind takes and a
  * switch to turn it off without removing it, the cameras of a kind you list
- * yourself, the name you give each camera, the order they show in, and what
- * the server records and how long it keeps it.
+ * yourself, the name you give each camera and whether it's on, the order
+ * they show in, and what the server records and how long it keeps it.
  * Saving sends them all to the server, which keeps them in the sources file
  * and restarts the sources that changed. Secrets never come back from the
  * server: a saved one shows as saved, and stays as it is unless you type a
@@ -223,6 +223,9 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
   /** The order cameras show in, by id, as saved or as you dragged it. */
   let order: ReadonlyArray<string> = [];
 
+  /** The cameras you've turned off, by id. */
+  let off = new Set<string>();
+
   /** What the server records and keeps, as the page edits it. */
   let recording = defaultRecording();
 
@@ -268,6 +271,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     }));
     labels = new Map(settings.cameras.map((each) => [each.camera, each.label]));
     order = settings.order;
+    off = new Set(settings.off);
     recording = {
       cameras: settings.recording.cameras,
       folder: settings.recording.folder,
@@ -281,27 +285,42 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     opened = drafts.find((source) => source.id === opened?.id);
   };
 
-  /** A field for each of a source's cameras' names, once the server has them. */
+  /** A field for each of a source's cameras' names and a switch to turn it off, once the server has them. */
   const labelInputs = (source: Draft) => {
     const own = cameras.filter((camera) => camera.source === source.id);
 
     if (own.length === 0) return [];
 
     const inputs = own.map((camera) => {
+      const row = element("gw-row");
       const input = element("gw-input");
+      const power = element("gw-switch");
 
+      row.setAttribute("nowrap", "");
+      row.setAttribute("align", "end");
       input.label = ownLabel(camera);
       input.placeholder = camera.name;
       input.value = labels.get(camera.id) ?? "";
+      input.style.flex = "1";
       input.addEventListener("input", () => labels.set(camera.id, input.value));
 
-      return input;
+      // Off keeps the camera's name and recordings, but shows no live video
+      power.label = `Show ${ownLabel(camera)}`;
+      power.labelHidden = true;
+      power.checked = !off.has(camera.id);
+      power.addEventListener("change", () => {
+        if (power.checked) off.delete(camera.id);
+        else off.add(camera.id);
+      });
+      row.append(input, power);
+
+      return row;
     });
 
     return [
       group(
-        "Camera names",
-        "What each camera shows as across the app. Leave one empty to use its own.",
+        "Cameras",
+        "What each camera shows as across the app, and whether it's on. Leave a name empty to use its own. One that's off has no live video and isn't recorded.",
         fieldGrid(inputs),
       ),
     ];
@@ -778,6 +797,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       label.trim() === "" ? [] : [{ camera, label: label.trim() }],
     ),
     order,
+    off: [...off],
     recording,
     revision,
   });

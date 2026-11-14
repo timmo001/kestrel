@@ -263,6 +263,10 @@ const sources = Command.make(
       yield* Console.log(`Camera order  ${settings.order.join(", ")}`);
     }
 
+    if (settings.off.length > 0) {
+      yield* Console.log(`Cameras off  ${settings.off.join(", ")}`);
+    }
+
     const recording = settings.recording;
 
     yield* Console.log(
@@ -300,7 +304,7 @@ const cameras = Command.make(
       ].flat();
 
       yield* Console.log(
-        `${each.id}  ${each.label ?? each.name}  ${can.join(", ")}${each.signal === false ? "  no signal" : ""}`,
+        `${each.id}  ${each.label ?? each.name}  ${can.join(", ")}${each.enabled ? "" : "  off"}${each.signal === false ? "  no signal" : ""}`,
       );
     }
   }),
@@ -919,6 +923,7 @@ const configCopy = Command.make(
           sources: ours.sources,
           cameras: ours.cameras,
           order: ours.order,
+          off: ours.off,
           recording: ours.recording,
           // The settings read back always carry one
           revision: theirs.revision ?? "",

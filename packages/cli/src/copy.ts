@@ -103,6 +103,7 @@ export const localSettings = Effect.fn("localSettings")(function* (
     ),
     cameras: settings.cameras,
     order: settings.order,
+    off: settings.off,
     recording: { ...settings.recording, folder: null },
   };
 });
