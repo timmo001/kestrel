@@ -35,8 +35,6 @@ import {
   phCaretLeft,
   phCaretLineRight,
   phCaretRight,
-  phCornersIn,
-  phCornersOut,
   phDownloadSimple,
   phGauge,
   phLightning,
@@ -77,6 +75,7 @@ import {
   dayFormat,
   element,
   find,
+  fullscreenToggle,
   helpToggle,
   isoDay,
   localDate,
@@ -111,8 +110,6 @@ const icons = {
   download: phDownloadSimple,
   zoomIn: phMagnifyingGlassPlus,
   zoomOut: phMagnifyingGlassMinus,
-  fullscreen: phCornersOut,
-  exitFullscreen: phCornersIn,
 };
 
 /** The speeds in the Speed menu; any other is typed in from its Custom item. */
@@ -733,7 +730,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   setIcon(downloadButton, icons.download);
   setIcon(zoomOutButton, icons.zoomOut);
   setIcon(zoomInButton, icons.zoomIn);
-  setIcon(fullscreenButton, icons.fullscreen);
   setIcon(previousDay, phCaretLeft, "Previous day");
   setIcon(nextDay, phCaretRight, "Next day");
   // Plain on the day picker's own track, small to sit inside it
@@ -1283,27 +1279,11 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     setAlone(!alone);
   });
 
-  // The video, its controls and the timeline go full screen together
-  fullscreenButton?.addEventListener("click", () => {
-    if (document.fullscreenElement === null) {
-      void view?.requestFullscreen().catch(() => undefined);
-    } else {
-      void document.exitFullscreen();
-    }
-  });
-
-  document.addEventListener("fullscreenchange", () => {
-    const full = document.fullscreenElement !== null;
-
-    setIcon(
-      fullscreenButton,
-      full ? icons.exitFullscreen : icons.fullscreen,
-      full ? "Exit full screen (F)" : "Full screen (F)",
-    );
-
-    // The picture's size changed, so the pan's reach did too
-    requestAnimationFrame(zoom.show);
-  });
+  // The video, its controls and the timeline go full screen together. The
+  // picture's size changes, so the pan's reach does too
+  fullscreenToggle(fullscreenButton, view, () =>
+    requestAnimationFrame(zoom.show),
+  );
 
   zoom.show();
 
@@ -1926,7 +1906,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     [captureButton, "S", "s"],
     [zoomOutButton, "−", "-"],
     [zoomInButton, "+", "+"],
-    [fullscreenButton, "F", "f"],
     [helpButton, "?", "?"],
   ];
 
@@ -1940,6 +1919,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   }
 
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
+  fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
 
   // A click in the player's card hands the focus back to the player, so the
   // keys keep working rather than going to the button clicked. Fields keep

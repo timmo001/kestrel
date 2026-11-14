@@ -6,7 +6,12 @@ import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import { type TableColumn, type TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
-import { phDownloadSimple, phPlay } from "./icons.ts";
+import {
+  phCornersIn,
+  phCornersOut,
+  phDownloadSimple,
+  phPlay,
+} from "./icons.ts";
 import { clipUrl, type Clip } from "./recording-player.ts";
 
 /**
@@ -94,6 +99,39 @@ export const followFullscreen = (overlay: HTMLElement) => {
   document.addEventListener("fullscreenchange", () => {
     (document.fullscreenElement ?? document.body).append(overlay);
   });
+};
+
+/**
+ * Wires a player's full screen button: it takes `target` full screen, or
+ * leaves, and its icon and name follow, with `onChange` after each change.
+ */
+export const fullscreenToggle = (
+  button: HTMLElementTagNameMap["gw-button"] | null,
+  target: HTMLElement | null,
+  onChange?: () => void,
+) => {
+  const show = () => {
+    const full = target !== null && document.fullscreenElement === target;
+
+    controlIcon(button, full ? phCornersIn : phCornersOut, {
+      label: full ? "Exit full screen (F)" : "Full screen (F)",
+    });
+  };
+
+  button?.addEventListener("click", () => {
+    if (document.fullscreenElement === null) {
+      void target?.requestFullscreen().catch(() => undefined);
+    } else {
+      void document.exitFullscreen();
+    }
+  });
+
+  document.addEventListener("fullscreenchange", () => {
+    show();
+    onChange?.();
+  });
+
+  show();
 };
 
 /**

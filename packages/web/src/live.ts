@@ -27,8 +27,6 @@ import { serverUrl } from "./api.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
   phCamera,
-  phCornersIn,
-  phCornersOut,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phPause,
@@ -51,6 +49,7 @@ import {
   controlIcon,
   element,
   find,
+  fullscreenToggle,
   helpToggle,
   swipeIgnore,
 } from "./shared.ts";
@@ -586,7 +585,6 @@ export const livePage = (): LivePage => {
   setIcon(captureButton, phCamera, "Save a still (S)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(helpButton, phQuestionMark, "Help (?)");
-  setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
@@ -1515,23 +1513,7 @@ export const livePage = (): LivePage => {
   playButton?.addEventListener("click", togglePause);
   captureButton?.addEventListener("click", capture);
 
-  fullscreenButton?.addEventListener("click", () => {
-    if (document.fullscreenElement === null) {
-      void stage?.requestFullscreen().catch(() => undefined);
-    } else {
-      void document.exitFullscreen();
-    }
-  });
-
-  document.addEventListener("fullscreenchange", () => {
-    const full = document.fullscreenElement === stage;
-
-    setIcon(
-      fullscreenButton,
-      full ? phCornersIn : phCornersOut,
-      full ? "Exit full screen (F)" : "Full screen (F)",
-    );
-  });
+  fullscreenToggle(fullscreenButton, stage);
 
   const help = helpToggle(shortcutsPopover, helpButton);
 
