@@ -201,6 +201,15 @@ const drawnSize = (width: number, height: number, ratio: number | null) => ({
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
 
+/**
+ * How many slow streams, such as a web page's, start at once: more at once
+ * only slow each other down, so the first cameras show sooner this way.
+ */
+const slowStarts = 2;
+
+/** How long a slow stream has to start before the next goes ahead anyway. */
+const slowStartWait = 30_000;
+
 /** A camera's still picture now; the time makes each one new to the browser. */
 const stillAddress = (camera: Camera) =>
   serverUrl(`api/cameras/${camera.id}/still?at=${Date.now()}`).href;
@@ -880,8 +889,59 @@ export const livePage = (): LivePage => {
     }
 
     for (const player of [tile.player, tile.inset]) {
-      if (player !== null) connectPlayer(tile, player);
+      if (player === null) continue;
+
+      if (liveOfPlayer(tile, player)?.slowStart === true) {
+        waiting.push({ tile, player });
+      } else {
+        connectPlayer(tile, player);
+      }
     }
+
+    startWaiting();
+  };
+
+  /** Slow players still to start, in the cameras' order. */
+  let waiting: Array<{ readonly tile: Tile; readonly player: LivePlayer }> = [];
+
+  /** Slow players started that haven't played yet, each with its start. */
+  const starting = new Map<LivePlayer, object>();
+
+  /** Starts slow players while fewer than `slowStarts` are still starting. */
+  const startWaiting = () => {
+    while (starting.size < slowStarts) {
+      const next = waiting.shift();
+
+      if (next === undefined) return;
+
+      // Gone with a new page or layout
+      if (!next.player.isConnected) continue;
+
+      const { player } = next;
+      const start = {};
+
+      // Only this start's end counts, not one from before a pause
+      const started = () => {
+        if (starting.get(player) !== start) return;
+
+        starting.delete(player);
+        startWaiting();
+      };
+
+      starting.set(player, start);
+      player.addEventListener("playing", started, {
+        capture: true,
+        once: true,
+      });
+      setTimeout(started, slowStartWait);
+      connectPlayer(next.tile, player);
+    }
+  };
+
+  /** Drops the slow players still to start or starting, as the page changes or pauses. */
+  const stopWaiting = () => {
+    waiting = [];
+    starting.clear();
   };
 
   /** The streams one of a tile's players plays, from its view. */
@@ -1164,6 +1224,8 @@ export const livePage = (): LivePage => {
 
     arrangeGrid(grid);
 
+    stopWaiting();
+
     // On the page each player makes its video: the page's controls stand in
     // for the video's own, and it starts quiet until its sound is picked
     for (const tile of tiles) {
@@ -1345,6 +1407,8 @@ export const livePage = (): LivePage => {
     if (streams.length === 0) return;
 
     paused = !paused;
+
+    if (paused) stopWaiting();
 
     for (const tile of tiles) {
       // A still picture stays as it is while paused

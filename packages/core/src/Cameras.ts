@@ -16,6 +16,11 @@ export const LiveStreams = Schema.Struct({
   subRatio: Schema.NullOr(Schema.Number),
   /** Whether they carry the camera's sound. */
   sound: Schema.Boolean,
+  /**
+   * Whether they take seconds to start, as a stream looked up afresh each
+   * time does, so the page starts them a few at a time, in order.
+   */
+  slowStart: Schema.Boolean,
 });
 
 export interface LiveStreams extends Schema.Schema.Type<typeof LiveStreams> {}

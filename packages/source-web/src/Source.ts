@@ -259,6 +259,8 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         ),
         sub: Redacted.make(echoAddress(ytDlp, node, camera.page, formats.sub)),
         sound: true,
+        // yt-dlp looks the stream up each time it starts
+        slowStart: true,
       })),
     ),
   };

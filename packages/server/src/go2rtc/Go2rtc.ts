@@ -55,6 +55,7 @@ export const streamNames = (feed: LiveFeed): LiveStreams => {
     sub: feed.sub === null ? null : `${main}_sub`,
     subRatio: feed.subRatio ?? null,
     sound: feed.sound === true,
+    slowStart: feed.slowStart === true,
   };
 };
 
@@ -83,6 +84,7 @@ export const viewsOf = (feed: LiveFeed): Array<CameraView> =>
               sub: other.sub === null ? null : `${main}_sub`,
               subRatio: null,
               sound: feed.sound === true,
+              slowStart: feed.slowStart === true,
             },
             zoom: other.zoom,
           };

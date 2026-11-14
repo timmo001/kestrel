@@ -187,7 +187,9 @@ as `swann_1` for the main stream and `swann_1_sub` for the sub stream. Play
 one with `/go2rtc/stream.html?src=swann_1_sub`. `subRatio` is the width over
 height to draw the sub stream at when its frames squeeze the picture into
 another shape, as the DVR8-4575's 352×288 sub stream does with a 16:9
-picture, and `null` when it's drawn at its own shape.
+picture, and `null` when it's drawn at its own shape. `slowStart` says the
+streams take seconds to start, as a web page's do while yt-dlp looks them up,
+so the page starts those two at a time, in the cameras' order.
 
 A camera's other views have streams named after them, such as
 `reolink-hub_1_telephoto` for a TrackMix's telephoto lens on a Reolink hub.

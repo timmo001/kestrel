@@ -105,6 +105,11 @@ export interface LiveFeed {
    */
   readonly sound?: boolean;
   /**
+   * Whether its streams take seconds to start, as one looked up afresh each
+   * time does, such as on a web page. Left out, they start at once.
+   */
+  readonly slowStart?: boolean;
+  /**
    * For a camera with other pictures, such as a second lens: the main
    * picture's name and whether the lens zoom changes it.
    */
