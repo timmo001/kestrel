@@ -262,7 +262,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const previousDay = find("gw-button", "day-previous");
   const nextDay = find("gw-button", "day-next");
   const cameraSelect = find("gw-select", "camera");
-  const recordedDays = find("gw-row", "recorded-days");
   const table = find("gw-table", "recordings");
   const grid = find("div", "player-grid");
   const view = find("div", "playback-view");
@@ -1145,12 +1144,39 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // A press that doesn't move plays or pauses; a drag moves a zoomed picture.
   // A double click's second press doesn't, and the double click puts back
   // what its first did
-  let press: { x: number; y: number; moved: boolean } | undefined;
+  let press:
+    | { x: number; y: number; moved: boolean; tile: CameraId | undefined }
+    | undefined;
+
   let lastPress = 0;
   let pressToggled = false;
+  /** The camera whose tile the last press was on, for a double click. */
+  let pressedCamera: CameraId | undefined;
+
+  /**
+   * The camera whose tile an event is on. Only for a press: once the screen
+   * captures the pointer, what follows is the screen's, not the tile's.
+   */
+  const tileCamera = (event: Event) => {
+    const tile = event
+      .composedPath()
+      .find(
+        (target) =>
+          target instanceof HTMLElement && target.matches(".player-tile"),
+      );
+
+    return tile instanceof HTMLElement ? tile.dataset.camera : undefined;
+  };
 
   screen?.addEventListener("pointerdown", (event) => {
-    press = { x: event.clientX, y: event.clientY, moved: false };
+    press = {
+      x: event.clientX,
+      y: event.clientY,
+      moved: false,
+      tile: tileCamera(event),
+    };
+
+    pressedCamera = press.tile;
     screen.setPointerCapture(event.pointerId);
   });
 
@@ -1164,25 +1190,25 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   });
 
   screen?.addEventListener("pointerup", (event) => {
-    // A press on another camera's tile picks that camera instead
-    const tile = event
-      .composedPath()
-      .find(
-        (target) =>
-          target instanceof HTMLElement && target.matches(".player-tile"),
-      );
-
-    const onOther =
-      tile instanceof HTMLElement && tile.dataset.camera !== camera;
-
     const second = event.timeStamp - lastPress < doublePress;
 
     lastPress = event.timeStamp;
 
+    // A press on another camera's tile picks that camera instead, as on Live
+    const other =
+      press !== undefined &&
+      !press.moved &&
+      !alone &&
+      press.tile !== undefined &&
+      press.tile !== camera
+        ? press.tile
+        : undefined;
+
     if (!second) {
-      pressToggled = press !== undefined && !press.moved && !onOther;
+      pressToggled = press !== undefined && !press.moved && other === undefined;
 
       if (pressToggled) togglePlay();
+      else if (other !== undefined) pickCamera(other);
     }
 
     press = undefined;
@@ -1206,15 +1232,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       return;
     }
 
-    const tile = event
-      .composedPath()
-      .find(
-        (target) =>
-          target instanceof HTMLElement && target.matches(".player-tile"),
-      );
-
-    const clicked =
-      tile instanceof HTMLElement ? tile.dataset.camera : undefined;
+    // The pointer's captured by the screen, so the double click is its
+    // own; the press says which tile it was on
+    const clicked = pressedCamera ?? tileCamera(event);
 
     if (clicked !== undefined && clicked !== camera) pickCamera(clicked);
 
@@ -1407,19 +1427,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (dayPicker !== null) dayPicker.marked = [...markedDays];
   };
 
-  const showDays = (days: ReadonlyArray<string>) => {
-    recordedDays?.replaceChildren(
-      ...days.map((recorded) => {
-        const chip = element("gw-chip", recorded.slice(8));
-
-        chip.setAttribute("tone", recorded === day ? "accent" : "neutral");
-        chip.addEventListener("click", () => pick(recorded));
-
-        return chip;
-      }),
-    );
-  };
-
   /** The cameras with recordings on the day shown, once known. */
   let recordedCameras: ReadonlySet<CameraId> | undefined;
 
@@ -1537,10 +1544,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
     // The recordings don't wait on the month's days
     const shown = showRecordings();
-    const days = await recordedDaysIn(day.slice(0, 7));
-
-    showDays(days);
-    markDays(days);
+    markDays(await recordedDaysIn(day.slice(0, 7)));
     void findRecordedCameras(day);
     await shown;
   };

@@ -705,15 +705,11 @@ gw-table gw-sheet {
 
 .day-picker {
   gap: var(--gw-space-1);
+  align-items: center;
 }
 
-.recorded-days {
-  flex-wrap: wrap;
-  gap: var(--gw-space-1);
-}
-
-/* The top of the Recordings page fills the window under the app bar: its
-   heading and days, the video and its controls, and the timeline. The video
+/* The top of the Recordings page fills the window under the app bar: the
+   cameras, the video and its controls, and the timeline with its day. The video
    takes whatever height is left, so the clip and the table start below the
    window whatever its size */
 .playback-view {
@@ -1065,7 +1061,7 @@ gw-table gw-sheet {
   }
 }
 
-/* The day's chips and the day and channel, in one row */
+/* The cameras playing, above them */
 .playback-bar {
   display: flex;
   flex-wrap: wrap;

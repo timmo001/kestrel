@@ -197,9 +197,9 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   const holding = new Set<Tile>();
 
   /**
-   * The tiles that have played some of the clip they're on. Every clip
-   * takes a moment to start, which says nothing of how fast the camera's
-   * video comes; running out partway through does.
+   * The tiles that ran out of video partway through the clip they're on.
+   * Every clip takes a moment to start, which says nothing of how fast the
+   * camera's video comes; running out partway through does.
    */
   const running = new Set<Tile>();
 
@@ -472,12 +472,29 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     figure.dataset.camera = camera;
     // A shimmer from when a clip starts loading until its first frame, so
     // the picture fades in rather than popping in
+    // Where the clip first played from, to tell running out partway through
+    // it from a slow start
+    let playedFrom: number | undefined;
+
     video.addEventListener("loadstart", () => {
       figure.dataset.loading = "";
       running.delete(tile);
+      playedFrom = undefined;
     });
 
-    video.addEventListener("playing", () => running.add(tile));
+    video.addEventListener("playing", () => {
+      playedFrom ??= video.currentTime;
+    });
+
+    // After a second or so of play, whatever the speed
+    video.addEventListener("waiting", () => {
+      if (
+        playedFrom !== undefined &&
+        video.currentTime - playedFrom > Math.max(1, video.playbackRate)
+      ) {
+        running.add(tile);
+      }
+    });
 
     for (const type of ["loadeddata", "emptied"]) {
       video.addEventListener(type, () => {
@@ -650,6 +667,10 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       const at = now();
       const wanted = new Set(next.map((track) => track.camera));
 
+      const sameSet =
+        wanted.size === tiles.size &&
+        [...tiles.keys()].every((camera) => wanted.has(camera));
+
       for (const [camera, tile] of tiles) {
         if (!wanted.has(camera)) {
           tile.player.stop();
@@ -663,21 +684,25 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       tracks = next;
       picked = pickedCamera;
 
-      // The picked camera first, so it's the large one in three
-      const order = [
-        ...next.filter((track) => track.camera === picked),
-        ...next.filter((track) => track.camera !== picked),
-      ];
+      // The picked camera first, so it's the large one in three. Only as
+      // the cameras change: picking another leaves them where they are, so
+      // a tile doesn't move from under the pointer, as for a double click
+      if (!sameSet) {
+        const order = [
+          ...next.filter((track) => track.camera === picked),
+          ...next.filter((track) => track.camera !== picked),
+        ];
 
-      for (const track of order) {
-        if (!tiles.has(track.camera)) {
-          tiles.set(track.camera, makeTile(track.camera));
+        for (const track of order) {
+          if (!tiles.has(track.camera)) {
+            tiles.set(track.camera, makeTile(track.camera));
+          }
         }
-      }
 
-      grid.replaceChildren(
-        ...order.flatMap((track) => tiles.get(track.camera)?.figure ?? []),
-      );
+        grid.replaceChildren(
+          ...order.flatMap((track) => tiles.get(track.camera)?.figure ?? []),
+        );
+      }
 
       for (const tile of tiles.values()) {
         tile.figure.toggleAttribute(
@@ -778,11 +803,16 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       }
 
       holdBack();
+      // Held for another camera, no video starts, so nothing else says so
+      events.onState();
     },
     pause: () => {
       playing = false;
 
       for (const tile of tiles.values()) tile.video.pause();
+
+      // Held, the videos were paused already, so none says it's paused
+      events.onState();
     },
     rate: (rate) => {
       // Another speed tries every camera on the whole stream again

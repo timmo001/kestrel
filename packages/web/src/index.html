@@ -293,29 +293,10 @@
                clip and the day's recordings are below it -->
           <div class="playback-view">
             <!-- The app bar marks the page, so its name is only for screen
-                 readers; the month's recorded days and the day and cameras
-                 share one row -->
+                 readers; the day is picked on the timeline -->
             <h2 class="visually-hidden">Recordings</h2>
             <div class="playback-bar">
-              <gw-row
-                class="recorded-days"
-                aria-label="Days with recordings"
-              ></gw-row>
               <gw-row class="recording-filters">
-                <gw-row class="day-picker" role="group" aria-label="Day">
-                  <gw-button
-                    class="day-previous"
-                    label="Previous day"
-                  ></gw-button>
-                  <!-- Days with recordings stand out; the rest can't be picked -->
-                  <gw-date-picker
-                    class="day"
-                    label="Day"
-                    inline-label
-                    unmarked="disabled"
-                  ></gw-date-picker>
-                  <gw-button class="day-next" label="Next day"></gw-button>
-                </gw-row>
                 <gw-select
                   class="camera"
                   label="Cameras"
@@ -486,8 +467,12 @@
                       </dd>
                       <dt><kbd>Esc</kbd> or <kbd>Backspace</kbd></dt>
                       <dd>Back from one camera alone</dd>
-                      <dt><kbd>Page Up</kbd> <kbd>Page Down</kbd></dt>
-                      <dd>Pick the previous or next camera</dd>
+                      <dt>
+                        <kbd>Page Up</kbd> <kbd>Page Down</kbd>, or a click
+                      </dt>
+                      <dd>
+                        Pick the previous or next camera, or the one clicked
+                      </dd>
                       <dt><kbd>T</kbd></dt>
                       <dd>
                         Smart tiling, sized to the window, or fixed layouts, as
@@ -529,6 +514,21 @@
               </div>
               <div class="timeline-ticks" aria-hidden="true"></div>
               <gw-row class="timeline-foot">
+                <!-- The day the timeline shows -->
+                <gw-row class="day-picker" role="group" aria-label="Day">
+                  <gw-button
+                    class="day-previous"
+                    label="Previous day"
+                  ></gw-button>
+                  <!-- Days with recordings stand out; the rest can't be picked -->
+                  <gw-date-picker
+                    class="day"
+                    label="Day"
+                    label-hidden
+                    unmarked="disabled"
+                  ></gw-date-picker>
+                  <gw-button class="day-next" label="Next day"></gw-button>
+                </gw-row>
                 <gw-row class="timeline-legend" aria-hidden="true">
                   <span data-tone="neutral">Normal</span>
                   <span data-tone="warning">Motion or alarm</span>
