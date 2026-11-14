@@ -9,7 +9,9 @@
  * is steered with `PtzCtrl` and `StartZoomFocus`, as its `GetAbility` says
  * it can, with its presets, its home (`PtzGuard`) and how it follows what it
  * sees (`AiCfg`), and a TrackMix's telephoto lens on a hub or recorder plays as its
- * second view. Its recordings, on an SD card or
+ * second view. Its picture settings, such as brightness, are read with
+ * `GetImage` and changed with `SetImage`, where its abilities say it has
+ * them. Its recordings, on an SD card or
  * a hub's disk, are listed from its `Search` command, one search per
  * request, as some firmware fails a batch. A hub or recorder hands its files
  * over by replaying them on its own protocol; a camera's are listed only, as
@@ -23,6 +25,7 @@ import {
   InvalidSettings,
   NoRecordings,
   NotSupported,
+  PictureCommand,
   PtzCommand,
   SourceUnavailable,
   UnknownCamera,
@@ -33,10 +36,13 @@ import {
   type EventKind,
   type Kind,
   type LiveFeed,
+  type PictureControls,
+  type PictureState,
   type PtzControls,
   type PtzHome,
   type PtzState,
   type Source,
+  type SourcePicture,
   type SourcePtz,
   type SourceRecordings,
   type SourceSettings,
@@ -128,6 +134,8 @@ const Reply = Schema.Struct({
   value: Schema.optional(Schema.Unknown),
   /** What each setting can be, for a command sent with action 1. */
   range: Schema.optional(Schema.Unknown),
+  /** Each setting's default, for a command sent with action 1. */
+  initial: Schema.optional(Schema.Unknown),
   error: Schema.optional(
     Schema.Struct({
       rspCode: Schema.Number,
@@ -262,6 +270,43 @@ const trackMethods = [
   ["turn-first", 4],
 ] as const satisfies ReadonlyArray<readonly [TrackMethod, number]>;
 
+/** Its picture settings, by its own names, such as `bright`. */
+const Image = Schema.Struct({
+  Image: Schema.Record(Schema.String, Schema.Number),
+});
+
+/** What each picture setting can be, with its channel among them. */
+const ImageRange = Schema.Struct({
+  Image: Schema.Record(Schema.String, Schema.Unknown),
+});
+
+const isSpan = Schema.is(Span);
+
+/**
+ * Its names for each picture setting by Kestrel's, and the ability that
+ * says it has it, as reolink_aio reads them, `ispSatruation` misspelt as
+ * the firmware has it.
+ */
+const pictureNames = [
+  ["hue", "hue", "ispHue"],
+  ["brightness", "bright", "ispBright"],
+  ["contrast", "contrast", "ispContrast"],
+  ["saturation", "saturation", "ispSatruation"],
+  ["sharpness", "sharpen", "ispSharpen"],
+] as const satisfies ReadonlyArray<
+  readonly [keyof PictureState, string, string]
+>;
+
+type PictureName = (typeof pictureNames)[number][0];
+
+/** One picture setting a channel has: its own name, its range and its default where it says. */
+interface ImageSetting {
+  readonly own: string;
+  readonly min: number;
+  readonly max: number;
+  readonly initial: number | undefined;
+}
+
 /** Each detection's state: a number on older firmware, or whether it's supported and alarming. */
 const OldState = Schema.Number;
 
@@ -391,6 +436,10 @@ interface Channel {
   readonly zoom: typeof Span.Type | null;
   /** Its telephoto lens's stream, for a TrackMix on a hub or recorder. */
   readonly telephoto: Redacted.Redacted | null;
+  /** Which picture settings it has; `null` where it has none. */
+  readonly picture: PictureControls | null;
+  /** Each picture setting it has. */
+  readonly image: ReadonlyMap<PictureName, ImageSetting>;
 }
 
 interface Device {
@@ -545,7 +594,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     list: ReadonlyArray<Reply>,
     at: number,
     schema: S,
-    field: "value" | "range" = "value",
+    field: "value" | "range" | "initial" = "value",
   ): Effect.Effect<S["Type"], SourceUnavailable> => {
     const reply = list[at];
 
@@ -773,6 +822,84 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           .map((each) => each.channel),
     });
 
+    // Its picture settings' ranges and defaults, once, as they don't change
+    const imaging = found.filter((each) =>
+      pictureNames.some(
+        ([, , ability]) => versionOf(each.channel, ability) > 0,
+      ),
+    );
+
+    const images = new Map<
+      number,
+      {
+        readonly range: Option.Option<typeof ImageRange.Type>;
+        readonly initial: Option.Option<typeof Image.Type>;
+      }
+    >();
+
+    if (imaging.length > 0) {
+      const list = yield* call(
+        imaging.map((each) =>
+          command("GetImage", { channel: each.channel }, 1),
+        ),
+      ).pipe(Effect.option);
+
+      if (Option.isSome(list)) {
+        yield* Effect.forEach(
+          imaging,
+          Effect.fnUntraced(function* (each, at) {
+            images.set(each.channel, {
+              range: yield* valueOf(list.value, at, ImageRange, "range").pipe(
+                Effect.option,
+              ),
+              initial: yield* valueOf(list.value, at, Image, "initial").pipe(
+                Effect.option,
+              ),
+            });
+          }),
+        );
+      }
+    }
+
+    /** Each picture setting a channel has, 0 to 255 where it doesn't say. */
+    const imageOf = (channel: number) => {
+      const read = images.get(channel);
+
+      return new Map(
+        pictureNames.flatMap(([setting, own, ability]) => {
+          if (versionOf(channel, ability) === 0) return [];
+
+          const span = Option.getOrUndefined(
+            Option.map(
+              read?.range ?? Option.none(),
+              (value) => value.Image[own],
+            ),
+          );
+
+          const initial = Option.getOrUndefined(
+            Option.map(
+              read?.initial ?? Option.none(),
+              (value) => value.Image[own],
+            ),
+          );
+
+          const known = isSpan(span) && span.max > span.min;
+
+          return [
+            [
+              setting,
+              {
+                own,
+                min: known ? span.min : 0,
+                max: known ? span.max : 255,
+                initial,
+              },
+            ] as const,
+          ];
+        }),
+      );
+    };
+
     const channels = yield* Effect.forEach(
       found,
       Effect.fnUntraced(function* (each, at) {
@@ -785,6 +912,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
         const zoom = zoomRanges.get(each.channel) ?? null;
         const pan = turns.includes(ptzType);
         const tilt = [2, 3, 5, 6].includes(ptzType);
+        const image = imageOf(each.channel);
 
         return {
           channel: each.channel,
@@ -822,6 +950,21 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
                   `rtsp://${base.hostname}:554/Preview_${two(each.channel + 1)}_autotrack`,
                 )
               : null,
+          picture:
+            image.size === 0
+              ? null
+              : {
+                  hue: image.has("hue"),
+                  brightness: image.has("brightness"),
+                  contrast: image.has("contrast"),
+                  saturation: image.has("saturation"),
+                  sharpness: image.has("sharpness"),
+                  // Only where it said every one's default
+                  reset: [...image.values()].every(
+                    (setting) => setting.initial !== undefined,
+                  ),
+                },
+          image,
         } satisfies Channel;
       }),
     );
@@ -1464,6 +1607,115 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
     }),
   };
 
+  /** A camera with picture settings. */
+  const adjustable = Effect.fnUntraced(function* (camera: CameraId) {
+    const device = yield* opened;
+    const channel = yield* channelOf(device, camera);
+
+    if (channel.picture === null) {
+      return yield* new NotSupported({
+        message: `${camera} has no picture settings`,
+      });
+    }
+
+    return { channel, controls: channel.picture };
+  });
+
+  /** Its picture settings now, each as a share of its range. */
+  const imageNow = (channel: Channel) =>
+    call([command("GetImage", { channel: channel.channel })]).pipe(
+      Effect.flatMap((list) => valueOf(list, 0, Image)),
+      Effect.map(({ Image: now }) => {
+        const shareOf = (setting: PictureName) => {
+          const known = channel.image.get(setting);
+          const value = known === undefined ? undefined : now[known.own];
+
+          return known === undefined || value === undefined
+            ? null
+            : Math.min(
+                1,
+                Math.max(0, (value - known.min) / (known.max - known.min)),
+              );
+        };
+
+        return {
+          hue: shareOf("hue"),
+          brightness: shareOf("brightness"),
+          contrast: shareOf("contrast"),
+          saturation: shareOf("saturation"),
+          sharpness: shareOf("sharpness"),
+        } satisfies PictureState;
+      }),
+    );
+
+  const picture: SourcePicture = {
+    state: Effect.fnUntraced(function* (camera) {
+      const { channel } = yield* adjustable(camera);
+
+      return yield* imageNow(channel);
+    }),
+    send: Effect.fnUntraced(function* (camera, order) {
+      const { channel, controls } = yield* adjustable(camera);
+
+      const values = yield* PictureCommand.match(order, {
+        Set: (change) => {
+          const asked = pictureNames.flatMap(([setting]) => {
+            const share = change[setting];
+
+            return share === undefined ? [] : [[setting, share] as const];
+          });
+
+          const missing = asked.find(
+            ([setting]) => !channel.image.has(setting),
+          );
+
+          if (missing !== undefined) {
+            return Effect.fail(
+              new NotSupported({ message: `${camera} has no ${missing[0]}` }),
+            );
+          }
+
+          return Effect.succeed(
+            asked.flatMap(([setting, share]) => {
+              const known = channel.image.get(setting);
+
+              return known === undefined
+                ? []
+                : [
+                    [
+                      known.own,
+                      Math.round(known.min + share * (known.max - known.min)),
+                    ] as const,
+                  ];
+            }),
+          );
+        },
+        Reset: () =>
+          controls.reset
+            ? Effect.succeed(
+                [...channel.image.values()].flatMap((known) =>
+                  known.initial === undefined
+                    ? []
+                    : [[known.own, known.initial] as const],
+                ),
+              )
+            : Effect.fail(
+                new NotSupported({
+                  message: `${camera} can't go back to its defaults`,
+                }),
+              ),
+      });
+
+      if (values.length > 0) {
+        yield* setting("SetImage", {
+          Image: { channel: channel.channel, ...Object.fromEntries(values) },
+        });
+      }
+
+      return yield* imageNow(channel);
+    }),
+  };
+
   const source: Source = {
     id,
     kind: "reolink",
@@ -1497,7 +1749,12 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
             events: true,
           };
 
-          return channel.ptz === null ? info : { ...info, ptz: channel.ptz };
+          const withPtz =
+            channel.ptz === null ? info : { ...info, ptz: channel.ptz };
+
+          return channel.picture === null
+            ? withPtz
+            : { ...withPtz, picture: channel.picture };
         }),
       ),
     ),
@@ -1534,6 +1791,7 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
       ),
     ),
     ptz,
+    picture,
     stills: {
       still: Effect.fnUntraced(function* (camera) {
         const device = yield* opened;
