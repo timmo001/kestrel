@@ -45,12 +45,12 @@ import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
-  controlIcon,
   element,
   find,
   focusOnPress,
   fullscreenToggle,
   helpToggle,
+  playerIcons,
   swipeIgnore,
 } from "./shared.ts";
 import {
@@ -574,11 +574,7 @@ export const livePage = (): LivePage => {
   };
 
   // Pause and Play lead, as on the Recordings page
-  const setIcon = (
-    button: HTMLElementTagNameMap["gw-button"] | null,
-    icon: string,
-    label?: string,
-  ) => controlIcon(button, icon, { label, main: button === playButton });
+  const setIcon = playerIcons(playButton);
 
   setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");

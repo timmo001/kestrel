@@ -79,6 +79,7 @@ import {
   helpToggle,
   isoDay,
   localDate,
+  playerIcons,
   reasonChips,
   reasonTones,
   recordingRow,
@@ -711,11 +712,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // The controls
 
   // Play and Pause lead
-  const setIcon = (
-    button: HTMLElementTagNameMap["gw-button"] | null,
-    icon: string,
-    label?: string,
-  ) => controlIcon(button, icon, { label, main: button === playButton });
+  const setIcon = playerIcons(playButton);
 
   setIcon(playButton, icons.play);
   setIcon(stopButton, icons.stop);

@@ -219,6 +219,19 @@ export const controlIcon = (
   button.textContent = button.getAttribute("label") ?? "";
 };
 
+/**
+ * `controlIcon` for one player's bar, where its `play` button leads and the
+ * rest are plain.
+ */
+export const playerIcons =
+  (play: HTMLElementTagNameMap["gw-button"] | null) =>
+  (
+    button: HTMLElementTagNameMap["gw-button"] | null,
+    icon: string,
+    label?: string,
+  ) =>
+    controlIcon(button, icon, { label, main: button === play });
+
 /** The first `tag` element with `className`, or null. */
 export const find = <K extends keyof HTMLElementTagNameMap>(
   tag: K,
