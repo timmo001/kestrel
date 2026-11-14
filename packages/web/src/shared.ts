@@ -40,22 +40,10 @@ export const helpToggle = (
   button: HTMLElementTagNameMap["gw-button"] | null,
 ) => {
   let open = false;
-  /** Whether it was open as the button was pressed, before that press shut it. */
-  let openOnPress = false;
 
   popover?.addEventListener("close", () => {
     open = false;
   });
-
-  // Ahead of the popover's own listener, which shuts it on a press outside
-  window.addEventListener(
-    "pointerdown",
-    (event) => {
-      openOnPress =
-        open && button !== null && event.composedPath().includes(button);
-    },
-    true,
-  );
 
   const toggle = () => {
     if (popover === null || button === null) return;
@@ -70,15 +58,7 @@ export const helpToggle = (
     popover.show(button);
   };
 
-  button?.addEventListener("click", () => {
-    if (openOnPress) {
-      openOnPress = false;
-
-      return;
-    }
-
-    toggle();
-  });
+  button?.addEventListener("click", toggle);
 
   return {
     toggle,

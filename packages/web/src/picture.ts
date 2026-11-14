@@ -282,19 +282,6 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     if (open) void refresh();
   };
 
-  // Whether it was open as its button was pressed, before that press shut
-  // it, so the click doesn't open it again
-  let openOnPress = false;
-
-  window.addEventListener(
-    "pointerdown",
-    (event) => {
-      openOnPress =
-        open && button !== null && event.composedPath().includes(button);
-    },
-    true,
-  );
-
   const toggle = () => {
     if (open) {
       close();
@@ -314,15 +301,7 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
     void refresh();
   };
 
-  button?.addEventListener("click", () => {
-    if (openOnPress) {
-      openOnPress = false;
-
-      return;
-    }
-
-    toggle();
-  });
+  button?.addEventListener("click", toggle);
 
   return { open: () => open, toggle, show, close };
 };
