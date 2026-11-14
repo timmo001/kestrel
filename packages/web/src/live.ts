@@ -323,7 +323,7 @@ export const livePage = (): LivePage => {
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
   const pictureButton = find("gw-button", "live-picture");
-  const soundDivider = find("span", "live-sound-divider");
+  const soundDivider = find("gw-divider", "live-sound-divider");
   const volume = find("gw-volume", "live-volume");
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");

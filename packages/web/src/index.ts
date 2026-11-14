@@ -33,6 +33,7 @@ import {
   createIcon,
   fillWindow,
   on,
+  overlayControls,
   type MenuItem,
 } from "@timmo001/groundwork-ui";
 import { Equal, Schema } from "effect";
@@ -65,12 +66,7 @@ import { livePage } from "./live.ts";
 import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import {
-  compactWhenCrowded,
-  find,
-  overflowMenu,
-  overlayControls,
-} from "./shared.ts";
+import { find, swipeIgnore } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
 import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
@@ -182,14 +178,30 @@ const showAttention = (all: ReadonlyArray<Attention>) => {
   );
 };
 
-// Both players' controls go to the phone's layout once they don't fit in a
-// row, and on a phone on its side over the picture, as a video player's
-for (const bar of document.querySelectorAll(".player-controls")) {
-  if (bar instanceof HTMLElement) {
-    overflowMenu(bar);
-    compactWhenCrowded(bar);
-    overlayControls(bar);
-  }
+// Both players' controls fit themselves to the fewest rows, and on a phone
+// on its side or full screen go over the picture as a video player's,
+// staying while paused. Turning a phone on its side takes the player full
+// screen, with Recordings' timeline
+for (const bar of document.querySelectorAll("gw-control-bar")) {
+  if (!bar.classList.contains("player-controls")) continue;
+
+  const player = bar.closest(".playback-view, .live-stage");
+
+  if (!(player instanceof HTMLElement)) continue;
+
+  bar.moreIcon = phDotsThreeVertical;
+
+  overlayControls(bar, {
+    fullscreen: player,
+    stays: () =>
+      (
+        bar.querySelector(".control-play, .live-play")?.getAttribute("label") ??
+        ""
+      ).startsWith("Play"),
+    // A press on a camera picks, plays or pauses it
+    pressable: ".live-tile, .player-tile, .player-video",
+    ignore: swipeIgnore,
+  });
 }
 
 // Both players fill the window under whatever shows above them

@@ -94,7 +94,7 @@
              their controls under them, which go full screen together -->
         <section class="page" data-page="live">
           <!-- Focusable, so the keyboard controls reach it after a click -->
-          <div class="live-stage" tabindex="0" data-tiling="smart">
+          <div class="live-stage" tabindex="-1" data-tiling="smart">
             <!-- The grid keeps its layout's shape, centred in the space -->
             <div class="live-area">
               <!-- Placeholders hold the grid's space until the cameras are known -->
@@ -109,109 +109,113 @@
                 <div class="live-tile" data-loading></div>
               </div>
             </div>
-            <div class="player-controls" role="toolbar" aria-label="Live view">
-              <gw-row class="controls-start">
-                <!-- The pager: how many cameras show at once, as many as fit
+            <!-- In the fewest rows they fit, the seldom used folding into
+                 More, and over the picture on a phone on its side -->
+            <gw-control-bar
+              class="player-controls"
+              label="Live view"
+              more-label="More"
+            >
+              <!-- The pager: how many cameras show at once, as many as fit
                      with the rest and how they tile in its More menu, and
                      beside it, while that pages them, which page shows
                      between Previous and Next -->
-                <gw-row class="live-pager" role="group" aria-label="Cameras">
-                  <gw-segmented
-                    class="live-layout"
-                    label="Cameras at once"
-                    more-label="More layouts"
-                    overflow
-                  ></gw-segmented>
-                  <gw-row class="live-pages" hidden>
-                    <gw-button
-                      class="live-previous"
-                      label="Previous cameras"
-                    ></gw-button>
-                    <gw-select
-                      class="live-page"
-                      label="Page"
-                      label-hidden
-                    ></gw-select>
-                    <gw-button
-                      class="live-next"
-                      label="Next cameras"
-                    ></gw-button>
-                  </gw-row>
+              <gw-row
+                slot="start"
+                class="live-pager"
+                role="group"
+                aria-label="Cameras"
+              >
+                <gw-segmented
+                  class="live-layout"
+                  label="Cameras at once"
+                  more-label="More layouts"
+                  overflow
+                ></gw-segmented>
+                <gw-row class="live-pages" hidden>
+                  <gw-button
+                    class="live-previous"
+                    label="Previous cameras"
+                  ></gw-button>
+                  <gw-select
+                    class="live-page"
+                    label="Page"
+                    label-hidden
+                  ></gw-select>
+                  <gw-button class="live-next" label="Next cameras"></gw-button>
                 </gw-row>
-                <!-- The picked camera's sound, where any camera has it: on
+              </gw-row>
+              <!-- The picked camera's sound, where any camera has it: on
                      or off, and how loud, its slider folding away when the
                      bar is tight -->
-                <span
-                  class="controls-divider live-sound-divider"
-                  aria-hidden="true"
-                  hidden
-                ></span>
-                <gw-volume class="live-volume" mute-key="U" hidden></gw-volume>
-              </gw-row>
-              <gw-row
-                class="controls-transport"
-                role="group"
-                aria-label="Playback"
-              >
-                <gw-button class="live-play" label="Pause"></gw-button>
-              </gw-row>
-              <gw-row class="controls-end">
-                <!-- The picked camera's zoom on one pill: fit or fill, then
+              <gw-divider
+                slot="start"
+                class="live-sound-divider"
+                orientation="vertical"
+                hidden
+              ></gw-divider>
+              <gw-volume
+                slot="start"
+                class="live-volume"
+                mute-key="U"
+                hidden
+              ></gw-volume>
+              <gw-button class="live-play" label="Pause"></gw-button>
+              <!-- The picked camera's zoom on one pill: fit or fill, then
                      a step at a time from there -->
-                <gw-control-group class="zoom-pill" label="Zoom">
-                  <gw-segmented
-                    class="live-fit"
-                    label="Zoom"
-                    labels="hide"
-                    size="small"
-                    value="fit"
-                  ></gw-segmented>
-                  <gw-button class="live-zoom-out" label="Zoom out"></gw-button>
-                  <!-- The zoom, which goes back to the whole picture -->
-                  <gw-button
-                    class="live-zoom-fit"
-                    label="Fit the picture (0)"
-                    appearance="plain"
-                    variant="neutral"
-                    >100%</gw-button
-                  >
-                  <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
-                </gw-control-group>
-                <span class="controls-divider" aria-hidden="true"></span>
-                <!-- The picked camera's hue, brightness and the rest, where
-                     it has them -->
-                <gw-button
-                  class="live-picture"
-                  label="Picture settings"
-                  hidden
-                ></gw-button>
-                <!-- Seldom used, so in the More menu when the bar is tight -->
-                <gw-button
-                  class="live-capture"
-                  label="Capture"
-                  data-overflow
-                ></gw-button>
-                <!-- In More when the bar is tight, as ? opens it too -->
-                <gw-button
-                  class="live-help"
-                  label="Help"
-                  data-overflow
-                ></gw-button>
-                <gw-menu-button
-                  class="controls-more"
-                  label="More"
+              <gw-control-group slot="end" class="zoom-pill" label="Zoom">
+                <gw-segmented
+                  class="live-fit"
+                  label="Zoom"
                   labels="hide"
-                  appearance="plain"
-                ></gw-menu-button>
+                  size="small"
+                  value="fit"
+                ></gw-segmented>
+                <gw-button class="live-zoom-out" label="Zoom out"></gw-button>
+                <!-- The zoom, which goes back to the whole picture -->
                 <gw-button
-                  class="live-fullscreen"
-                  label="Full screen"
-                ></gw-button>
-                <!-- The gestures and keys, opened from the help button, ? or
+                  class="live-zoom-fit"
+                  label="Fit the picture (0)"
+                  appearance="plain"
+                  variant="neutral"
+                  >100%</gw-button
+                >
+                <gw-button class="live-zoom-in" label="Zoom in"></gw-button>
+              </gw-control-group>
+              <gw-divider slot="end" orientation="vertical"></gw-divider>
+              <!-- The picked camera's hue, brightness and the rest, where
+                     it has them -->
+              <gw-button
+                slot="end"
+                class="live-picture"
+                label="Picture settings"
+                hidden
+              ></gw-button>
+              <!-- Seldom used, so in the More menu when the bar is tight -->
+              <gw-button
+                slot="end"
+                class="live-capture"
+                label="Capture"
+                data-overflow
+              ></gw-button>
+              <!-- In More when the bar is tight, as ? opens it too -->
+              <gw-button
+                slot="end"
+                class="live-help"
+                label="Help"
+                data-overflow
+              ></gw-button>
+              <gw-button
+                slot="end"
+                class="live-fullscreen"
+                label="Full screen"
+              ></gw-button>
+              <!-- The gestures and keys, opened from the help button, ? or
                      a three finger swipe up -->
-                <gw-popover class="live-shortcuts" heading="Controls">
-                  <dl class="key-list touch-only">
-                    <dt class="key-list-heading">Gestures</dt>
+              <gw-popover slot="end" class="live-shortcuts" heading="Controls">
+                <gw-key-list input="touch">
+                  <h3>Gestures</h3>
+                  <dl>
                     <dt>Swipe left or right</dt>
                     <dd>Next or previous cameras</dd>
                     <dt>Swipe up or down</dt>
@@ -223,8 +227,10 @@
                     <dt>Three fingers up or down</dt>
                     <dd>Open or close this help</dd>
                   </dl>
-                  <dl class="key-list keys-only">
-                    <dt class="key-list-heading">Cameras</dt>
+                </gw-key-list>
+                <gw-key-list input="keys">
+                  <h3>Cameras</h3>
+                  <dl>
                     <dt><kbd>1</kbd> to <kbd>9</kbd>, <kbd>A</kbd></dt>
                     <dd>That many cameras at once, or all of them</dd>
                     <dt><kbd>T</kbd></dt>
@@ -237,8 +243,9 @@
                     <dd>The picked camera alone, and back</dd>
                     <dt><kbd>Esc</kbd> <kbd>Backspace</kbd></dt>
                     <dd>Back from one camera, or clear the pick</dd>
-
-                    <dt class="key-list-heading">The picked camera</dt>
+                  </dl>
+                  <h3>The picked camera</h3>
+                  <dl>
                     <dt><kbd>Space</kbd> <kbd>K</kbd></dt>
                     <dd>Pause or play</dd>
                     <dt><kbd>U</kbd></dt>
@@ -249,16 +256,18 @@
                     <dd>Swap its two views, such as wide and telephoto</dd>
                     <dt><kbd>P</kbd></dt>
                     <dd>Picture settings, where it has them</dd>
-
-                    <dt class="key-list-heading">Zoom</dt>
+                  </dl>
+                  <h3>Zoom</h3>
+                  <dl>
                     <dt><kbd>Z</kbd></dt>
                     <dd>Fit the picture whole, or fill its tile</dd>
                     <dt><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></dt>
                     <dd>Zoom in, out, or back to the whole picture</dd>
                     <dt><kbd>Ctrl</kbd> + scroll</dt>
                     <dd>Zoom at the pointer; drag to move around</dd>
-
-                    <dt class="key-list-heading">Move mode</dt>
+                  </dl>
+                  <h3>Move mode</h3>
+                  <dl>
                     <dt><kbd>M</kbd></dt>
                     <dd>Start or end it, for a camera that moves</dd>
                     <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt>
@@ -267,16 +276,17 @@
                     <dd>Zoom its lens</dd>
                     <dt><kbd>Esc</kbd></dt>
                     <dd>End Move mode</dd>
-
-                    <dt class="key-list-heading">Page</dt>
+                  </dl>
+                  <h3>Page</h3>
+                  <dl>
                     <dt><kbd>F</kbd></dt>
                     <dd>Full screen</dd>
                     <dt><kbd>?</kbd></dt>
                     <dd>This help</dd>
                   </dl>
-                </gw-popover>
-              </gw-row>
-            </div>
+                </gw-key-list>
+              </gw-popover>
+            </gw-control-bar>
           </div>
         </section>
 
@@ -295,7 +305,7 @@
             <!-- The video and its controls, which go full screen with the
                  timeline -->
             <!-- Focusable, so the keyboard controls reach it after a click -->
-            <div class="player-stage" tabindex="0">
+            <div class="player-stage" tabindex="-1">
               <div class="player-screen">
                 <!-- A tile per camera playing, each with its own video -->
                 <div class="player-grid camera-grid" data-layout="1"></div>
@@ -304,141 +314,140 @@
                 </p>
                 <span class="player-caption" hidden></span>
               </div>
-              <div class="player-controls" role="toolbar" aria-label="Playback">
+              <gw-control-bar
+                class="player-controls"
+                label="Playback"
+                more-label="More"
+              >
                 <!-- As System Bridge's media controls: the cameras and speed
                      first, as Live's pager starts its bar, the transport in
                      the middle, the rest at the end -->
-                <gw-row class="controls-start">
-                  <gw-select
-                    class="camera"
-                    label="Cameras"
-                    inline-label
-                  ></gw-select>
-                  <!-- The speed, as Live's Layout menu shows its count, with
-                       Custom last for any other speed, typed in its popover -->
-                  <gw-menu-button
-                    class="control-speed"
-                    heading="Speed"
-                    appearance="plain"
-                  ></gw-menu-button>
-                  <gw-popover class="speed-custom" heading="Custom speed">
-                    <gw-input
-                      class="control-speed-other"
-                      label="Custom speed"
-                      label-hidden
-                      type="number"
-                      inputmode="decimal"
-                      min="0.1"
-                      max="32"
-                      step="0.1"
-                      suffix="×"
-                      autofocus
-                    ></gw-input>
-                  </gw-popover>
-                </gw-row>
-                <gw-row
-                  class="controls-transport"
-                  role="group"
-                  aria-label="Transport"
+                <gw-select
+                  slot="start"
+                  class="camera"
+                  label="Cameras"
+                  inline-label
+                ></gw-select>
+                <!-- The speed, as Live's Layout menu shows its count, with
+                     Custom last for any other speed, typed in its popover -->
+                <gw-menu-button
+                  slot="start"
+                  class="control-speed"
+                  heading="Speed"
+                  appearance="plain"
+                ></gw-menu-button>
+                <gw-popover
+                  slot="start"
+                  class="speed-custom"
+                  heading="Custom speed"
                 >
-                  <gw-button
-                    class="control-previous"
-                    label="Previous recording"
-                  ></gw-button>
-                  <gw-button class="control-play" label="Play"></gw-button>
-                  <gw-button
-                    class="control-next"
-                    label="Next recording"
-                  ></gw-button>
-                  <!-- A frame on, beside the rest of the transport -->
-                  <gw-button
-                    class="control-frame"
-                    label="Next frame"
-                  ></gw-button>
-                  <gw-button class="control-stop" label="Stop"></gw-button>
-                  <!-- On to the next motion, PIR or alarm, a little ahead of
+                  <gw-input
+                    class="control-speed-other"
+                    label="Custom speed"
+                    label-hidden
+                    type="number"
+                    inputmode="decimal"
+                    min="0.1"
+                    max="32"
+                    step="0.1"
+                    suffix="×"
+                    autofocus
+                  ></gw-input>
+                </gw-popover>
+                <gw-button
+                  class="control-previous"
+                  label="Previous recording"
+                ></gw-button>
+                <gw-button class="control-play" label="Play"></gw-button>
+                <gw-button
+                  class="control-next"
+                  label="Next recording"
+                ></gw-button>
+                <!-- A frame on, beside the rest of the transport -->
+                <gw-button class="control-frame" label="Next frame"></gw-button>
+                <gw-button class="control-stop" label="Stop"></gw-button>
+                <!-- On to the next motion, PIR or alarm, a little ahead of
                        it, and only those, skipping the rest -->
-                  <gw-button
-                    class="control-next-event"
-                    label="Next event"
-                  ></gw-button>
-                </gw-row>
-                <gw-row class="controls-end">
-                  <!-- Seldom used, so in the More menu when the bar is tight -->
-                  <gw-button
-                    class="control-cut"
-                    label="Cut a clip"
-                    toggle
-                    data-overflow
-                  ></gw-button>
-                  <gw-button
-                    class="control-capture"
-                    label="Capture"
-                    data-overflow
-                  ></gw-button>
-                  <gw-button
-                    class="control-download"
-                    label="Download this recording"
-                    data-overflow
-                  ></gw-button>
-                  <span class="controls-divider" aria-hidden="true"></span>
-                  <span class="player-clock">--:--:--</span>
-                  <span class="controls-divider" aria-hidden="true"></span>
-                  <!-- The picked camera's zoom on one pill, as on Live -->
-                  <gw-control-group class="zoom-pill" label="Zoom">
-                    <gw-segmented
-                      class="control-fit"
-                      label="Zoom"
-                      labels="hide"
-                      size="small"
-                      value="fit"
-                    ></gw-segmented>
-                    <gw-button
-                      class="control-zoom-out"
-                      label="Zoom out"
-                    ></gw-button>
-                    <!-- The zoom, which goes back to the whole picture -->
-                    <gw-button
-                      class="control-zoom-fit"
-                      label="Fit the picture"
-                      appearance="plain"
-                      variant="neutral"
-                      >100%</gw-button
-                    >
-                    <gw-button
-                      class="control-zoom-in"
-                      label="Zoom in"
-                    ></gw-button>
-                  </gw-control-group>
-                  <!-- How several cameras tile, as on Live -->
-                  <gw-menu-button
-                    class="control-view"
-                    label="View"
+                <gw-button
+                  class="control-next-event"
+                  label="Next event"
+                ></gw-button>
+                <!-- Seldom used, so in the More menu when the bar is tight -->
+                <gw-button
+                  slot="end"
+                  class="control-cut"
+                  label="Cut a clip"
+                  toggle
+                  data-overflow
+                ></gw-button>
+                <gw-button
+                  slot="end"
+                  class="control-capture"
+                  label="Capture"
+                  data-overflow
+                ></gw-button>
+                <gw-button
+                  slot="end"
+                  class="control-download"
+                  label="Download this recording"
+                  data-overflow
+                ></gw-button>
+                <gw-divider slot="end" orientation="vertical"></gw-divider>
+                <span slot="end" class="player-clock">--:--:--</span>
+                <gw-divider slot="end" orientation="vertical"></gw-divider>
+                <!-- The picked camera's zoom on one pill, as on Live -->
+                <gw-control-group slot="end" class="zoom-pill" label="Zoom">
+                  <gw-segmented
+                    class="control-fit"
+                    label="Zoom"
                     labels="hide"
-                    appearance="plain"
-                    hidden
-                  ></gw-menu-button>
-                  <!-- In More when the bar is tight, as ? opens it too -->
+                    size="small"
+                    value="fit"
+                  ></gw-segmented>
                   <gw-button
-                    class="control-help"
-                    label="Help"
-                    data-overflow
+                    class="control-zoom-out"
+                    label="Zoom out"
                   ></gw-button>
-                  <gw-menu-button
-                    class="controls-more"
-                    label="More"
-                    labels="hide"
-                    appearance="plain"
-                  ></gw-menu-button>
+                  <!-- The zoom, which goes back to the whole picture -->
                   <gw-button
-                    class="control-fullscreen"
-                    label="Full screen"
+                    class="control-zoom-fit"
+                    label="Fit the picture"
+                    appearance="plain"
+                    variant="neutral"
+                    >100%</gw-button
+                  >
+                  <gw-button
+                    class="control-zoom-in"
+                    label="Zoom in"
                   ></gw-button>
-                  <!-- The gestures and keys, opened from the help button, ?
+                </gw-control-group>
+                <!-- How several cameras tile, as on Live -->
+                <gw-menu-button
+                  slot="end"
+                  class="control-view"
+                  label="View"
+                  labels="hide"
+                  appearance="plain"
+                  hidden
+                ></gw-menu-button>
+                <!-- In More when the bar is tight, as ? opens it too -->
+                <gw-button
+                  slot="end"
+                  class="control-help"
+                  label="Help"
+                  data-overflow
+                ></gw-button>
+                <gw-button
+                  slot="end"
+                  class="control-fullscreen"
+                  label="Full screen"
+                ></gw-button>
+                <!-- The gestures and keys, opened from the help button, ?
                        or a three finger swipe up -->
-                  <gw-popover class="shortcuts" heading="Controls">
-                    <dl class="key-list touch-only">
-                      <dt class="key-list-heading">Gestures</dt>
+                <gw-popover slot="end" class="shortcuts" heading="Controls">
+                  <gw-key-list input="touch">
+                    <h3>Gestures</h3>
+                    <dl>
                       <dt>Swipe left or right</dt>
                       <dd>On or back 10 seconds</dd>
                       <dt>Two fingers left or right</dt>
@@ -450,8 +459,10 @@
                       <dt>Three fingers up or down</dt>
                       <dd>Open or close this help</dd>
                     </dl>
-                    <dl class="key-list keys-only">
-                      <dt class="key-list-heading">Playing</dt>
+                  </gw-key-list>
+                  <gw-key-list input="keys">
+                    <h3>Playing</h3>
+                    <dl>
                       <dt><kbd>Space</kbd> <kbd>K</kbd></dt>
                       <dd>Play or pause</dd>
                       <dt><kbd>[</kbd> <kbd>]</kbd></dt>
@@ -460,8 +471,9 @@
                       <dd>Events only, skipping what's between</dd>
                       <dt><kbd>.</kbd></dt>
                       <dd>Next frame</dd>
-
-                      <dt class="key-list-heading">Moving through the day</dt>
+                    </dl>
+                    <h3>Moving through the day</h3>
+                    <dl>
                       <dt><kbd>←</kbd> <kbd>→</kbd></dt>
                       <dd>Back or on 5 seconds</dd>
                       <dt><kbd>J</kbd> <kbd>L</kbd></dt>
@@ -472,8 +484,9 @@
                       <dd>Previous or next event, from 20 seconds before it</dd>
                       <dt><kbd>P</kbd> <kbd>N</kbd></dt>
                       <dd>Previous or next recording</dd>
-
-                      <dt class="key-list-heading">Cameras</dt>
+                    </dl>
+                    <h3>Cameras</h3>
+                    <dl>
                       <dt><kbd>Page Up</kbd> <kbd>Page Down</kbd></dt>
                       <dd>Pick the previous or next camera</dd>
                       <dt><kbd>Enter</kbd> or double click</dt>
@@ -482,30 +495,33 @@
                       <dd>Back from one camera alone</dd>
                       <dt><kbd>T</kbd></dt>
                       <dd>Smart tiling, or the View menu's fixed layouts</dd>
-
-                      <dt class="key-list-heading">Zoom</dt>
+                    </dl>
+                    <h3>Zoom</h3>
+                    <dl>
                       <dt><kbd>Z</kbd></dt>
                       <dd>Fit the picture whole, or fill its tile</dd>
                       <dt><kbd>+</kbd> <kbd>-</kbd> <kbd>0</kbd></dt>
                       <dd>Zoom in, out, or back to the whole picture</dd>
                       <dt><kbd>Ctrl</kbd> + scroll</dt>
                       <dd>Zoom at the pointer; drag to move around</dd>
-
-                      <dt class="key-list-heading">Clip and still</dt>
+                    </dl>
+                    <h3>Clip and still</h3>
+                    <dl>
                       <dt><kbd>C</kbd></dt>
                       <dd>Mark the clip's start, then its end</dd>
                       <dt><kbd>S</kbd></dt>
                       <dd>Save a still</dd>
-
-                      <dt class="key-list-heading">Page</dt>
+                    </dl>
+                    <h3>Page</h3>
+                    <dl>
                       <dt><kbd>F</kbd></dt>
                       <dd>Full screen</dd>
                       <dt><kbd>?</kbd></dt>
                       <dd>This help</dd>
                     </dl>
-                  </gw-popover>
-                </gw-row>
-              </div>
+                  </gw-key-list>
+                </gw-popover>
+              </gw-control-bar>
             </div>
 
             <!-- The day on the cameras playing. A click plays from there; the
@@ -559,7 +575,7 @@
                     variant="neutral"
                     >Events only</gw-button
                   >
-                  <span class="controls-divider" aria-hidden="true"></span>
+                  <gw-divider orientation="vertical"></gw-divider>
                   <gw-control-group class="timeline-zoom" label="Timeline zoom">
                     <gw-button
                       class="timeline-zoom-out"
@@ -588,36 +604,40 @@
                       click or tap plays from there, or from the nearest
                       recording, or event with Events only, where there's none.
                     </p>
-                    <dl class="key-list timeline-legend">
-                      <div>
-                        <dt><span data-tone="neutral">Normal</span></dt>
-                        <dd>Recorded all the time, on a schedule</dd>
-                      </div>
-                      <div>
-                        <dt>
-                          <span data-tone="warning">Motion or alarm</span>
-                        </dt>
-                        <dd>
-                          The camera saw movement, or an alarm input was
-                          triggered
-                        </dd>
-                      </div>
-                      <div>
-                        <dt><span data-tone="important">PIR</span></dt>
-                        <dd>The camera's heat sensor saw a person or animal</dd>
-                      </div>
-                      <div>
-                        <dt><span data-tone="info">Manual</span></dt>
-                        <dd>Someone started it by hand</dd>
-                      </div>
-                      <div class="timeline-legend-camera" hidden>
-                        <dt><span data-muted>Only on the camera</span></dt>
-                        <dd>
-                          Listed by its source, which can't hand it over, so it
-                          can't be played here
-                        </dd>
-                      </div>
-                    </dl>
+                    <gw-key-list class="timeline-legend">
+                      <dl>
+                        <div>
+                          <dt><span data-tone="neutral">Normal</span></dt>
+                          <dd>Recorded all the time, on a schedule</dd>
+                        </div>
+                        <div>
+                          <dt>
+                            <span data-tone="warning">Motion or alarm</span>
+                          </dt>
+                          <dd>
+                            The camera saw movement, or an alarm input was
+                            triggered
+                          </dd>
+                        </div>
+                        <div>
+                          <dt><span data-tone="important">PIR</span></dt>
+                          <dd>
+                            The camera's heat sensor saw a person or animal
+                          </dd>
+                        </div>
+                        <div>
+                          <dt><span data-tone="info">Manual</span></dt>
+                          <dd>Someone started it by hand</dd>
+                        </div>
+                        <div class="timeline-legend-camera" hidden>
+                          <dt><span data-muted>Only on the camera</span></dt>
+                          <dd>
+                            Listed by its source, which can't hand it over, so
+                            it can't be played here
+                          </dd>
+                        </div>
+                      </dl>
+                    </gw-key-list>
                   </gw-popover>
                 </gw-row>
               </gw-row>

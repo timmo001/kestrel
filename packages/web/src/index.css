@@ -183,15 +183,8 @@ gw-table gw-sheet {
   background: #000;
 }
 
-/* The cameras take the focus for the keys, which only work while they have
-   it. A ring shows when Tab brings it there, not after a click */
 .live-stage:focus {
   outline: none;
-}
-
-.live-stage:focus-visible {
-  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
-  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 .live-stage:fullscreen {
@@ -540,9 +533,7 @@ gw-table gw-sheet {
 
   /* ...and full screen, it goes with the controls, staying on the picked
      camera and the one under the pointer */
-  [data-overlay]:has(> .player-controls[data-hidden])
-    .live-tile:not([data-picked], :hover)
-    figcaption {
+  [data-controls-hidden] .live-tile:not([data-picked], :hover) figcaption {
     opacity: 0;
   }
 }
@@ -1088,15 +1079,9 @@ gw-table gw-sheet {
   }
 }
 
-/* It takes the focus for the keyboard controls, with a ring only when Tab
-   brings it there */
+/* It takes the focus for the keyboard controls, which needs no ring */
 .player-stage:focus {
   outline: none;
-}
-
-.player-stage:focus-visible {
-  outline: var(--gw-focus-width, 2px) solid var(--gw-color-focus);
-  outline-offset: calc(-1 * var(--gw-focus-width, 2px));
 }
 
 /* Filled or zoomed past its tile, a drag moves around the picture */
@@ -1129,83 +1114,43 @@ gw-table gw-sheet {
 }
 
 /* Their own band under the picture, stacked above it, so the video never
-   draws over them */
+   draws over them. Three groups, as System Bridge's media controls: the
+   start, the transport in the middle, and the end, in the fewest rows they
+   fit, the seldom used folding into More before the bar takes another row */
 .player-controls {
+  --gw-control-bar-gap: var(--gw-space-3);
+  --gw-control-bar-group-gap: var(--gw-space-1);
+  --gw-control-bar-row-gap: var(--gw-space-1);
+
   position: relative;
   z-index: 1;
-  /* Three parts, as System Bridge's media controls: the start, the
-     transport in the middle, and the end. Each side keeps its controls on
-     one line and they share what's left, so the transport sits in the
-     middle where the sides leave it room, and beside the wider one where
-     they don't */
-  display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto minmax(max-content, 1fr);
-  gap: var(--gw-space-1) var(--gw-space-3);
-  align-items: center;
   padding: var(--gw-space-1) var(--gw-space-2);
   /* The controls stay readable on the black, in any theme */
   background: color-mix(in oklab, var(--gw-color-surface-raised) 92%, #000);
   border-block-start: 1px solid var(--gw-color-border-quiet);
 }
 
-/* Each group stays on one line: the page picks the rows, so a group never
-   wraps on its own */
-.controls-start,
-.controls-transport,
-.controls-end {
-  flex-wrap: nowrap;
-  gap: var(--gw-space-1);
-  align-items: center;
-}
-
-.controls-end {
-  justify-content: flex-end;
-}
-
-/* The page measures how the controls fit, as they differ by page and by what
-   the cameras can do, and lays them out in one row, or in two, or as on a
-   phone, never wrapping unevenly. In two, with room for the start and end
-   side by side but not the transport between them, the transport goes first,
-   across, and the start and end under it, at either side */
-.player-controls[data-split] {
-  grid-template-columns: auto auto;
-  justify-content: space-between;
+/* A popover's own element takes no room in the bar; what it opens is in the
+   top layer, a sheet on a phone */
+.player-controls > gw-popover {
+  position: absolute;
 }
 
 /* Tight, the volume gives up its slider, which slides out from its button
-   or opens over the bar, before the bar takes another row; its least width
-   is the button's, so no width at all leaves that. The seldom used fold
-   into More, which only shows then */
-.player-controls:is([data-tight], [data-compact]) gw-volume {
+   or opens over the bar; its least width is the button's, so no width at all
+   leaves that */
+.player-controls:is(:state(tight), :state(compact)) gw-volume {
   max-inline-size: 0;
 }
 
-.player-controls[data-tight] .control-download + .controls-divider,
-.player-controls:is([data-tight], [data-compact]) [data-overflow],
-.player-controls:not([data-tight], [data-compact]) .controls-more {
+.player-controls:state(tight) .control-download + gw-divider {
   display: none;
 }
 
-/* Tight, the start gives way to the transport and the end, so a control that
-   folds what doesn't fit into its own More, such as Live's layouts, gets the
-   room left rather than its full width */
-.player-controls[data-tight] {
-  grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
-}
-
-.player-controls[data-split][data-tight] {
-  grid-template-columns: minmax(0, 1fr) max-content;
-}
-
-.player-controls[data-tight] > .controls-start,
-.player-controls[data-tight] .live-pager {
+/* Tight, the start gives way to the transport and the end, so Live's
+   layouts fold what doesn't fit into their own More */
+.player-controls:state(tight) .live-pager {
   min-width: 0;
-}
-
-.player-controls[data-split] > .controls-transport {
-  grid-column: 1 / -1;
-  grid-row: 1;
-  justify-content: center;
 }
 
 /* With less room, both players' controls take the same three rows on seven
@@ -1213,117 +1158,130 @@ gw-table gw-sheet {
    transport in the middle with full screen at the end, then Live's pager or
    Recordings' speed with the rest of its transport, then the zoom and
    capture. The groups give their controls straight to the grid, and every
-   control keeps a place of its own */
-.player-controls[data-compact] {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--gw-space-2) 0;
-  justify-items: center;
+   control keeps a place of its own. Over the picture they take it as soon
+   as they need two rows, so the first row, all that shows until opened,
+   keeps the sound and full screen beside the transport */
+.player-controls:is(:state(compact), [data-over]:state(split)) {
   padding: var(--gw-space-3) var(--gw-space-2);
 }
 
-.player-controls[data-compact] > .controls-start,
-.player-controls[data-compact] > .controls-transport,
-.player-controls[data-compact] > .controls-end {
+/* There the seldom used are in More, as when tight */
+.player-controls[data-over]:state(split) gw-volume {
+  max-inline-size: 0;
+}
+
+.player-controls[data-over]:state(split) > [data-overflow] {
+  display: none;
+}
+
+.player-controls[data-over]:state(split)::part(more) {
+  display: inline-block;
+}
+
+.player-controls:is(:state(compact), [data-over]:state(split))::part(bar) {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--gw-space-2) 0;
+  justify-items: center;
+}
+
+.player-controls:is(:state(compact), [data-over]:state(split))::part(start),
+.player-controls:is(:state(compact), [data-over]:state(split))::part(middle),
+.player-controls:is(:state(compact), [data-over]:state(split))::part(end) {
   display: contents;
 }
 
 /* The dividers have no place */
-.player-controls[data-compact] .controls-divider {
+.player-controls:is(:state(compact), [data-over]:state(split)) gw-divider {
   display: none;
-}
-
-/* A popover's own element would take a cell of the grid; what it opens is
-   in the top layer, a sheet on a phone, so this only keeps it out of the way */
-.player-controls[data-compact] gw-popover {
-  position: absolute;
 }
 
 /* The first row: the sound or the time, the transport, Recordings' View menu
    and full screen */
-.player-controls[data-compact] .live-volume {
+.player-controls:is(:state(compact), [data-over]:state(split)) .live-volume {
   grid-area: 1 / 1;
 }
 
-.player-controls[data-compact] .player-clock {
+.player-controls:is(:state(compact), [data-over]:state(split)) .player-clock {
   grid-area: 1 / 1 / auto / 3;
   justify-self: start;
 }
 
-.player-controls[data-compact] .control-previous {
+.player-controls:is(:state(compact), [data-over]:state(split))
+  .control-previous {
   grid-area: 1 / 3;
 }
 
-.player-controls[data-compact] .live-play,
-.player-controls[data-compact] .control-play {
+.player-controls:is(:state(compact), [data-over]:state(split)) .live-play,
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-play {
   grid-area: 1 / 4;
 }
 
-.player-controls[data-compact] .control-next {
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-next {
   grid-area: 1 / 5;
 }
 
-.player-controls[data-compact] .control-view {
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-view {
   grid-area: 1 / 6;
 }
 
 /* Picture settings, where a camera has them, beside the sound */
-.player-controls[data-compact] .live-picture {
+.player-controls:is(:state(compact), [data-over]:state(split)) .live-picture {
   grid-area: 1 / 2;
 }
 
-.player-controls[data-compact] .live-fullscreen,
-.player-controls[data-compact] .control-fullscreen {
+.player-controls:is(:state(compact), [data-over]:state(split)) .live-fullscreen,
+.player-controls:is(:state(compact), [data-over]:state(split))
+  .control-fullscreen {
   grid-area: 1 / 7;
 }
 
 /* Then Live's pager across, or Recordings' cameras and speed with the rest
    of its transport: a frame on and the next event */
-.player-controls[data-compact] .live-pager {
+.player-controls:is(:state(compact), [data-over]:state(split)) .live-pager {
   grid-area: 2 / 1 / auto / -1;
   max-width: 100%;
 }
 
-.player-controls[data-compact] gw-select.camera {
+.player-controls:is(:state(compact), [data-over]:state(split))
+  gw-select.camera {
   grid-area: 2 / 1 / auto / 4;
   justify-self: start;
   max-width: 100%;
 }
 
 /* There the cameras' names get the room, its label still read out */
-.player-controls[data-compact] gw-select.camera .gw-select-inline-label {
+.player-controls:is(:state(compact), [data-over]:state(split))
+  gw-select.camera
+  .gw-select-inline-label {
   display: none;
 }
 
-.player-controls[data-compact] .control-speed {
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-speed {
   grid-area: 2 / 4 / auto / 6;
 }
 
-.player-controls[data-compact] .control-frame {
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-frame {
   grid-area: 2 / 6;
 }
 
-.player-controls[data-compact] .control-next-event {
+.player-controls:is(:state(compact), [data-over]:state(split))
+  .control-next-event {
   grid-area: 2 / 7;
 }
 
 /* Stop beside the zoom, the row above being full */
-.player-controls[data-compact] .control-stop {
+.player-controls:is(:state(compact), [data-over]:state(split)) .control-stop {
   grid-area: 3 / 6;
 }
 
 /* Then the zoom's pill, and More, holding the seldom used, such as Capture */
-.player-controls[data-compact] .zoom-pill {
+.player-controls:is(:state(compact), [data-over]:state(split)) .zoom-pill {
   grid-area: 3 / 1 / auto / 6;
   justify-self: start;
 }
 
-.player-controls[data-compact] .controls-more {
+.player-controls:is(:state(compact), [data-over]:state(split))::part(more) {
   grid-area: 3 / 7;
-}
-
-/* The tab that opens the rows past the first, only on a phone on its side */
-.controls-expand {
-  display: none;
 }
 
 @media (width < 40rem) {
@@ -1332,29 +1290,6 @@ gw-table gw-sheet {
   .playback-view {
     min-height: 24rem;
   }
-}
-
-/* The help lists the gestures where there's a touch screen, and the keys
-   where there's likely a keyboard: a device with only a finger to point
-   with leaves them out */
-@media not (any-pointer: coarse) {
-  .touch-only {
-    display: none;
-  }
-}
-
-@media (any-pointer: coarse) and (any-hover: none) {
-  .keys-only {
-    display: none;
-  }
-}
-
-.key-list-heading {
-  grid-column: 1 / -1;
-  margin: var(--gw-space-2) 0 0;
-  color: var(--gw-color-text-strong);
-  font-size: var(--gw-font-size-s);
-  font-weight: 600;
 }
 
 /* Live's cameras take a finger's swipes and pinches themselves, rather than
@@ -1450,33 +1385,12 @@ gw-table gw-sheet {
   white-space: nowrap;
 }
 
-/* The keyboard controls and the timeline's colours, each key beside what it
-   means. A group of one key and its meaning can be shown or hidden whole */
+/* The keyboard controls and the timeline's colours, in Groundwork's key
+   lists */
 .shortcuts,
 .live-shortcuts,
 .timeline-key {
   --gw-popover-width: 24rem;
-}
-
-.key-list {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--gw-space-2) var(--gw-space-4);
-  align-items: center;
-  margin: 0;
-}
-
-.key-list > div {
-  display: contents;
-}
-
-.key-list dt {
-  white-space: nowrap;
-}
-
-.key-list dd {
-  margin: 0;
-  color: var(--gw-color-text-secondary);
 }
 
 .key-intro {
@@ -1484,29 +1398,8 @@ gw-table gw-sheet {
   color: var(--gw-color-text-secondary);
 }
 
-kbd {
-  display: inline-block;
-  min-width: 1.5em;
-  padding: 0.1em 0.4em;
-  border: 1px solid var(--gw-color-border-normal);
-  border-block-end-width: 2px;
-  border-radius: var(--gw-radius-sm, 4px);
-  background: var(--gw-color-surface-raised);
-  color: var(--gw-color-text-strong);
-  font-family: var(--gw-font-mono);
-  font-size: 0.8125rem;
-  text-align: center;
-}
-
 .control-speed-other {
   width: 7.5rem;
-}
-
-.controls-divider {
-  width: 1px;
-  height: 1.25rem;
-  margin-inline: var(--gw-space-1);
-  background: var(--gw-color-border-normal);
 }
 
 .player-clock {
@@ -1779,7 +1672,7 @@ kbd {
 /* Too tight for the day, Events only and the zoom on one line, Events only
    goes into the zoom's menu */
 .timeline-foot[data-tight] .control-events,
-.timeline-foot[data-tight] .control-events + .controls-divider {
+.timeline-foot[data-tight] .control-events + gw-divider {
   display: none;
 }
 
@@ -1803,7 +1696,8 @@ kbd {
 
 /* On a phone on its side, or full screen, the controls go over the bottom of
    the picture as a video player's: see-through, their first row only until
-   opened, and fading out while playing. The page marks the stage */
+   opened, and fading out while playing. Groundwork's overlayControls marks
+   the stage and the bar, and fades them; here they keep their grid cell */
 .live-stage[data-overlay],
 .player-stage[data-overlay] {
   grid-template-rows: minmax(0, 1fr);
@@ -1824,22 +1718,6 @@ kbd {
     transparent
   );
   border-block-start: none;
-  backdrop-filter: blur(4px);
-  transition: opacity 0.25s ease;
-}
-
-/* Left alone while playing, as a video player's controls are; a tap where
-   there's nothing to press, a swipe up or the handle brings them back */
-[data-overlay] > .player-controls[data-hidden] {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* The handle, a tab at the bottom in the middle while they're hidden: clear
-   of a phone's rounded corners and of the cameras' own controls in their
-   tiles' corners, and a full finger's width to press */
-.controls-handle {
-  display: none;
 }
 
 /* Over the picture, on a phone on its side or full screen, everything that
@@ -1848,10 +1726,6 @@ kbd {
    keeps the page clear of the cutout itself, as Kestrel doesn't opt into
    viewport-fit=cover, but nothing reports the corners, so Groundwork's safe
    margins keep a margin of their own, or the safe area's where that's wider */
-[data-overlay] {
-  position: relative;
-}
-
 [data-overlay] > .live-area,
 [data-overlay] > .player-screen {
   box-sizing: border-box;
@@ -1863,63 +1737,36 @@ kbd {
   padding-block-end: var(--gw-safe-bottom);
 }
 
-[data-overlay]:has(> .player-controls[data-hidden]) > .controls-handle {
-  position: absolute;
-  inset-block-end: 0;
-  inset-inline-start: 50%;
-  z-index: 2;
-  display: block;
-  padding-block-end: var(--gw-safe-bottom);
-  translate: -50% 0;
-  background: color-mix(
-    in oklab,
-    var(--gw-color-surface-raised) 30%,
-    transparent
-  );
-  border-start-start-radius: var(--gw-radius-sm, 4px);
-  border-start-end-radius: var(--gw-radius-sm, 4px);
-  backdrop-filter: blur(4px);
-  opacity: 0.8;
-}
-
-.controls-handle::part(button) {
-  width: 4rem;
-  height: 2.75rem;
-}
-
-/* Beside the camera panel, under the middle of the cameras, not of both,
-   so it's clear of a camera's other view in its corner */
+/* The handle that brings them back: beside the camera panel, under the
+   middle of the cameras, not of both, so it's clear of a camera's other view
+   in its corner */
 @media (orientation: landscape) {
-  [data-overlay].live-stage:has(> .live-steer-dock) > .controls-handle {
+  [data-overlay].live-stage:has(> .live-steer-dock) > .gw-overlay-handle {
     /* Every line given, as an absolute box's missing one is the stage's edge */
     grid-area: 1 / 1 / 2 / 2;
   }
 }
 
-[data-overlay]:has(> .player-controls[data-hidden]) {
-  cursor: none;
-}
-
 /* As little of the picture covered as their rows allow: the first row only,
    until the tab on the bar's edge opens the rest */
-[data-overlay] > .player-controls[data-compact] {
-  row-gap: var(--gw-space-1);
+[data-overlay]
+  > .player-controls:is(:state(compact), [data-over]:state(split)) {
   padding-block: var(--gw-space-1);
 }
 
-[data-overlay] > .player-controls[data-compact] > .controls-expand {
-  position: absolute;
-  inset-block-end: 100%;
-  inset-inline-end: var(--gw-safe-inline);
-  display: block;
-  background: inherit;
-  border-start-start-radius: var(--gw-radius-sm, 4px);
-  border-start-end-radius: var(--gw-radius-sm, 4px);
-  backdrop-filter: blur(4px);
+[data-overlay]
+  > .player-controls:is(:state(compact), [data-over]:state(split))::part(bar) {
+  row-gap: var(--gw-space-1);
 }
 
 [data-overlay]
-  > .player-controls[data-compact]:not([data-expanded])
+  > .player-controls:is(:state(compact), [data-over]:state(split)):not(
+    [expanded]
+  )::part(more),
+[data-overlay]
+  > .player-controls:is(:state(compact), [data-over]:state(split)):not(
+    [expanded]
+  )
   :is(
     .live-pager,
     gw-select.camera,
@@ -1927,8 +1774,7 @@ kbd {
     .control-frame,
     .control-stop,
     .control-next-event,
-    .zoom-pill,
-    .controls-more
+    .zoom-pill
   ) {
   display: none;
 }
