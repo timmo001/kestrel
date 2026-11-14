@@ -51,6 +51,7 @@ export const filledIn = (
   id: source.id,
   kind: source.kind,
   name: source.name,
+  enabled: source.enabled,
   settings: Object.fromEntries([
     ...Object.entries(source.settings),
     ...(kind?.fields ?? []).flatMap((field) => {

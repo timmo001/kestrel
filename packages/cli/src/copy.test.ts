@@ -36,6 +36,7 @@ test("only fields left out or empty are filled in, numbers as numbers", () => {
     id: "swann",
     kind: "raysharp",
     name: "Recorder",
+    enabled: true,
     settings: { host: "", username: "kept" },
     cameras: [],
     secrets: [],

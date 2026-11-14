@@ -1,7 +1,8 @@
 /**
- * The Settings page: each source with the settings its kind takes, the
- * cameras of a kind you list yourself, the name you give each camera, the
- * order they show in, and what the server records and how long it keeps it.
+ * The Settings page: each source with the settings its kind takes and a
+ * switch to turn it off without removing it, the cameras of a kind you list
+ * yourself, the name you give each camera, the order they show in, and what
+ * the server records and how long it keeps it.
  * Saving sends them all to the server, which keeps them in the sources file
  * and restarts the sources that changed. Secrets never come back from the
  * server: a saved one shows as saved, and stays as it is unless you type a
@@ -86,6 +87,8 @@ interface Draft {
   id: string;
   kind: string;
   name: string;
+  /** Whether the server runs it; one that's off keeps its settings. */
+  enabled: boolean;
   settings: Values;
   cameras: Array<Values>;
   /** The secret settings saved on the server, which it doesn't send back. */
@@ -257,6 +260,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       id: source.id,
       kind: source.kind,
       name: source.name,
+      enabled: source.enabled,
       settings: { ...source.settings },
       cameras: source.cameras.map((camera) => ({ ...camera })),
       secrets: source.secrets,
@@ -435,12 +439,17 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
     const kind = kinds.find((each) => each.kind === source.kind);
     const card = element("gw-expansion");
     const remove = button("Remove", phTrash);
+    const power = element("gw-switch");
     const name = element("gw-input");
 
     const describe = () =>
       card.setAttribute(
         "description",
-        `${kind?.name ?? source.kind} · ${source.id}`,
+        [
+          kind?.name ?? source.kind,
+          source.id,
+          ...(source.enabled ? [] : ["Off"]),
+        ].join(" · "),
       );
 
     card.setAttribute(
@@ -461,6 +470,16 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       } else if (opened === source) {
         opened = undefined;
       }
+    });
+
+    // Off keeps the source and its settings, but the server doesn't start it
+    power.slot = "actions";
+    power.label = `Run ${source.name.trim() || "this source"}`;
+    power.labelHidden = true;
+    power.checked = source.enabled;
+    power.addEventListener("change", () => {
+      source.enabled = power.checked;
+      describe();
     });
 
     remove.slot = "actions";
@@ -505,7 +524,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       );
     }
 
-    card.append(remove, fieldGrid(fields));
+    card.append(power, remove, fieldGrid(fields));
 
     if (kind === undefined) {
       const alert = element(
@@ -693,6 +712,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       ),
       kind: kind.kind,
       name: kind.name,
+      enabled: true,
       settings: {},
       cameras: kind.cameraFields === null ? [] : [{ id: "1" }],
       secrets: [],
@@ -749,6 +769,7 @@ export const settingsPage = (options: SettingsOptions): SettingsPage => {
       id: source.id,
       kind: source.kind,
       name: source.name.trim(),
+      enabled: source.enabled,
       settings: source.settings,
       cameras: source.cameras,
       secrets: [],

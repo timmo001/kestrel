@@ -2,6 +2,7 @@
  * The sources the server serves, from the sources file, and finding one by
  * id. Each runs in a scope of its own, so a save from the Settings page
  * stops only the sources whose settings changed and starts their new ones.
+ * A source you've turned off keeps its settings but isn't started.
  * A source that can't start, such as one with no address, is listed as not
  * connected with the reason, rather than stopping the server. Without a
  * sources file, it's the Raysharp recorder alone, as `swann`, from the
@@ -66,6 +67,7 @@ const firstSettings: Settings = {
       id: "swann",
       kind: "raysharp",
       name: "Swann recorder",
+      enabled: true,
       settings: {},
       cameras: [],
       secrets: [],
@@ -82,6 +84,9 @@ const firstSettings: Settings = {
     limits: defaultLimits,
   },
 };
+
+/** Whether the server runs a source: you can turn one off without removing it. */
+const isOn = (settings: SourceSettings) => settings.enabled;
 
 /** A source that couldn't start, listed with the reason and nothing else. */
 const unstarted = (settings: SourceSettings, reason: string): Source => {
@@ -180,7 +185,9 @@ export class Sources extends Context.Service<
       });
 
       const startAll = (settings: Settings) =>
-        Effect.forEach(settings.sources, start, { concurrency: "unbounded" });
+        Effect.forEach(settings.sources.filter(isOn), start, {
+          concurrency: "unbounded",
+        });
 
       const first = saved ?? firstSettings;
 
@@ -202,11 +209,10 @@ export class Sources extends Context.Service<
       /** Moves to new settings: stops the sources that changed or went, then starts the new ones. */
       const apply = Effect.fnUntraced(function* (next: Settings) {
         const { running } = yield* SubscriptionRef.get(state);
+        const wanted = next.sources.filter(isOn);
 
         const kept = running.filter((each) =>
-          next.sources.some((settings) =>
-            Equal.equals(settings, each.settings),
-          ),
+          wanted.some((settings) => Equal.equals(settings, each.settings)),
         );
 
         yield* Effect.forEach(
@@ -216,7 +222,7 @@ export class Sources extends Context.Service<
         );
 
         const started = yield* Effect.forEach(
-          next.sources,
+          wanted,
           (settings) => {
             const same = kept.find((each) =>
               Equal.equals(settings, each.settings),

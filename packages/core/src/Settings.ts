@@ -1,7 +1,8 @@
 /**
  * How sources are set up: each kind describes the settings it takes, so the
- * app can build its form, and each source is saved as its id, kind, name
- * and those settings, with a label for any camera you've named.
+ * app can build its form, and each source is saved as its id, kind, name,
+ * whether it's on and those settings, with a label for any camera you've
+ * named.
  *
  * @module
  */
@@ -60,6 +61,10 @@ export const SourceSettings = Schema.Struct({
   id: SourceId,
   kind: Schema.String,
   name: Schema.String,
+  /** Whether the server runs it. One that's off keeps its settings but isn't started. */
+  enabled: Schema.Boolean.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(true)),
+  ),
   settings: SettingValues,
   /** Its cameras' settings, for a kind you list cameras for yourself; empty otherwise. */
   cameras: Schema.Array(SettingValues).pipe(

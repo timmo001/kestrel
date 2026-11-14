@@ -101,6 +101,8 @@ const forFile = (settings: Settings) => ({
     id: source.id,
     kind: source.kind,
     name: source.name,
+    // Only an off source says so, as JSON leaves undefined out, so the files of sources left on stay as they were
+    enabled: source.enabled ? undefined : false,
     settings: source.settings,
     cameras: source.cameras,
   })),
@@ -130,6 +132,7 @@ export const shown = (
       id: source.id,
       kind: source.kind,
       name: source.name,
+      enabled: source.enabled,
       settings: shownValues(fields, source.settings),
       cameras: source.cameras.map((camera) =>
         shownValues(cameraFields, camera),
@@ -170,6 +173,7 @@ export const restored = (
       id: source.id,
       kind: source.kind,
       name: source.name,
+      enabled: source.enabled,
       settings: restoredValues(
         kind?.fields ?? [],
         source.settings,

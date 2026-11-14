@@ -251,7 +251,7 @@ const sources = Command.make(
           : `  ${source.cameras.length} camera${source.cameras.length === 1 ? "" : "s"}`;
 
       yield* Console.log(
-        `${source.id}  ${source.name}  ${source.kind}${cameras}`,
+        `${source.id}  ${source.name}  ${source.kind}${cameras}${source.enabled ? "" : "  off"}`,
       );
     }
 

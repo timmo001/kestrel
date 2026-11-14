@@ -7,6 +7,7 @@ const settingsWith = (page: string) => ({
   id: "web",
   kind: "web",
   name: "Web",
+  enabled: true,
   settings: {},
   cameras: [{ id: "harbour", name: "Harbour", page }],
   secrets: [],
