@@ -140,6 +140,9 @@ const frameSeconds = 1 / 15;
 
 const daySeconds = 24 * 60 * 60;
 
+/** How soon a second press makes a double click, in milliseconds. */
+const doublePress = 400;
+
 /** How often where it's playing is kept, in milliseconds. */
 const keepEvery = 2000;
 
@@ -279,6 +282,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   let camera: CameraId = "";
   /** Every camera playing, the picked one among them. */
   let ticked: ReadonlyArray<CameraId> = [];
+  /** Whether the picked one shows alone, of several ticked. */
+  let alone = false;
   let speed = saved.speed;
 
   /** What the address asked for before the cameras were known. */
@@ -678,7 +683,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
       caption.textContent =
         clip === undefined
           ? ""
-          : `${ticked.length > 1 ? `${ticked.length} cameras` : cameraLabel(clip.camera)} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
+          : `${ticked.length > 1 && !alone ? `${ticked.length} cameras` : cameraLabel(clip.camera)} · ${dayFormat.format(localDate(clip.begin))} · ${clock(clip.begin)} to ${clock(clip.end)}${
               // The sub stream, or past the browser's fastest, key frames only
               shownView.stream === "sub"
                 ? " · sub stream"
@@ -753,7 +758,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   nextButton?.addEventListener("click", () => skip(1));
 
   const showSpeed = () => {
-    const view = viewFor(Number(speed), ticked.length);
+    // Alone, the picked camera has the recorder's full stream to itself
+    const view = viewFor(Number(speed), alone ? 1 : ticked.length);
     // What's left of the speed after the server's part
     const rate = Number(speed) / view.speedUp;
 
@@ -918,8 +924,33 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     fit: fitToggle,
   });
 
-  // A press that doesn't move plays or pauses; a drag moves a zoomed picture
+  /** Shows the picked camera alone, or every ticked camera again, as Live does. */
+  const setAlone = (on: boolean) => {
+    const next = on && ticked.length > 1;
+
+    if (next === alone) return;
+
+    alone = next;
+    player?.solo(alone);
+    showSpeed();
+    zoom.show();
+    showState();
+  };
+
+  /** Picks the camera `step` along the ticked ones, alone or not. */
+  const stepCamera = (step: -1 | 1) => {
+    const index = ticked.indexOf(camera);
+    const next = ticked[(index + step + ticked.length) % ticked.length];
+
+    if (ticked.length > 1 && next !== undefined) pickCamera(next);
+  };
+
+  // A press that doesn't move plays or pauses; a drag moves a zoomed picture.
+  // A double click's second press doesn't, and the double click puts back
+  // what its first did
   let press: { x: number; y: number; moved: boolean } | undefined;
+  let lastPress = 0;
+  let pressToggled = false;
 
   screen?.addEventListener("pointerdown", (event) => {
     press = { x: event.clientX, y: event.clientY, moved: false };
@@ -947,7 +978,15 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     const onOther =
       tile instanceof HTMLElement && tile.dataset.camera !== camera;
 
-    if (press !== undefined && !press.moved && !onOther) togglePlay();
+    const second = event.timeStamp - lastPress < doublePress;
+
+    lastPress = event.timeStamp;
+
+    if (!second) {
+      pressToggled = press !== undefined && !press.moved && !onOther;
+
+      if (pressToggled) togglePlay();
+    }
 
     press = undefined;
   });
@@ -956,7 +995,34 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     press = undefined;
   });
 
-  screen?.addEventListener("dblclick", () => fullscreenButton?.click());
+  // With several cameras, a double click shows the one clicked alone, and
+  // back, as on Live; with one, it goes full screen
+  screen?.addEventListener("dblclick", (event) => {
+    if (pressToggled) {
+      pressToggled = false;
+      togglePlay();
+    }
+
+    if (ticked.length < 2) {
+      fullscreenButton?.click();
+
+      return;
+    }
+
+    const tile = event
+      .composedPath()
+      .find(
+        (target) =>
+          target instanceof HTMLElement && target.matches(".player-tile"),
+      );
+
+    const clicked =
+      tile instanceof HTMLElement ? tile.dataset.camera : undefined;
+
+    if (clicked !== undefined && clicked !== camera) pickCamera(clicked);
+
+    setAlone(!alone);
+  });
 
   // The video, its controls and the timeline go full screen together
   fullscreenButton?.addEventListener("click", () => {
@@ -1192,12 +1258,24 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const inOrder = (ids: ReadonlyArray<CameraId>) =>
     ids.toSorted((a, b) => placeOf(a) - placeOf(b));
 
+  /** The same cameras, in any order. */
+  const sameCameras = (
+    a: ReadonlyArray<CameraId>,
+    b: ReadonlyArray<CameraId>,
+  ) => a.length === b.length && a.every((id) => b.includes(id));
+
   /** Shows cameras and a day: the month's recorded days and the day's recordings. */
   const show = async (picked: {
     camera: CameraId;
     cameras: ReadonlyArray<CameraId>;
     date: string;
   }) => {
+    // Other cameras ticked show them all
+    if (!sameCameras(picked.cameras, ticked)) {
+      alone = false;
+      player?.solo(false);
+    }
+
     camera = picked.camera;
     ticked = picked.cameras;
     day = picked.date;
@@ -1279,12 +1357,6 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   }
 
   pickCamera = (picked) => options.onPick(searchFor(day, picked));
-
-  /** The same cameras, in any order. */
-  const sameCameras = (
-    a: ReadonlyArray<CameraId>,
-    b: ReadonlyArray<CameraId>,
-  ) => a.length === b.length && a.every((id) => b.includes(id));
 
   /** Shows what the address asks for, filling in what it leaves out. */
   const follow = async (search: RecordingsSearch) => {
@@ -1406,14 +1478,32 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     ["c", () => cutButton?.click()],
     ["s", () => captureButton?.click()],
     ["?", () => helpButton?.click()],
+    // Several cameras, as on Live: the picked one alone and back, and the
+    // previous or next one picked
+    ["Enter", () => setAlone(!alone)],
+    ["Escape", () => setAlone(false)],
+    ["Backspace", () => setAlone(false)],
+    ["PageUp", () => stepCamera(-1)],
+    ["PageDown", () => stepCamera(1)],
   ]);
 
   document.addEventListener("keydown", (event) => {
     if (page?.hidden !== false) return;
 
-    const action = keys.get(controlKey(event) ?? "");
+    const key = controlKey(event);
+    const action = keys.get(key ?? "");
 
-    if (action === undefined) return;
+    // Enter on a control presses it, and Esc and Backspace are left alone
+    // unless there's a camera alone to go back from
+    const onControl = event.target !== stage && event.target !== document.body;
+
+    if (
+      action === undefined ||
+      (key === "Enter" && (onControl || ticked.length < 2)) ||
+      ((key === "Escape" || key === "Backspace") && !alone)
+    ) {
+      return;
+    }
 
     event.preventDefault();
     action();

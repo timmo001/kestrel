@@ -7,8 +7,10 @@
  * else the first that did. The others are put back on its time when they
  * drift. With nothing recorded on any of them, it runs on to the next
  * recording on any. Between clips, a tile holds its last frame and fades it
- * out over the next. Why a camera's video stopped shows over its own tile.
- * It answers what the page asks of one player, so the page
+ * out over the next. While one camera waits for video, the others hold
+ * where they are, so they play on together rather than drifting apart. One
+ * camera can be shown alone, the others let go until the grid comes back.
+ * Why a camera's video stopped shows over its own tile. It answers what the page asks of one player, so the page
  * drives one camera or several the same way.
  */
 import type { CameraId } from "@timmo001/kestrel-core";
@@ -50,6 +52,8 @@ export interface GroupEvents {
 export interface Group extends Player {
   /** The cameras to play, in order, and the picked one, which comes first and largest. */
   readonly setCameras: (tracks: ReadonlyArray<Track>, picked: CameraId) => void;
+  /** Shows the picked camera alone, or every camera again, on the same clock. */
+  readonly solo: (on: boolean) => void;
   /** The video that keeps the time, for a still, a held frame and the frame step. */
   readonly video: () => HTMLVideoElement | undefined;
   /** The picked camera's video. */
@@ -67,6 +71,9 @@ export interface Group extends Player {
 
 /** How many cameras the layouts take at once. */
 export const mostCameras = 4;
+
+/** How long the cameras hold for one waiting for its video, in milliseconds. */
+const holdLimit = 10_000;
 
 const isPlaying = (video: HTMLVideoElement) =>
   !video.paused && video.readyState >= 3;
@@ -112,6 +119,78 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   let playing = false;
   let playbackRate = 1;
   let view: View = fullView;
+  /** Whether the picked camera shows alone. */
+  let alone = false;
+
+  /** The cameras showing: every one, or the picked one alone. */
+  const shownTracks = () =>
+    alone ? tracks.filter((track) => track.camera === picked) : tracks;
+
+  /**
+   * Whether a tile should be showing video but has none to play yet, such
+   * as while its clip loads. A tile with a problem waits for nothing.
+   */
+  const isWaiting = (tile: Tile) =>
+    tile.player.clip() !== undefined &&
+    tile.figure.dataset.empty === undefined &&
+    !tile.figure.hasAttribute("data-problem") &&
+    !tile.video.ended &&
+    tile.video.readyState < 3;
+
+  /** When each tile waiting for video started to. */
+  const waitingSince = new Map<Tile, number>();
+
+  /** Whether a tile waiting holds the others: only for so long, so one whose video never comes doesn't stop them all. */
+  const isStalled = (tile: Tile) => {
+    if (!isWaiting(tile)) {
+      waitingSince.delete(tile);
+
+      return false;
+    }
+
+    const since = waitingSince.get(tile);
+
+    if (since === undefined) {
+      waitingSince.set(tile, Date.now());
+      // Looked again once it's held as long as it may
+      setTimeout(() => holdBack(), holdLimit);
+
+      return true;
+    }
+
+    return Date.now() - since < holdLimit;
+  };
+
+  const held = () => [...tiles.values()].some(isStalled);
+
+  /**
+   * Holds the tiles with video where they are while another waits for its
+   * own, then plays them on together. At speed the cameras load at
+   * different rates, and one left playing ran ahead, so the slow one was
+   * put back on its time with a seek that loaded again and fell further
+   * behind.
+   */
+  const holdBack = () => {
+    if (!playing) return;
+
+    const hold = held();
+
+    for (const tile of tiles.values()) {
+      if (
+        tile.player.clip() === undefined ||
+        tile.figure.dataset.empty !== undefined ||
+        tile.video.ended ||
+        isStalled(tile)
+      ) {
+        continue;
+      }
+
+      if (hold && !tile.video.paused) tile.video.pause();
+      else if (!hold && tile.video.paused) {
+        void tile.video.play().catch(() => undefined);
+      }
+    }
+  };
 
   /** The recorder second the clock is at, from the video keeping the time. */
   const now = () => {
@@ -131,10 +210,10 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
   /** Puts every tile on the clock at `at`, in recorder seconds; returns the loads it started. */
   const align = (at: number, exact: boolean): Array<Promise<void>> => {
-    const moment = momentAt(tracks, picked, at);
+    const moment = momentAt(shownTracks(), picked, at);
 
     if (moment.driver === undefined) {
-      const next = nextMoment(tracks, at);
+      const next = nextMoment(shownTracks(), at);
 
       // Nothing on any camera until the end of the day: stop there
       if (next === undefined) {
@@ -194,7 +273,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
         tile.player.seek(into);
       }
 
-      if (playing && tile.video.paused) {
+      // A tile held for another loading plays on once that one can too
+      if (playing && tile.video.paused && !held()) {
         void tile.video.play().catch(() => undefined);
       } else if (!playing && !tile.video.paused) {
         tile.video.pause();
@@ -244,6 +324,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       problem.textContent =
         message === undefined ? "" : `Video stopped: ${message}`;
       figure.toggleAttribute("data-problem", message !== undefined);
+      // One that's stopped holds the others back no longer
+      holdBack();
     };
 
     for (const type of ["loadstart", "emptied"]) {
@@ -294,6 +376,19 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       });
     }
 
+    // Each change in whether it has video to play holds the others, or lets
+    // them go
+    for (const type of [
+      "waiting",
+      "canplay",
+      "playing",
+      "seeked",
+      "emptied",
+      "ended",
+    ]) {
+      video.addEventListener(type, holdBack);
+    }
+
     figure.addEventListener("click", () => {
       if (camera !== picked) events.onPick(camera);
     });
@@ -311,6 +406,28 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     driver = undefined;
     playing = false;
     events.onState();
+  };
+
+  /**
+   * Lays the grid out for the cameras showing. While the picked one shows
+   * alone, the others let go of their video, so it has the recorder's
+   * bandwidth to itself.
+   */
+  const arrange = () => {
+    grid.toggleAttribute("data-alone", alone);
+    grid.dataset.layout = String(alone ? 1 : Math.max(tiles.size, 1));
+
+    for (const tile of tiles.values()) {
+      tile.figure.toggleAttribute("data-picked", tile.camera === picked);
+
+      if (!alone || tile.camera === picked) continue;
+
+      if (tile.player.clip() !== undefined) tile.player.stop();
+
+      releaseFrame(tile);
+
+      if (tile === driver) driver = undefined;
+    }
   };
 
   return {
@@ -346,21 +463,30 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       grid.replaceChildren(
         ...order.flatMap((track) => tiles.get(track.camera)?.figure ?? []),
       );
-      grid.dataset.layout = String(Math.max(order.length, 1));
-
-      for (const tile of tiles.values()) {
-        tile.figure.toggleAttribute("data-picked", tile.camera === picked);
-      }
+      arrange();
 
       // Cameras joining part way through come in at the clock's time
       if (at !== undefined) void Promise.all(align(at, false));
+    },
+    solo: (on) => {
+      if (on === alone) return;
+
+      const at = now();
+
+      alone = on;
+      arrange();
+
+      // Back to the grid, the others load again at the clock's time
+      if (at !== undefined) void Promise.all(align(at, false));
+
+      events.onState();
     },
     play: async (clip: Clip, from = 0, autoplay = true) => {
       playing = autoplay;
 
       const at = toSeconds(clip.begin) + from;
 
-      if (momentAt(tracks, picked, at).driver !== undefined) {
+      if (momentAt(shownTracks(), picked, at).driver !== undefined) {
         await Promise.all(align(at, true));
 
         return;
@@ -403,7 +529,9 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     video: () => driver?.video,
     lead: () => tiles.get(picked)?.video,
     tiles: () => [...tiles.values()],
-    paused: () => driver === undefined || driver.video.paused,
+    // Held for another camera's video, it's still playing
+    paused: () =>
+      driver === undefined || !playing || (driver.video.paused && !held()),
     resume: () => {
       playing = true;
 
@@ -411,9 +539,11 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
       if (at !== undefined) void Promise.all(align(at, false));
 
-      if (driver !== undefined && driver.video.paused) {
+      if (driver !== undefined && driver.video.paused && !held()) {
         void driver.video.play().catch(() => undefined);
       }
+
+      holdBack();
     },
     pause: () => {
       playing = false;

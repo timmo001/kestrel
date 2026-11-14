@@ -786,6 +786,11 @@ gw-table gw-sheet {
   cursor: pointer;
 }
 
+/* The picked camera alone, by Enter or a double click */
+.player-grid[data-alone] .player-tile:not([data-picked]) {
+  display: none;
+}
+
 /* A tile's last frame, over its picture while the next clip loads. It shows
    at once and fades out once the next clip draws its first frame */
 .player-hold {
