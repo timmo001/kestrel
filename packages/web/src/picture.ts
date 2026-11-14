@@ -65,8 +65,6 @@ export const pictureSettings = (options: PictureOptions): PicturePanel => {
 
   panel.classList.add("picture-panel");
   appliesAtOnce(panel);
-  // Kept beside its button on a phone too, so the picture stays in sight
-  panel.sheetBelow = 0;
   reset.setAttribute("size", "small");
   reset.setAttribute("label", "Put them back to the camera's defaults");
   message.className = "picture-note";

@@ -16,7 +16,12 @@ import {
   type CameraId,
   type Recording,
 } from "@timmo001/kestrel-core";
-import { on, type TableRow } from "@timmo001/groundwork-ui";
+import {
+  on,
+  onSwipe,
+  type SwipeDirection,
+  type TableRow,
+} from "@timmo001/groundwork-ui";
 import { isText, keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
 import { SavedCamera } from "./addresses.ts";
@@ -79,9 +84,9 @@ import {
   recordingRow,
   seconds,
   timeFormat,
+  swipeIgnore,
   typingTargets,
 } from "./shared.ts";
-import { onSwipe, type Direction } from "./gestures.ts";
 import {
   minimumSpan,
   spanLabel,
@@ -1856,24 +1861,28 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // seconds, two the previous or next recording, and three up or down open
   // or close the help
   if (stage !== null) {
-    onSwipe(stage, (swipe) => {
-      const ways: Record<Direction, -1 | 0 | 1> = {
-        left: 1,
-        right: -1,
-        up: 0,
-        down: 0,
-      };
+    onSwipe(
+      stage,
+      (swipe) => {
+        const ways: Record<SwipeDirection, -1 | 0 | 1> = {
+          left: 1,
+          right: -1,
+          up: 0,
+          down: 0,
+        };
 
-      const across = ways[swipe.direction];
+        const across = ways[swipe.direction];
 
-      if (swipe.fingers === 1 && across !== 0) seekBy(10 * across);
-      else if (swipe.fingers === 2 && across !== 0) skip(across);
-      else if (swipe.fingers === 3 && swipe.direction === "up") {
-        helpWired.show();
-      } else if (swipe.fingers === 3 && swipe.direction === "down") {
-        helpWired.close();
-      }
-    });
+        if (swipe.fingers === 1 && across !== 0) seekBy(10 * across);
+        else if (swipe.fingers === 2 && across !== 0) skip(across);
+        else if (swipe.fingers === 3 && swipe.direction === "up") {
+          helpWired.show();
+        } else if (swipe.fingers === 3 && swipe.direction === "down") {
+          helpWired.close();
+        }
+      },
+      { ignore: swipeIgnore },
+    );
   }
 
   showState();

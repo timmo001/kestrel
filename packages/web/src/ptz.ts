@@ -1,8 +1,10 @@
 /**
- * A camera that moves, on the Live page. The picked one shows its presets,
- * Home and a Tracking switch along the bottom of its tile, and a gear opens
- * a panel that saves, renames and clears presets and sets how it goes home
- * and follows what it sees. In Move mode it turns while a drag on its
+ * A camera that moves, on the Live page. The picked one has a Move button
+ * on its picture, and Move mode brings in its panel, off the picture: the
+ * arrow pad and lens zoom, Home, its presets, and a gear that opens a panel
+ * that saves, renames and clears presets and sets how it goes home and
+ * follows what it sees. Out of Move mode its picture is like any other's.
+ * In Move mode it turns while a drag on its
  * picture or an arrow on its pad is held, faster the further it's dragged,
  * and stops when it's let go; the arrow keys do the same while they're
  * held. Ctrl and the wheel, a pinch, the + and − keys or the slider under
@@ -29,6 +31,7 @@ import {
   phCaretUpBold,
   phGearBold,
   phHouseBold,
+  phJoystick,
   phMagnifyingGlassMinusBold,
   phMagnifyingGlassPlusBold,
   phPlus,
@@ -53,6 +56,9 @@ const keySpeed = 0.5;
 
 /** How far each step of the lens zoom goes, as a share of its range. */
 const zoomStep = 0.1;
+
+/** The narrowest picture Move says its name on, in pixels. */
+const wordyTile = 300;
 
 /**
  * How often the picked camera's state is read again, since it moves by
@@ -127,10 +133,19 @@ export interface SteerTile {
 export interface SteeringOptions {
   /** The tiles' grid, where the wheel and drags are caught. */
   readonly area: HTMLElement | null;
+  /** Where the camera's controls go, off its picture. */
+  readonly host: HTMLElement | null;
+  /** What they go before in `host`, such as the page's controls. */
+  readonly before: Element | null;
   /** The picked camera's tile, for a camera that moves. */
   readonly picked: () => SteerTile | undefined;
   /** Move mode started or ended, for the page's controls. */
   readonly onChange: () => void;
+  /**
+   * Move or Done pressed, for the page to call `toggle` with what goes with
+   * it, such as going to the camera alone, as one transition.
+   */
+  readonly onToggle: () => void;
 }
 
 export interface Steering {
@@ -310,11 +325,19 @@ export const steering = (options: SteeringOptions): Steering => {
   };
 
   /**
-   * The tile's controls at its bottom left, as big as the page's own: in
-   * Move mode, the arrow pad over the lens zoom, the same width; then the
-   * bar of presets, Home, Tracking and the gear. And the drag's line.
+   * The picked camera's controls, in a panel of their own beside the page's
+   * controls rather than over its picture, there only in Move mode: a titled
+   * bar saying so with Done, over the arrow pad and the lens zoom, then Home,
+   * the presets and the gear. Move, on the picture, starts it. The drag's
+   * line goes on the picture.
    */
   const dock = element("div");
+  const moveButton = tileButton("Move the camera (M)", phJoystick);
+  const head = element("div");
+  const title = element("span");
+  const hint = element("span", "Drag the picture, or hold an arrow");
+  const done = tileButton("Done");
+  const body = element("div");
   const pad = element("div");
   const arrowPad = element("div");
   const zoomRow = element("div");
@@ -324,13 +347,20 @@ export const steering = (options: SteeringOptions): Steering => {
   const bar = element("div");
   const presets = element("div");
   const homeButton = tileButton("Send it home", phHouseBold);
-  const trackSwitch = element("gw-switch");
+  const split = element("span");
   const setupButton = tileButton("Presets, home and tracking", phGearBold);
   const message = element("span");
   const line = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   const stroke = document.createElementNS("http://www.w3.org/2000/svg", "line");
 
   dock.className = "live-steer-dock";
+  moveButton.className = "live-steer-move";
+  moveButton.setAttribute("aria-keyshortcuts", "m");
+  moveButton.textContent = "Move";
+  head.className = "live-steer-head";
+  title.className = "live-steer-title";
+  hint.className = "live-steer-hint";
+  body.className = "live-steer-body";
   pad.className = "live-steer-pad";
   pad.setAttribute("role", "group");
   pad.setAttribute("aria-label", "Move the camera");
@@ -344,7 +374,9 @@ export const steering = (options: SteeringOptions): Steering => {
   bar.setAttribute("role", "group");
   bar.setAttribute("aria-label", "Camera controls");
   presets.className = "live-presets";
-  trackSwitch.label = "Tracking";
+  homeButton.setAttribute("appearance", "accent");
+  split.className = "live-steer-split";
+  split.setAttribute("aria-hidden", "true");
   message.className = "live-steer-note";
   line.classList.add("live-steer-line");
   line.setAttribute("aria-hidden", "true");
@@ -384,12 +416,31 @@ export const steering = (options: SteeringOptions): Steering => {
   arrowPad.append(...arrowButtons.map(([, button]) => button));
   zoomRow.append(zoomOut, zoomSlider, zoomIn);
   pad.append(arrowPad, zoomRow);
-  bar.append(presets, homeButton, trackSwitch, setupButton, message);
-  dock.append(pad, bar);
+  // Home first, as the main way back, then the presets past a line
+  bar.append(homeButton, split, presets, setupButton, message);
+  head.append(title, hint, done);
+  body.append(pad, bar);
+  dock.append(head, body);
+  done.setAttribute("variant", "brand");
+  done.addEventListener("click", () => options.onToggle());
 
-  // A press on the controls doesn't steer, and a double click doesn't go to
-  // one camera alone
-  dock.addEventListener("dblclick", (event) => event.stopPropagation());
+  // A press on Move is its own, not a tap or double tap on the picture
+  moveButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    options.onToggle();
+  });
+
+  for (const target of [dock, moveButton]) {
+    target.addEventListener("dblclick", (event) => event.stopPropagation());
+  }
+
+  // On a small picture, Move is only its icon, so it covers little of it
+  const sizing = new ResizeObserver(([entry]) => {
+    moveButton.setAttribute(
+      "labels",
+      (entry?.contentRect.width ?? 0) < wordyTile ? "hide" : "show",
+    );
+  });
 
   /** The setup, opened from the gear: presets, home and tracking. */
   const panel = element("gw-popover");
@@ -417,7 +468,15 @@ export const steering = (options: SteeringOptions): Steering => {
     const { controls } = current.tile;
     const zooms = lensZoom();
 
-    pad.hidden = !on;
+    // The panel's there only in Move mode, so the cameras have the room
+    if (!on) dock.remove();
+    else if (dock.parentElement !== options.host) {
+      options.host?.insertBefore(dock, options.before);
+    }
+
+    moveButton.hidden = on;
+    dock.toggleAttribute("data-moving", on);
+    title.textContent = `Moving ${cameraLabel(current.tile.id)}`;
     zoomRow.hidden = !zooms;
     zoomSlider.value = Math.round((state?.zoom ?? 0) * 100);
     zoomOut.disabled = (state?.zoom ?? 0) <= 0;
@@ -434,6 +493,9 @@ export const steering = (options: SteeringOptions): Steering => {
       ...(state?.presets ?? []).map((preset) => {
         const button = tileButton(preset.name);
 
+        // Quieter than Home: a preset is a choice, not the main action
+        button.setAttribute("appearance", "filled");
+        button.setAttribute("variant", "neutral");
         button.setAttribute("label", `Go to ${preset.name}`);
         button.addEventListener(
           "click",
@@ -445,8 +507,7 @@ export const steering = (options: SteeringOptions): Steering => {
     );
 
     homeButton.hidden = state?.home?.set !== true;
-    trackSwitch.hidden = state?.tracking === null || state === undefined;
-    trackSwitch.checked = state?.tracking?.on === true;
+    split.hidden = homeButton.hidden || presets.childElementCount === 0;
 
     setupButton.hidden =
       state === undefined ||
@@ -510,11 +571,6 @@ export const steering = (options: SteeringOptions): Steering => {
 
     return taken;
   };
-
-  trackSwitch.addEventListener(
-    "change",
-    () => void change(PtzCommand.cases.Track.make({ on: trackSwitch.checked })),
-  );
 
   homeButton.addEventListener(
     "click",
@@ -807,6 +863,8 @@ export const steering = (options: SteeringOptions): Steering => {
     current.tile.figure.removeAttribute("data-steering");
     dock.remove();
     line.remove();
+    moveButton.remove();
+    sizing.disconnect();
     panel.close();
     current = undefined;
   };
@@ -830,7 +888,7 @@ export const steering = (options: SteeringOptions): Steering => {
     }
 
     // The page draws its tiles again, such as after a layout change, so the
-    // controls move to the camera's new one
+    // line moves to the camera's new one
     if (tile.figure !== current?.tile.figure) {
       halt();
       current?.tile.figure.removeAttribute("data-steering");
@@ -838,7 +896,9 @@ export const steering = (options: SteeringOptions): Steering => {
 
     current = { tile, state: current?.state };
     tile.figure.toggleAttribute("data-steering", on);
-    tile.figure.append(line, dock);
+    tile.figure.append(line, moveButton);
+    sizing.disconnect();
+    sizing.observe(tile.figure);
     showBar();
   };
 
@@ -885,8 +945,7 @@ export const steering = (options: SteeringOptions): Steering => {
         .composedPath()
         .some(
           (target) =>
-            target === dock ||
-            (target instanceof Element && target.matches(".live-inset")),
+            target instanceof Element && target.matches(".live-inset"),
         )
     ) {
       return;

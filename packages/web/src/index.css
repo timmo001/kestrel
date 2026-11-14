@@ -607,51 +607,230 @@ gw-table gw-sheet {
   stroke-linecap: round;
 }
 
-/* The camera's controls at the bottom left of the tile: the arrow pad and
-   lens zoom in Move mode, over the presets, Home, Tracking and setup */
+/* The picked camera's controls in Move mode, off its picture: a panel of
+   their own between the cameras and the page's controls, or beside the
+   cameras where the window is wider than tall. A titled bar with Done, then
+   the arrow pad and lens zoom, Home and setup, and the presets */
+/* The cameras take only the room their pictures fill, which the page works
+   out as --live-fit-height or --live-fit-width, and the panel the rest, with
+   its controls in the middle of it */
+.live-stage:has(> .live-steer-dock) {
+  grid-template-rows:
+    minmax(0, var(--live-fit-height, 1fr))
+    var(--live-dock-size, auto)
+    auto;
+}
+
 .live-steer-dock {
-  position: absolute;
-  inset-block-end: var(--gw-space-2);
-  inset-inline-start: var(--gw-space-2);
-  z-index: 1;
   display: flex;
   flex-direction: column;
-  align-items: start;
-  gap: var(--gw-space-2);
-  max-width: calc(100% - var(--gw-space-2) * 2);
-  max-height: calc(100% - var(--gw-space-2) * 2);
-  color: #fff;
+  justify-content: safe center;
+  align-items: center;
+  gap: var(--gw-space-3);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--gw-space-2) var(--gw-space-3);
+  overflow-y: auto;
+  background: color-mix(in oklab, var(--gw-color-surface-raised) 92%, #000);
+  border-block-start: 1px solid var(--gw-color-border-quiet);
+  color: var(--gw-color-text-primary);
   cursor: default;
+  view-transition-name: live-steer-dock;
 }
 
-/* Clear of the other view, where there's one */
-.live-tile:has(.live-inset) .live-steer-dock {
-  max-width: calc(72% - var(--gw-space-2) * 3);
+/* It comes in from the edge it sits on as the cameras make room, and goes
+   back the same way */
+::view-transition-new(live-steer-dock):only-child {
+  animation: 250ms cubic-bezier(0.2, 0, 0, 1) both steer-dock-in;
 }
 
-/* The arrows, and the lens zoom under them, in a square */
+::view-transition-old(live-steer-dock):only-child {
+  animation: 200ms cubic-bezier(0.3, 0, 1, 1) both steer-dock-in reverse;
+}
+
+@keyframes steer-dock-in {
+  from {
+    translate: 0 100%;
+    opacity: 0;
+  }
+}
+
+@media (orientation: landscape) {
+  @keyframes steer-dock-in {
+    from {
+      translate: 100% 0;
+      opacity: 0;
+    }
+  }
+}
+
+/* Move, on the picked camera's picture, bottom left: clear of its name, its
+   other view and the camera's own clock */
+.live-steer-move {
+  position: absolute;
+  inset: auto auto var(--gw-space-2) var(--gw-space-2);
+  z-index: 1;
+  view-transition-name: live-steer-move;
+}
+
+/* Dark behind it like the camera's name, so it reads on any picture */
+.live-steer-move::part(button) {
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+}
+
+.live-steer-move:hover::part(button) {
+  background: rgb(0 0 0 / 70%);
+}
+
+/* Says what Move mode is, so it's never mistaken for a joystick: the title,
+   the hint as a second line under it, and Done beside them */
+.live-steer-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0 var(--gw-space-3);
+  align-self: stretch;
+}
+
+.live-steer-head > gw-button {
+  grid-area: 1 / 2 / span 2;
+}
+
+.live-steer-head[hidden] {
+  display: none;
+}
+
+.live-steer-title {
+  font-weight: 600;
+}
+
+.live-steer-hint {
+  color: var(--gw-color-text-secondary);
+  font-size: 0.875rem;
+}
+
+/* On a phone on its side the panel is short, so the title says what Move
+   mode is on one line, the hint is left to help, and the arrows close up */
+@media (orientation: landscape) and (max-height: 30rem) {
+  .live-steer-hint {
+    display: none;
+  }
+
+  .live-steer-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .live-steer-pad > .live-arrow-pad {
+    grid-template-rows: repeat(3, 3rem);
+  }
+
+  /* ...and the presets scroll in a short row, leaving the picture the
+     width */
+  .live-stage .live-presets {
+    max-inline-size: 6.5rem;
+  }
+}
+
+/* In Move mode, a row each: the arrows, the lens zoom, Home and setup, then
+   the presets */
+.live-steer-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gw-space-3);
+  max-width: 100%;
+}
+
+@media (orientation: landscape) {
+  /* Measured at its own width, so the cameras are sized for the room it
+     really leaves them */
+  .live-stage:has(> .live-steer-dock) {
+    grid-template-columns:
+      minmax(0, var(--live-fit-width, 1fr))
+      var(--live-dock-size, auto);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  /* More presets than that scroll, rather than widening the panel */
+  .live-presets {
+    max-inline-size: 20rem;
+  }
+
+  /* The page's controls stay the stage's full width under both, so their
+     rows never depend on how wide the cameras' column is, which depends on
+     how tall the cameras can be */
+  .live-stage > .live-steer-dock {
+    grid-area: 1 / 2;
+    border-block-start: none;
+    border-inline-start: 1px solid var(--gw-color-border-quiet);
+  }
+
+  /* ...without their width pushing the panel's column wider */
+  .live-stage:has(> .live-steer-dock) > .player-controls {
+    grid-column: 1 / -1;
+    contain: inline-size;
+  }
+}
+
+/* Over the picture, on a phone on its side or full screen, the panel keeps
+   its own column, clear of the screen's side and bottom, or its own row
+   under the cameras where full screen is taller than wide */
+[data-overlay].live-stage:has(> .live-steer-dock) {
+  grid-template-rows:
+    minmax(0, var(--live-fit-height, 1fr))
+    var(--live-dock-size, auto);
+}
+
+[data-overlay] > .live-steer-dock {
+  grid-area: 2 / 1;
+  padding-block-end: calc(var(--safe-bottom) + 4rem);
+}
+
+/* ...where the page's controls go over the panel's empty foot, rather than
+   over the short picture */
+[data-overlay].live-stage:has(> .live-steer-dock) > .player-controls {
+  grid-area: 2 / 1;
+}
+
+@media (orientation: landscape) {
+  [data-overlay].live-stage:has(> .live-steer-dock) {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* There the page's controls go over the cameras only, not the panel */
+  [data-overlay].live-stage:has(> .live-steer-dock) > .player-controls {
+    grid-area: 1 / 1;
+  }
+
+  [data-overlay] > .live-steer-dock {
+    grid-area: 1 / 2;
+    padding-inline-end: var(--safe-inline);
+    padding-block-end: var(--safe-bottom);
+  }
+}
+
+/* The arrows, and the lens zoom under them */
 .live-steer-pad {
   display: flex;
   flex-direction: column;
   gap: var(--gw-space-2);
-  box-sizing: border-box;
-  width: 16rem;
-  max-width: 100%;
-  aspect-ratio: 1;
-  padding: var(--gw-space-2);
-  border-radius: var(--gw-radius-md, 8px);
-  background: rgb(0 0 0 / 55%);
+  width: 12rem;
+}
+
+.live-steer-pad[hidden] {
+  display: none;
 }
 
 .live-arrow-pad {
-  flex: 1;
   display: grid;
   grid-template:
-    ". up ." 1fr
-    "left . right" 1fr
-    ". down ." 1fr / 1fr 1fr 1fr;
+    ". up ." 3.5rem
+    "left . right" 3.5rem
+    ". down ." 3.5rem / 1fr 1fr 1fr;
   place-items: center;
-  min-height: 0;
 }
 
 .live-arrow-pad [data-arrow="ArrowUp"] {
@@ -686,21 +865,63 @@ gw-table gw-sheet {
   gap: var(--gw-space-1);
 }
 
+/* Home, the presets and setup on one row, the presets scrolling sideways
+   rather than wrapping when there are more than fit */
 .live-steer-bar {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--gw-space-2);
   max-width: 100%;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--gw-space-2);
-  border-radius: var(--gw-radius-md, 8px);
-  background: rgb(0 0 0 / 55%);
+  min-width: 0;
 }
 
 .live-presets {
-  display: contents;
+  display: flex;
+  gap: var(--gw-space-2);
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.live-presets > * {
+  flex: none;
+}
+
+.live-presets:empty {
+  display: none;
+}
+
+/* In Move mode, Home and setup a row of their own over the presets, except
+   on a phone on its side, where there's no height to spare */
+@media not ((orientation: landscape) and (max-height: 30rem)) {
+  .live-steer-dock[data-moving] .live-steer-bar {
+    flex-wrap: wrap;
+  }
+
+  .live-steer-dock[data-moving] .live-presets {
+    flex-basis: 100%;
+    order: 1;
+    justify-content: safe center;
+  }
+
+  .live-steer-dock[data-moving] .live-steer-split {
+    display: none;
+  }
+}
+
+/* Between Home and the presets */
+.live-steer-split {
+  align-self: stretch;
+  width: 1px;
+  min-height: 1.5rem;
+  background: var(--gw-color-border-quiet);
+}
+
+.live-steer-split[hidden] {
+  display: none;
 }
 
 .live-steer-note:empty {
@@ -712,7 +933,7 @@ gw-table gw-sheet {
   --gw-popover-width: 22rem;
 }
 
-/* The picture settings, opened beside Move */
+/* The picture settings, opened from their button */
 .picture-panel {
   --gw-popover-width: 20rem;
 }
@@ -959,6 +1180,8 @@ gw-table gw-sheet {
   display: none;
 }
 
+/* A popover's own element would take a cell of the grid; what it opens is
+   in the top layer, a sheet on a phone, so this only keeps it out of the way */
 .player-controls[data-compact] gw-popover {
   position: absolute;
 }
@@ -1028,15 +1251,10 @@ gw-table gw-sheet {
   grid-area: 2 / 6;
 }
 
-/* Then the zoom's pill, with camera moves on Live, and More, holding the
-   seldom used, such as Capture */
+/* Then the zoom's pill, and More, holding the seldom used, such as Capture */
 .player-controls[data-compact] .zoom-pill {
   grid-area: 3 / 1 / auto / 6;
   justify-self: start;
-}
-
-.player-controls[data-compact] .live-move {
-  grid-area: 3 / 6;
 }
 
 .player-controls[data-compact] .controls-more {
@@ -1645,6 +1863,15 @@ kbd {
   height: 2.75rem;
 }
 
+/* Beside the camera panel, under the middle of the cameras, not of both,
+   so it's clear of a camera's other view in its corner */
+@media (orientation: landscape) {
+  [data-overlay].live-stage:has(> .live-steer-dock) > .controls-handle {
+    /* Every line given, as an absolute box's missing one is the stage's edge */
+    grid-area: 1 / 1 / 2 / 2;
+  }
+}
+
 [data-overlay]:has(> .player-controls[data-hidden]) {
   cursor: none;
 }
@@ -1677,7 +1904,6 @@ kbd {
     .control-next-event,
     .control-events,
     .zoom-pill,
-    .live-move,
     .controls-more
   ) {
   display: none;

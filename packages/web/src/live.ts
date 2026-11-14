@@ -29,7 +29,6 @@ import {
   phCamera,
   phCornersIn,
   phCornersOut,
-  phJoystick,
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phPause,
@@ -40,7 +39,7 @@ import {
   phSpeakerLow,
   phSpeakerSlash,
 } from "./icons.ts";
-import { onSwipe } from "./gestures.ts";
+import { onSwipe } from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
@@ -50,6 +49,7 @@ import {
   element,
   find,
   helpToggle,
+  swipeIgnore,
   transitionName,
   typingTargets,
   withTransition,
@@ -164,6 +164,9 @@ const drawnSize = (width: number, height: number, ratio: number | null) => ({
 
 /** How often a camera with only a still picture shows a new one. */
 const stillEvery = 5000;
+
+/** The narrowest a tile is steered on, in pixels; a smaller one goes alone first. */
+const smallTile = 200;
 
 /**
  * How many slow streams, such as a web page's, start at once: more at once
@@ -319,7 +322,6 @@ export const livePage = (): LivePage => {
   const zoomInButton = find("gw-button", "live-zoom-in");
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
-  const moveButton = find("gw-button", "live-move");
   const pictureButton = find("gw-button", "live-picture");
   const soundButton = find("gw-button", "live-sound");
   const soundDivider = find("span", "live-sound-divider");
@@ -443,7 +445,60 @@ export const livePage = (): LivePage => {
    */
   const arrangeGrid = (target: HTMLElement) => {
     stage?.setAttribute("data-tiling", tiling);
+    fitFree();
+    arrangeIn(target);
+    fitToGrid(target);
+  };
 
+  const fitProperties = [
+    "--live-fit-width",
+    "--live-fit-height",
+    "--live-dock-size",
+  ] as const;
+
+  /** The cameras back to all the room the camera panel leaves them. */
+  const fitFree = () => {
+    for (const name of fitProperties) stage?.style.removeProperty(name);
+  };
+
+  /**
+   * With the camera panel showing, the cameras keep only the room their
+   * pictures fill, and the panel takes the rest, rather than black bands
+   * around the pictures. Measured with the panel at its smallest.
+   */
+  const fitToGrid = (target: HTMLElement) => {
+    const area = target.parentElement;
+
+    if (
+      stage === null ||
+      area === null ||
+      stage.querySelector(":scope > .live-steer-dock") === null
+    ) {
+      return;
+    }
+
+    const box = target.getBoundingClientRect();
+
+    if (box.width === 0 || box.height === 0) return;
+
+    const style = getComputedStyle(area);
+
+    const width =
+      box.width +
+      parseFloat(style.paddingLeft) +
+      parseFloat(style.paddingRight);
+
+    const height =
+      box.height +
+      parseFloat(style.paddingTop) +
+      parseFloat(style.paddingBottom);
+
+    stage.style.setProperty("--live-fit-width", `${Math.ceil(width)}px`);
+    stage.style.setProperty("--live-fit-height", `${Math.ceil(height)}px`);
+    stage.style.setProperty("--live-dock-size", "minmax(min-content, 1fr)");
+  };
+
+  const arrangeIn = (target: HTMLElement) => {
     const smart = tiling === "smart";
     const arrangement = smart ? undefined : gridFor(size());
 
@@ -475,14 +530,20 @@ export const livePage = (): LivePage => {
     const area = target.parentElement;
 
     // Hidden, the space measures nothing, so the last tiling stays until
-    // it shows again
+    // it shows again. Its padding, clear of a phone's corners, isn't room
+    const style = area === null ? undefined : getComputedStyle(area);
+
     const tiled =
-      area === null
+      area === null || style === undefined
         ? undefined
         : tilingFor(
             Math.max(target.childElementCount, 1),
-            area.clientWidth,
-            area.clientHeight,
+            area.clientWidth -
+              parseFloat(style.paddingLeft) -
+              parseFloat(style.paddingRight),
+            area.clientHeight -
+              parseFloat(style.paddingTop) -
+              parseFloat(style.paddingBottom),
           );
 
     if (tiled !== undefined) applyTiling(target, tiled);
@@ -524,7 +585,6 @@ export const livePage = (): LivePage => {
   setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
-  setIcon(moveButton, phJoystick, "Move the camera (M)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
   setIcon(helpButton, phQuestionMark, "Help (?)");
@@ -533,8 +593,6 @@ export const livePage = (): LivePage => {
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
-  moveButton?.setAttribute("aria-keyshortcuts", "m");
-  moveButton?.toggleAttribute("toggle", true);
   pictureButton?.setAttribute("aria-keyshortcuts", "p");
   pictureButton?.toggleAttribute("toggle", true);
   soundButton?.setAttribute("aria-keyshortcuts", "u");
@@ -558,15 +616,6 @@ export const livePage = (): LivePage => {
       controls,
       lensZoom: viewOf(tile.stream)?.zoom ?? true,
     };
-  };
-
-  /** Move, shown where any camera moves and pressed while it's on. */
-  const showMove = () => {
-    if (moveButton === null) return;
-
-    moveButton.hidden = !streams.some((stream) => stream.controls.ptz !== null);
-    moveButton.disabled = steerTile() === undefined;
-    moveButton.pressed = steer.on();
   };
 
   /** The picked camera, for one with picture settings. */
@@ -686,21 +735,54 @@ export const livePage = (): LivePage => {
   document.addEventListener("click", release);
   document.addEventListener("keyup", release);
 
+  /** Whether Move mode went to the camera alone, to go back after. */
+  let movedSolo = false;
+
   const steer = steering({
     area: grid,
+    host: stage,
+    before: stage?.querySelector(".player-controls") ?? null,
     picked: steerTile,
     onChange: () => {
-      showMove();
+      // Moving off the camera, such as to the next, keeps where that went
+      if (!steer.on()) movedSolo = false;
+
+      if (grid !== null) arrangeGrid(grid);
+
       showZoom();
     },
+    onToggle: () => toggleMove(),
   });
 
-  /** Move mode on the picked camera, where it moves, or off. */
+  /**
+   * Move mode on the picked camera, where it moves, or off, its panel coming
+   * and going as the cameras make room. A camera too small to steer goes
+   * alone first, and back to the others after.
+   */
   const toggleMove = () => {
-    if (steer.on() || steerTile() !== undefined) steer.toggle();
-  };
+    const tile = steerTile();
 
-  moveButton?.addEventListener("click", toggleMove);
+    if (!steer.on() && tile === undefined) return;
+
+    const alone =
+      !steer.on() &&
+      solo === undefined &&
+      (tile?.figure.getBoundingClientRect().width ?? 0) < smallTile;
+
+    const back = steer.on() && movedSolo;
+
+    withTransition(() => {
+      if (alone && startSolo()) render();
+
+      steer.toggle();
+      movedSolo = alone;
+
+      if (back) {
+        endSolo();
+        render();
+      }
+    });
+  };
 
   const picture = pictureSettings({
     button: pictureButton,
@@ -761,7 +843,6 @@ export const livePage = (): LivePage => {
 
     // Move mode follows the camera, and ends once another's picked
     steer.show();
-    showMove();
     picture.show();
     showPicture();
     showZoom();
@@ -1210,7 +1291,7 @@ export const livePage = (): LivePage => {
   };
 
   /** Back from one camera alone to the layout it came from, at the page with the camera now picked. */
-  const leaveSolo = () => {
+  const endSolo = () => {
     if (solo === undefined) return;
 
     const index = streams.findIndex((stream) => stream.id === picked);
@@ -1220,7 +1301,30 @@ export const livePage = (): LivePage => {
       index === -1 || layout === "all" ? solo.page : Math.floor(index / layout);
     solo = undefined;
     keepPlace();
+  };
+
+  const leaveSolo = () => {
+    if (solo === undefined) return;
+
+    endSolo();
     withTransition(render);
+  };
+
+  /** The picked camera alone, or the first on the page; false where there's none. */
+  const startSolo = () => {
+    const index = streams.findIndex((stream) => stream.id === picked);
+    const at = index === -1 ? page * size() : index;
+    const camera = streams[at];
+
+    if (camera === undefined) return false;
+
+    solo = { layout, page };
+    picked = camera.id;
+    layout = 1;
+    page = at;
+    keepPlace();
+
+    return true;
   };
 
   /** The picked camera alone, or back to the layout it came from. */
@@ -1231,18 +1335,7 @@ export const livePage = (): LivePage => {
       return;
     }
 
-    const index = streams.findIndex((stream) => stream.id === picked);
-    const at = index === -1 ? page * size() : index;
-    const camera = streams[at];
-
-    if (camera === undefined) return;
-
-    solo = { layout, page };
-    picked = camera.id;
-    layout = 1;
-    page = at;
-    keepPlace();
-    withTransition(render);
+    if (startSolo()) withTransition(render);
   };
 
   /**
@@ -1401,15 +1494,15 @@ export const livePage = (): LivePage => {
   });
 
   // Smart tiling follows the space the cameras have, as the window's size
-  // changes or they go full screen
+  // changes or they go full screen, and every layout fits the camera panel
+  // to what's left as it comes and goes
   const area = grid?.parentElement ?? null;
 
   if (grid !== null && area !== null) {
     new ResizeObserver(() => {
-      if (tiling !== "smart") return;
-
       arrangeGrid(grid);
-      showZoom();
+
+      if (tiling === "smart") showZoom();
     }).observe(area);
   }
 
@@ -1439,12 +1532,18 @@ export const livePage = (): LivePage => {
   // On a touch screen: one finger across the cameras moves on or back a
   // page, and three up or down open or close the help
   if (stage !== null) {
-    onSwipe(stage, (swipe) => {
-      if (swipe.fingers === 1 && swipe.direction === "left") step(1);
-      else if (swipe.fingers === 1 && swipe.direction === "right") step(-1);
-      else if (swipe.fingers === 3 && swipe.direction === "up") help.show();
-      else if (swipe.fingers === 3 && swipe.direction === "down") help.close();
-    });
+    onSwipe(
+      stage,
+      (swipe) => {
+        if (swipe.fingers === 1 && swipe.direction === "left") step(1);
+        else if (swipe.fingers === 1 && swipe.direction === "right") step(-1);
+        else if (swipe.fingers === 3 && swipe.direction === "up") help.show();
+        else if (swipe.fingers === 3 && swipe.direction === "down") {
+          help.close();
+        }
+      },
+      { ignore: swipeIgnore },
+    );
   }
 
   // Zoom, each camera's its own and kept, once in tiles and once alone, as
@@ -1513,7 +1612,7 @@ export const livePage = (): LivePage => {
     [
       "Escape",
       () => {
-        if (steer.on()) steer.leave();
+        if (steer.on()) toggleMove();
         else if (solo === undefined) unpick();
         else leaveSolo();
       },
@@ -1608,7 +1707,7 @@ export const livePage = (): LivePage => {
       .some(
         (target) =>
           target instanceof Element &&
-          target.matches(".live-tile, .player-controls"),
+          target.matches(".live-tile, .player-controls, .live-steer-dock"),
       );
   });
 

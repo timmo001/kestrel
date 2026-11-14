@@ -5,13 +5,13 @@
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import {
   on,
+  onSwipe,
   type MenuItem,
   type TableColumn,
   type TableRow,
 } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
-import { onSwipe } from "./gestures.ts";
 import {
   phCaretDown,
   phCaretUp,
@@ -20,6 +20,13 @@ import {
   phPlay,
 } from "./icons.ts";
 import { clipUrl, type Clip } from "./recording-player.ts";
+
+/**
+ * What a drag on a player already moves, so a touch starting there is never
+ * a swipe: a zoomed picture, a camera being steered, or a control.
+ */
+export const swipeIgnore =
+  "[data-movable], [data-steering], .player-controls, .live-steer-dock, gw-range, gw-popover";
 
 /** Fields that take text: a toggle's radios don't, so keys pass them by. */
 export const typingTargets =
@@ -586,12 +593,16 @@ export const overlayControls = (bar: HTMLElement) => {
 
   // A swipe of one finger up shows it, and down hides it
   if (stage !== null) {
-    onSwipe(stage, (swipe) => {
-      if (!isOver() || swipe.fingers !== 1) return;
+    onSwipe(
+      stage,
+      (swipe) => {
+        if (!isOver() || swipe.fingers !== 1) return;
 
-      if (swipe.direction === "up") wake();
-      else if (swipe.direction === "down") hide();
-    });
+        if (swipe.direction === "up") wake();
+        else if (swipe.direction === "down") hide();
+      },
+      { ignore: swipeIgnore },
+    );
   }
 
   // One the browser takes over, such as to scroll, toggles nothing
