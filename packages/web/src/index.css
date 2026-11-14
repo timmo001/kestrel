@@ -673,6 +673,11 @@ gw-table gw-sheet {
   --gw-popover-width: 20rem;
 }
 
+/* A slider's own styles show it even when hidden, as for a camera without hue */
+.picture-panel [hidden] {
+  display: none;
+}
+
 .picture-note {
   margin: 0;
   color: var(--gw-color-text-secondary);
