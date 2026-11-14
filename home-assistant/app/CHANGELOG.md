@@ -1,23 +1,15 @@
-This release reworks how you steer a camera that moves, and makes the Live page fit phones better, in portrait, on their side and full screen.
+Camera moving and picture settings get more room, and the lens zoom is easier to use.
 
 ## Live
 
-- A camera that moves has a **Move** button on its picture. Out of Move mode its picture works like any other camera's: tap to pick, double tap to see it alone, pinch, pan and swipe.
-- Pressing Move brings in the camera's panel, sliding in from below in portrait or from the side in landscape, as the cameras move up to make room. The panel says which camera is moving, with Done beside it, then the arrow pad, the lens zoom, Home, the setup gear and the presets. Done slides it all away again.
-- On a small tile, Move shows the camera alone first, and Done goes back to the others. The button shrinks to its icon on small pictures, so it covers little of them.
-- The bar's own Move button has gone. The M key still starts and ends Move mode.
-- Presets come after Home past a line, in a quieter filled style, and scroll sideways when there are more than fit.
-- The picture now fills the room beside the panel, with no black bands, on desktop and on phones.
-- Full screen on a phone held upright no longer squashes the picture: the panel sits under it, with the page's controls at its foot.
-- Popovers open as sheets from the bottom on phones, in both orientations.
-- On a phone on its side, the controls' handle sits under the cameras rather than over a camera's other view.
-
-## Recordings
-
-- A click on the timeline snaps to the nearest recording, or event.
-- The timeline zooms at the pointer, with the day and zoom in one control group.
+- A camera's moving setup (presets, home and tracking) and its picture settings now open as a sheet instead of a small popover: from the right on a computer, and up from the bottom on a phone either way up. The backdrop is light, so you can still see the picture you're adjusting.
+- While a sheet is open, a tap or click outside only closes it. It no longer presses, picks or focuses anything on the page underneath.
+- Keys typed in an open sheet now belong to the sheet, so Esc closes it rather than also leaving Move mode, and the Live shortcuts no longer fire behind it.
+- Presets scroll sideways when there are more than fit, with ‹ and › buttons that only show while there's more to see that way. You can also drag them with a mouse.
+- The lens zoom slider now spans the Move panel's full width, for finer control.
+- On a phone on its side, the Move panel is more compact, and the presets use all the space between Home and the setup button instead of a short fixed strip.
 
 ## Fixes
 
-- Swipes and gestures now come from Groundwork, so they behave the same as in Kestrel's other apps.
-- The version shown now comes from the release itself.
+- The Move panel no longer keeps rules from before it appeared only in Move mode.
+- Updated Groundwork to 0.33.0.
