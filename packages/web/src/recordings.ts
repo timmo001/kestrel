@@ -82,7 +82,12 @@ import {
   typingTargets,
 } from "./shared.ts";
 import { onSwipe, type Direction } from "./gestures.ts";
-import { timelineFor, type TimelineSpan } from "./timeline.ts";
+import {
+  minimumSpan,
+  spanLabel,
+  timelineFor,
+  type TimelineSpan,
+} from "./timeline.ts";
 import { tilingItems, tilingOf, type TilingMode } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
@@ -216,11 +221,13 @@ const kept = () => {
     speed: isText(speed) && isSpeed(Number(speed)) ? speed : "1",
     smart: tiling !== "fixed",
     eventsOnly: values?.["eventsOnly"] === true,
+    // A preset kept as text before, or any span a pinch or drag left
     timelineZoom:
-      isText(timelineZoom) &&
-      timelineZooms.some((zoom) => zoom.value === timelineZoom)
-        ? timelineZoom
-        : "86400",
+      Number.isFinite(Number(timelineZoom)) &&
+      Number(timelineZoom) >= minimumSpan &&
+      Number(timelineZoom) <= daySeconds
+        ? Number(timelineZoom)
+        : daySeconds,
     position:
       position === undefined || positionCamera === undefined
         ? undefined
@@ -295,7 +302,30 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const clipFrom = find("gw-input", "clip-from");
   const clipTo = find("gw-input", "clip-to");
   const clipDownload = find("gw-button", "clip-download");
-  const timelineZoom = find("gw-segmented", "timeline-zoom");
+  const timelineZoomOut = find("gw-button", "timeline-zoom-out");
+  const timelineZoomIn = find("gw-button", "timeline-zoom-in");
+  const timelinePresets = find("gw-menu-button", "timeline-presets");
+
+  /** The timeline's zoom controls for how much it shows, kept for next time. */
+  const showTimelineZoom = (seconds: number) => {
+    keep(storageKey, { timelineZoom: seconds });
+
+    if (timelinePresets !== null) {
+      timelinePresets.label = spanLabel(seconds);
+      timelinePresets.items = timelineZooms.map((zoom) => ({
+        value: zoom.value,
+        label: zoom.label,
+        checked: Number(zoom.value) === seconds,
+      }));
+    }
+
+    if (timelineZoomOut !== null)
+      timelineZoomOut.disabled = seconds >= daySeconds;
+
+    if (timelineZoomIn !== null) {
+      timelineZoomIn.disabled = seconds <= minimumSpan;
+    }
+  };
 
   const saved = kept();
   let lastDay = "";
@@ -426,6 +456,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   const timelineHover = find("span", "timeline-hover");
   const timelineClip = find("span", "timeline-clip");
   const timelineTicks = find("div", "timeline-ticks");
+  const timelineOverview = find("div", "timeline-overview");
   const idleText = find("p", "player-idle");
   const pickText = idleText?.textContent.trim() ?? "";
   const cameraOnlyKey = find("div", "timeline-legend-camera");
@@ -442,7 +473,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     timelinePlayhead === null ||
     timelineHover === null ||
     timelineClip === null ||
-    timelineTicks === null
+    timelineTicks === null ||
+    timelineOverview === null
       ? undefined
       : timelineFor(
           {
@@ -452,55 +484,59 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
             hover: timelineHover,
             clip: timelineClip,
             ticks: timelineTicks,
+            overview: timelineOverview,
           },
-          // A click plays every camera from there, or from the next
-          // recording after a gap; in the recording already playing, it seeks.
-          // Any click clears the last one's note
-          (second) => {
-            const at = (recording: Recording) =>
-              secondOfDay(recording.begin) <= second &&
-              secondOfDay(recording.end) > second;
+          {
+            // A click plays every camera from there, snapped to the nearest
+            // recording; in the recording already playing, it seeks. Any
+            // click clears the last one's note
+            onPick: (second) => {
+              const at = (recording: Recording) =>
+                secondOfDay(recording.begin) <= second &&
+                secondOfDay(recording.end) > second;
 
-            hideNote();
+              hideNote();
 
-            // A clip only on the camera doesn't skip on to a later recording
-            if (!recordings.some(at) && listed.some(at)) {
-              showNote(
-                "That clip is only on the camera's SD card, and this camera doesn't share those. Kestrel's own recordings of it play as usual",
-              );
+              // A clip only on the camera doesn't skip on to a later recording
+              if (!recordings.some(at) && listed.some(at)) {
+                showNote(
+                  "That clip is only on the camera's SD card, and this camera doesn't share those. Kestrel's own recordings of it play as usual",
+                );
 
-              return;
-            }
+                return;
+              }
 
-            const hit = recordingAt(second);
+              const hit = recordingAt(second);
 
-            if (hit === undefined) return;
+              if (hit === undefined) return;
 
-            const from = Math.max(second - secondOfDay(hit.begin), 0);
-            const playing = player?.clip();
+              const from = Math.max(second - secondOfDay(hit.begin), 0);
+              const playing = player?.clip();
 
-            if (
-              playing !== undefined &&
-              playing.camera === hit.camera &&
-              playing.begin === hit.begin
-            ) {
-              player?.seek(from);
-              player?.resume();
-            } else {
-              playClip(hit, from);
-            }
-          },
-          // With Events only, a click goes to the nearest event, as only
-          // those play; else to the nearest recording
-          () => {
-            if (!eventsOnly) return undefined;
+              if (
+                playing !== undefined &&
+                playing.camera === hit.camera &&
+                playing.begin === hit.begin
+              ) {
+                player?.seek(from);
+                player?.resume();
+              } else {
+                playClip(hit, from);
+              }
+            },
+            // With Events only, a click goes to the nearest event, as only
+            // those play; else to the nearest recording
+            targets: () => {
+              if (!eventsOnly) return undefined;
 
-            const dayStart = toSeconds(`${day}T00:00:00`);
+              const dayStart = toSeconds(`${day}T00:00:00`);
 
-            return spans.map((span) => ({
-              start: span.start - dayStart,
-              end: span.end - dayStart,
-            }));
+              return spans.map((span) => ({
+                start: span.start - dayStart,
+                end: span.end - dayStart,
+              }));
+            },
+            onZoom: (seconds) => showTimelineZoom(seconds),
           },
         );
 
@@ -1201,15 +1237,24 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     followEvents();
   };
 
-  if (timelineZoom !== null) {
-    timelineZoom.options = timelineZooms;
-    timelineZoom.value = saved.timelineZoom;
-    timeline?.zoom(Number(saved.timelineZoom));
-    on(timelineZoom, "change", () => {
-      keep(storageKey, { timelineZoom: timelineZoom.value });
-      timeline?.zoom(Number(timelineZoom.value));
-    });
+  // The timeline's zoom, joined in one group: a step out or in either side
+  // of a menu that names how much it shows and holds the presets. A pinch,
+  // Ctrl and the wheel or the overview zoom it too, and the menu follows
+  controlIcon(timelineZoomOut, phMagnifyingGlassMinus);
+  controlIcon(timelineZoomIn, phMagnifyingGlassPlus);
+  timelineZoomOut?.setAttribute("size", "small");
+  timelineZoomIn?.setAttribute("size", "small");
+  timelineZoomOut?.addEventListener("click", () => timeline?.zoomBy(1 / 4));
+  timelineZoomIn?.addEventListener("click", () => timeline?.zoomBy(4));
+
+  if (timelinePresets !== null) {
+    on(timelinePresets, "select", (event) =>
+      timeline?.zoom(Number(event.detail.value)),
+    );
   }
+
+  showTimelineZoom(saved.timelineZoom);
+  timeline?.zoom(saved.timelineZoom);
 
   // The day and cameras, the month's recorded days, and the day's table
 

@@ -562,6 +562,9 @@
                 <span class="timeline-hover" hidden></span>
               </div>
               <div class="timeline-ticks" aria-hidden="true"></div>
+              <!-- The whole day in small while zoomed in: a drag across it
+                   zooms to that stretch, a drag on the view moves it -->
+              <div class="timeline-overview" aria-hidden="true" hidden></div>
               <gw-row class="timeline-foot">
                 <!-- The day the timeline shows -->
                 <gw-control-group class="day-picker" label="Day">
@@ -584,15 +587,28 @@
                     size="small"
                   ></gw-button>
                 </gw-control-group>
-                <!-- How much of the day the timeline shows, and what its
-                     colours mean, from a button rather than always there -->
+                <!-- How much of the day the timeline shows, a step at a time
+                     or a preset from the menu, which names the span, and what
+                     its colours mean, from a button rather than always there -->
                 <gw-row class="timeline-tools">
-                  <gw-segmented
-                    class="timeline-zoom"
-                    label="Timeline zoom"
-                    size="small"
-                    value="86400"
-                  ></gw-segmented>
+                  <gw-control-group class="timeline-zoom" label="Timeline zoom">
+                    <gw-button
+                      class="timeline-zoom-out"
+                      label="Show more of the day"
+                      size="small"
+                    ></gw-button>
+                    <gw-menu-button
+                      class="timeline-presets"
+                      heading="Timeline shows"
+                      size="small"
+                      appearance="plain"
+                    ></gw-menu-button>
+                    <gw-button
+                      class="timeline-zoom-in"
+                      label="Show less of the day"
+                      size="small"
+                    ></gw-button>
+                  </gw-control-group>
                   <gw-button
                     class="timeline-key-button"
                     label="What the colours mean"

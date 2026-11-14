@@ -1481,6 +1481,45 @@ kbd {
   translate: -100% 0;
 }
 
+/* The whole day in small while zoomed in, under the time labels: the day's
+   recordings, the stretch the bar shows, and one being picked by a drag */
+.timeline-overview {
+  position: relative;
+  height: 0.875rem;
+  overflow: hidden;
+  border-radius: var(--gw-radius-sm, 4px);
+  background: var(--gw-color-surface-raised);
+  box-shadow: inset 0 0 0 1px var(--gw-color-border-quiet);
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.timeline-overview-spans {
+  position: absolute;
+  inset: 0;
+  opacity: 0.6;
+}
+
+.timeline-overview-view,
+.timeline-overview-pick {
+  position: absolute;
+  inset-block: 0;
+  min-width: 4px;
+  border: 1px solid var(--gw-color-text-strong);
+  border-radius: var(--gw-radius-sm, 4px);
+  background: color-mix(in oklab, var(--gw-color-text-strong) 15%, transparent);
+}
+
+.timeline-overview-view {
+  cursor: grab;
+}
+
+.timeline-overview-pick {
+  border-style: dashed;
+  pointer-events: none;
+}
+
 /* The day at the start and the zoom with the colours' key at the end, on
    one line wherever they fit */
 .timeline-foot {
