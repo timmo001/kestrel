@@ -20,7 +20,6 @@
  */
 import type { Camera, CameraView, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
-import { on } from "@timmo001/groundwork-ui";
 import { keep, keptAt } from "@timmo001/groundwork-ui/kept.ts";
 import { Option, Schema } from "effect";
 import { SavedCamera } from "./addresses.ts";
@@ -28,8 +27,6 @@ import { serverUrl } from "./api.ts";
 import { cameraLabel, fileName } from "./cameras.ts";
 import {
   phCamera,
-  phCaretLeft,
-  phCaretRight,
   phCornersIn,
   phCornersOut,
   phJoystick,
@@ -42,11 +39,12 @@ import {
   phSpeakerHigh,
   phSpeakerLow,
   phSpeakerSlash,
-  phSquaresFour,
 } from "./icons.ts";
+import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import {
+  controlIcon,
   controlKey,
   element,
   find,
@@ -57,7 +55,6 @@ import {
   applyTiling,
   clearTiling,
   tilingFor,
-  tilingModes as tilings,
   type TilingMode as Tiling,
 } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
@@ -131,25 +128,6 @@ const styledLayouts = [1, 2, 3, 4, 5, 6, 9, 16];
 
 /** The most cameras a digit key picks at once. */
 const keyedLayouts = 9;
-
-/** A layout: how many cameras at once, or all of them. */
-type Layout = number | "all";
-
-/**
- * The layouts worth offering for this many cameras: every count from one up
- * to one fewer than there are, then All, so seven cameras offer 1 to 6 and All.
- */
-const layoutsFor = (cameras: number): Array<Layout> => [
-  ...Array.from({ length: Math.max(cameras - 1, 0) }, (_, index) => index + 1),
-  "all",
-];
-
-/** A layout's tooltip. */
-const layoutHint = (layout: Layout) => {
-  if (layout === "all") return "Every camera at once";
-
-  return layout === 1 ? "One camera" : `${layout} cameras at once`;
-};
 
 /**
  * The grid for `count` cameras at once: its own shape where it has one, else
@@ -332,13 +310,7 @@ export interface LivePage {
 export const livePage = (): LivePage => {
   const stage = find("div", "live-stage");
   const grid = find("div", "live-grid");
-  const layoutToggle = find("gw-segmented", "live-layout");
-  const layoutMore = find("gw-menu-button", "live-layout-more");
-  const viewMenu = find("gw-menu-button", "live-view");
-  const previousButton = find("gw-button", "live-previous");
   const playButton = find("gw-button", "live-play");
-  const nextButton = find("gw-button", "live-next");
-  const pageSelect = find("gw-select", "live-page");
   const zoomOutButton = find("gw-button", "live-zoom-out");
   const zoomFitButton = find("gw-button", "live-zoom-fit");
   const zoomInButton = find("gw-button", "live-zoom-in");
@@ -539,30 +511,13 @@ export const livePage = (): LivePage => {
     arrangeGrid(grid);
   };
 
+  // Pause and Play lead, as on the Recordings page
   const setIcon = (
     button: HTMLElementTagNameMap["gw-button"] | null,
     icon: string,
     label?: string,
-  ) => {
-    // Pause and Play lead, larger and on a round filled button, as on the
-    // Recordings page
-    const main = button === playButton;
+  ) => controlIcon(button, icon, { label, main: button === playButton });
 
-    button?.setAttribute("icon", icon);
-    button?.setAttribute("labels", "hide");
-    button?.setAttribute("appearance", main ? "accent" : "plain");
-    button?.setAttribute("variant", main ? "brand" : "neutral");
-    button?.setAttribute("size", main ? "large" : "medium");
-
-    if (label !== undefined) button?.setAttribute("label", label);
-
-    if (button !== null) {
-      button.textContent = button.getAttribute("label") ?? "";
-    }
-  };
-
-  setIcon(previousButton, phCaretLeft, "Previous cameras (Page Up)");
-  setIcon(nextButton, phCaretRight, "Next cameras (Page Down)");
   setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
@@ -571,8 +526,6 @@ export const livePage = (): LivePage => {
   setIcon(soundButton, phSpeakerSlash, "Unmute (U)");
   setIcon(helpButton, phQuestion, "Keyboard controls (?)");
   setIcon(fullscreenButton, phCornersOut, "Full screen (F)");
-  previousButton?.setAttribute("aria-keyshortcuts", "PageUp");
-  nextButton?.setAttribute("aria-keyshortcuts", "PageDown");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
@@ -770,80 +723,17 @@ export const livePage = (): LivePage => {
 
   /** The controls for the cameras there are, and whether they're paused. */
   const showControls = () => {
-    const layouts = layoutsFor(count());
-
-    // Counts up to what a digit key picks sit in the row, with All; the
-    // rest go in a menu beside it, so the row stays short
-    const keyed = layouts.filter(
-      (each) => each === "all" || each <= keyedLayouts,
-    );
-
-    const more = layouts.filter(
-      (each): each is number => each !== "all" && each > keyedLayouts,
-    );
-
-    if (layoutToggle !== null) {
-      // The last is every camera, so it shows how many that is
-      layoutToggle.options = keyed.map((each) => ({
-        value: String(each),
-        label: each === "all" ? `${count()}/All` : String(each),
-        hint: layoutHint(each),
-      }));
-      layoutToggle.value = keyed.includes(layout) ? String(layout) : "";
-    }
-
-    if (layoutMore !== null) {
-      const isMore = layout !== "all" && layout > keyedLayouts;
-
-      layoutMore.hidden = more.length === 0;
-      layoutMore.label = isMore ? String(layout) : `${keyedLayouts + 1}+`;
-      layoutMore.active = isMore;
-      layoutMore.items = more.map((each) => ({
-        value: String(each),
-        label: String(each),
-        description: layoutHint(each),
-        checked: each === layout,
-      }));
-    }
-
-    if (viewMenu !== null) {
-      viewMenu.items = tilings.map((each) => ({
-        ...each,
-        group: "Tiling",
-        checked: each.value === tiling,
-      }));
-    }
-
-    const single = pages() <= 1;
-
-    if (previousButton !== null) previousButton.disabled = single;
-
-    if (nextButton !== null) nextButton.disabled = single;
-
-    // Which page shows, when there's more than one, and the others to pick:
-    // the cameras by name with one at a time, else each page's cameras
-    if (pageSelect !== null) {
-      pageSelect.hidden = single;
-      pageSelect.label = size() === 1 ? "Camera" : "Page";
-      pageSelect.options = Array.from({ length: pages() }, (_, index) => {
-        const onPage = streams
+    pager.show({
+      cameras: count(),
+      layout,
+      tiling,
+      page,
+      pages: Array.from({ length: pages() }, (_, index) =>
+        streams
           .slice(index * size(), index * size() + size())
-          .map((stream) => cameraLabel(stream.id));
-
-        return size() === 1
-          ? {
-              value: String(index),
-              label: onPage[0] ?? `Camera ${index + 1}`,
-              description: `${index + 1} of ${pages()}`,
-            }
-          : {
-              value: String(index),
-              label: `Page ${index + 1} of ${pages()}`,
-              description: onPage.join(", "),
-            };
-      });
-      pageSelect.value = String(page);
-    }
+          .map((stream) => cameraLabel(stream.id)),
+      ),
+    });
 
     setIcon(
       playButton,
@@ -1493,26 +1383,15 @@ export const livePage = (): LivePage => {
     );
   };
 
-  if (layoutToggle !== null) {
-    on(layoutToggle, "change", () =>
-      setLayout(
-        layoutToggle.value === "all" ? "all" : Number(layoutToggle.value),
-      ),
-    );
-  }
-
-  if (layoutMore !== null) {
-    on(layoutMore, "select", (event) => setLayout(Number(event.detail.value)));
-  }
-
-  if (viewMenu !== null) {
-    viewMenu.setAttribute("icon", phSquaresFour);
-    on(viewMenu, "select", (event) => {
-      const chosen = tilings.find((each) => each.value === event.detail.value);
-
-      if (chosen !== undefined) setTiling(chosen.value);
-    });
-  }
+  const pager = cameraPager({
+    onLayout: setLayout,
+    onTiling: setTiling,
+    onPage: (next) => {
+      goTo(next);
+      requestAnimationFrame(() => stage?.focus({ preventScroll: true }));
+    },
+    onStep: step,
+  });
 
   // Smart tiling follows the space the cameras have, as the window's size
   // changes or they go full screen
@@ -1527,8 +1406,6 @@ export const livePage = (): LivePage => {
     }).observe(area);
   }
 
-  previousButton?.addEventListener("click", () => step(-1));
-  nextButton?.addEventListener("click", () => step(1));
   playButton?.addEventListener("click", togglePause);
   captureButton?.addEventListener("click", capture);
 
@@ -1551,13 +1428,6 @@ export const livePage = (): LivePage => {
   });
 
   helpToggle(shortcutsPopover, helpButton);
-
-  if (pageSelect !== null) {
-    on(pageSelect, "change", () => {
-      goTo(Number(pageSelect.value));
-      requestAnimationFrame(() => stage?.focus({ preventScroll: true }));
-    });
-  }
 
   // Zoom, each camera's its own and kept, once in tiles and once alone, as
   // on the Recordings page, and each of a camera's views its own, since

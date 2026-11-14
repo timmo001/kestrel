@@ -931,8 +931,8 @@ gw-table gw-sheet {
   position: absolute;
 }
 
-/* The first row: the sound or the time, the transport, the View menu and
-   full screen */
+/* The first row: the sound or the time, the transport, Recordings' View menu
+   and full screen */
 .player-controls[data-compact] .live-sound {
   grid-area: 1 / 1;
 }
@@ -942,7 +942,6 @@ gw-table gw-sheet {
   justify-self: start;
 }
 
-.player-controls[data-compact] .live-previous,
 .player-controls[data-compact] .control-previous {
   grid-area: 1 / 3;
 }
@@ -952,12 +951,10 @@ gw-table gw-sheet {
   grid-area: 1 / 4;
 }
 
-.player-controls[data-compact] .live-next,
 .player-controls[data-compact] .control-next {
   grid-area: 1 / 5;
 }
 
-.player-controls[data-compact] .live-view,
 .player-controls[data-compact] .control-view {
   grid-area: 1 / 6;
 }
@@ -972,20 +969,17 @@ gw-table gw-sheet {
   grid-area: 1 / 7;
 }
 
-/* Then the layout or speeds across, scrolling in place where they're wider
-   than the bar */
-.player-controls[data-compact] .live-layout,
+/* Then Live's pager or Recordings' speeds across, the speeds scrolling in
+   place where they're wider than the bar */
+.player-controls[data-compact] .live-pager,
 .player-controls[data-compact] .control-speed {
   grid-area: 2 / 1 / auto / -1;
   max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-/* Live's page of cameras, when a layout pages them, goes last, so no empty
-   row is left when it's hidden */
-.player-controls[data-compact] .live-page {
-  grid-area: 4 / 1 / auto / -1;
+.player-controls[data-compact] .control-speed {
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
 /* Then the zoom, with camera moves and capture on Live, and capture and More
@@ -1224,9 +1218,18 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
-/* Which page of cameras Live shows, after Next, and a pick of the others */
+/* Live's pager keeps its parts together on one line, the page between
+   Previous and Next wide enough for "10 of 12", and a camera's name with
+   one at a time cut short rather than pushing the pager past a phone */
+.live-pager,
+.live-pages {
+  flex-wrap: nowrap;
+  gap: var(--gw-space-1);
+  align-items: center;
+}
+
 .live-page {
-  min-width: 9rem;
+  width: 8rem;
 }
 
 /* Full screen: the picture takes the screen, with the controls and the
@@ -1516,9 +1519,8 @@ kbd {
 [data-overlay]
   > .player-controls[data-compact]:not([data-expanded])
   :is(
-    .live-layout,
+    .live-pager,
     .control-speed,
-    .live-page,
     .live-fit,
     .control-fit,
     .live-zoom-out,

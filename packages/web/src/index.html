@@ -111,27 +111,31 @@
             </div>
             <div class="player-controls" role="toolbar" aria-label="Live view">
               <gw-row class="controls-start">
-                <gw-segmented
-                  class="live-layout"
-                  label="Cameras at once"
-                  value="all"
-                ></gw-segmented>
-                <!-- Counts past what a digit key picks, once there are that
-                     many cameras -->
-                <gw-menu-button
-                  class="live-layout-more"
-                  heading="Cameras at once"
-                  appearance="plain"
-                  hidden
-                ></gw-menu-button>
-                <!-- How the cameras tile: smart, sized to the window, or
-                     each count's fixed layout -->
-                <gw-menu-button
-                  class="live-view"
-                  label="View"
-                  labels="hide"
-                  appearance="plain"
-                ></gw-menu-button>
+                <!-- The pager: how many cameras show at once and how they
+                     tile, in one menu, and beside it, while that pages them,
+                     which page shows between Previous and Next -->
+                <gw-row class="live-pager" role="group" aria-label="Cameras">
+                  <gw-menu-button
+                    class="live-layout"
+                    heading="Layout"
+                    appearance="plain"
+                  ></gw-menu-button>
+                  <gw-row class="live-pages" hidden>
+                    <gw-button
+                      class="live-previous"
+                      label="Previous cameras"
+                    ></gw-button>
+                    <gw-select
+                      class="live-page"
+                      label="Page"
+                      label-hidden
+                    ></gw-select>
+                    <gw-button
+                      class="live-next"
+                      label="Next cameras"
+                    ></gw-button>
+                  </gw-row>
+                </gw-row>
                 <!-- The picked camera's sound, where any camera has it: on
                      or off, and how loud -->
                 <span
@@ -154,22 +158,9 @@
               <gw-row
                 class="controls-transport"
                 role="group"
-                aria-label="Cameras"
+                aria-label="Playback"
               >
-                <gw-button
-                  class="live-previous"
-                  label="Previous cameras"
-                ></gw-button>
                 <gw-button class="live-play" label="Pause"></gw-button>
-                <gw-button class="live-next" label="Next cameras"></gw-button>
-                <!-- Which page of cameras shows, and a pick of the others,
-                     when a layout pages them; one camera alone lists them -->
-                <gw-select
-                  class="live-page"
-                  label="Page"
-                  label-hidden
-                  hidden
-                ></gw-select>
               </gw-row>
               <gw-row class="controls-end">
                 <!-- The picked camera's zoom: fit or fill, as the theme's
@@ -225,7 +216,7 @@
                     <dt><kbd>T</kbd></dt>
                     <dd>
                       Smart tiling, sized to the window, or fixed layouts, as
-                      the View menu picks
+                      the Layout menu picks
                     </dd>
                     <dt><kbd>←</kbd> <kbd>↑</kbd> <kbd>→</kbd> <kbd>↓</kbd></dt>
                     <dd>Pick a camera, on to the next cameras past the edge</dd>

@@ -123,6 +123,35 @@ export const controlKey = (event: KeyboardEvent): string | undefined => {
   return event.shiftKey && key.startsWith("Arrow") ? `Shift+${key}` : key;
 };
 
+/**
+ * Draws one of a player's control buttons as an icon, named by its label,
+ * which shows as its tooltip. The play button (`main`) leads, larger and on
+ * a round filled button, as System Bridge's media controls do; the rest are
+ * plain.
+ */
+export const controlIcon = (
+  button: HTMLElementTagNameMap["gw-button"] | null,
+  icon: string,
+  options: {
+    readonly label?: string | undefined;
+    readonly main?: boolean;
+  } = {},
+) => {
+  if (button === null) return;
+
+  const main = options.main === true;
+
+  button.setAttribute("icon", icon);
+  button.setAttribute("labels", "hide");
+  button.setAttribute("appearance", main ? "accent" : "plain");
+  button.setAttribute("variant", main ? "brand" : "neutral");
+  button.setAttribute("size", main ? "large" : "medium");
+
+  if (options.label !== undefined) button.setAttribute("label", options.label);
+
+  button.textContent = button.getAttribute("label") ?? "";
+};
+
 /** An element's width with its side margins. */
 const outerWidth = (element: Element) => {
   const style = getComputedStyle(element);
@@ -256,11 +285,12 @@ export const overlayControls = (bar: HTMLElement) => {
     tab.setAttribute("aria-expanded", String(open));
   };
 
-  /** Paused, as Recordings' Play button says, or with its rows open. */
+  /** Paused, as either page's Play button says, or with its rows open. */
   const stays = () =>
     bar.hasAttribute("data-expanded") ||
     (
-      bar.querySelector(".control-play")?.getAttribute("label") ?? ""
+      bar.querySelector(".control-play, .live-play")?.getAttribute("label") ??
+      ""
     ).startsWith("Play");
 
   const sleep = () => {

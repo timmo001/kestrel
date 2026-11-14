@@ -30,6 +30,18 @@ export const tilingModes: ReadonlyArray<{
   },
 ];
 
+/** The modes as a menu's items, under a Tiling heading, `current` ticked. */
+export const tilingItems = (current: TilingMode) =>
+  tilingModes.map((each) => ({
+    ...each,
+    group: "Tiling",
+    checked: each.value === current,
+  }));
+
+/** The mode a chosen menu item names, if it names one. */
+export const tilingOf = (value: string) =>
+  tilingModes.find((each) => each.value === value)?.value;
+
 /** A layout of tiles, in pixels. */
 export interface Tiling {
   /** Rows across, or columns down. */

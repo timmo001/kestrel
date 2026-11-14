@@ -66,6 +66,7 @@ import type { RecordingsSearch } from "./router.ts";
 import {
   actionsColumn,
   clock,
+  controlIcon,
   controlKey,
   dayFormat,
   element,
@@ -81,7 +82,7 @@ import {
   typingTargets,
 } from "./shared.ts";
 import { timelineFor, type TimelineSpan } from "./timeline.ts";
-import { tilingModes, type TilingMode } from "./tiling.ts";
+import { tilingItems, tilingOf, type TilingMode } from "./tiling.ts";
 import { pictureZoom, type PictureView, type ZoomTile } from "./zoom.ts";
 
 // Phosphor's regular icons, as Upkeep uses
@@ -652,27 +653,12 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   // The controls
 
+  // Play and Pause lead
   const setIcon = (
     button: HTMLElementTagNameMap["gw-button"] | null,
     icon: string,
     label?: string,
-  ) => {
-    // Play and Pause lead, larger and on a round filled button, as System
-    // Bridge's media controls do
-    const main = button === playButton;
-
-    button?.setAttribute("icon", icon);
-    button?.setAttribute("labels", "hide");
-    button?.setAttribute("appearance", main ? "accent" : "plain");
-    button?.setAttribute("variant", main ? "brand" : "neutral");
-    button?.setAttribute("size", main ? "large" : "medium");
-
-    if (label !== undefined) button?.setAttribute("label", label);
-
-    if (button !== null) {
-      button.textContent = button.getAttribute("label") ?? "";
-    }
-  };
+  ) => controlIcon(button, icon, { label, main: button === playButton });
 
   setIcon(playButton, icons.play);
   setIcon(stopButton, icons.stop);
@@ -1093,11 +1079,7 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
     if (viewMenu === null) return;
 
     viewMenu.hidden = ticked.length < 2;
-    viewMenu.items = tilingModes.map((each) => ({
-      ...each,
-      group: "Tiling",
-      checked: each.value === (smart ? "smart" : "fixed"),
-    }));
+    viewMenu.items = tilingItems(smart ? "smart" : "fixed");
   };
 
   const setTiling = (next: TilingMode) => {
@@ -1112,11 +1094,9 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   if (viewMenu !== null) {
     on(viewMenu, "select", (event) => {
-      const chosen = tilingModes.find(
-        (each) => each.value === event.detail.value,
-      );
+      const chosen = tilingOf(event.detail.value);
 
-      if (chosen !== undefined) setTiling(chosen.value);
+      if (chosen !== undefined) setTiling(chosen);
     });
   }
 
