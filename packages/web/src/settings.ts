@@ -143,7 +143,11 @@ const settingInput = (
     input.inputmode = "numeric";
   }
 
-  if (field.type === "address") input.monospace = true;
+  // An address gets a row of its own, as it's often longer than the column
+  if (field.type === "address") {
+    input.monospace = true;
+    input.style.gridColumn = "1 / -1";
+  }
 
   input.addEventListener("input", () => {
     const typed = field.type === "secret" ? input.value : input.value.trim();
