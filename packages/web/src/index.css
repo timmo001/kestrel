@@ -1027,6 +1027,11 @@ gw-table gw-sheet {
   display: none;
 }
 
+/* The tab that opens the rows past the first, only on a phone on its side */
+.controls-expand {
+  display: none;
+}
+
 @media (width < 40rem) {
   /* Eight speeds only fit across a phone a little smaller */
   .control-speed {
@@ -1467,4 +1472,109 @@ kbd {
 .player-clip {
   flex-wrap: wrap;
   align-items: end;
+}
+
+/* On a phone on its side, or full screen, the controls go over the bottom of
+   the picture as a video player's: see-through, their first row only until
+   opened, and fading out while playing. The page marks the stage */
+.live-stage[data-overlay],
+.player-stage[data-overlay] {
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+[data-overlay] > .live-area,
+[data-overlay] > .player-screen,
+[data-overlay] > .player-controls {
+  grid-area: 1 / 1;
+}
+
+[data-overlay] > .player-controls {
+  align-self: end;
+  background: color-mix(
+    in oklab,
+    var(--gw-color-surface-raised) 30%,
+    transparent
+  );
+  border-block-start: none;
+  backdrop-filter: blur(4px);
+  transition: opacity 0.25s ease;
+}
+
+/* Left alone while playing, as a video player's controls are; a tap on the
+   picture brings them back */
+[data-overlay] > .player-controls[data-hidden] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-overlay]:has(> .player-controls[data-hidden]) {
+  cursor: none;
+}
+
+/* As little of the picture covered as their rows allow: the first row only,
+   until the tab on the bar's edge opens the rest */
+[data-overlay] > .player-controls[data-compact] {
+  row-gap: var(--gw-space-1);
+  padding-block: var(--gw-space-1);
+}
+
+[data-overlay] > .player-controls[data-compact] > .controls-expand {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-end: var(--gw-space-2);
+  display: block;
+  background: inherit;
+  border-start-start-radius: var(--gw-radius-sm, 4px);
+  border-start-end-radius: var(--gw-radius-sm, 4px);
+  backdrop-filter: blur(4px);
+}
+
+[data-overlay]
+  > .player-controls[data-compact]:not([data-expanded])
+  :is(
+    .live-layout,
+    .control-speed,
+    .live-page,
+    .live-fit,
+    .control-fit,
+    .live-zoom-out,
+    .control-zoom-out,
+    .live-zoom-fit,
+    .control-zoom-fit,
+    .live-zoom-in,
+    .control-zoom-in,
+    .live-move,
+    .control-capture,
+    .live-capture,
+    .control-more
+  ) {
+  display: none;
+}
+
+/* A phone on its side has the height for the picture or the rest, not both:
+   on Recordings the player fills the window, with the cameras and the
+   timeline below it */
+@media (orientation: landscape) and (max-height: 32rem) {
+  .live-stage {
+    min-height: 0;
+  }
+
+  .playback-view:not(:fullscreen) {
+    height: auto;
+    min-height: 0;
+  }
+
+  .playback-view:not(:fullscreen) .player-stage {
+    flex: none;
+    height: calc(100dvh - var(--gw-app-bar-height, 3.5rem) - var(--gw-space-5));
+  }
+
+  .playback-view .playback-bar {
+    order: 1;
+  }
+
+  .playback-view .timeline {
+    order: 2;
+  }
 }

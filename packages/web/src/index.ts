@@ -55,7 +55,7 @@ import { livePage } from "./live.ts";
 import { pairPage } from "./pair.ts";
 import { recordingsPage } from "./recordings.ts";
 import { currentLocation, href, navigate, type Location } from "./router.ts";
-import { compactWhenCrowded, find } from "./shared.ts";
+import { compactWhenCrowded, find, overlayControls } from "./shared.ts";
 import { settingsPage } from "./settings.ts";
 import { activityPage } from "./activity.ts";
 import { attentionAlert, isStorageNote, sourcesPage } from "./sources.ts";
@@ -167,9 +167,13 @@ const showAttention = (all: ReadonlyArray<Attention>) => {
   );
 };
 
-// Both players' controls go to the phone's layout once they don't fit in a row
+// Both players' controls go to the phone's layout once they don't fit in a
+// row, and on a phone on its side over the picture, as a video player's
 for (const bar of document.querySelectorAll(".player-controls")) {
-  if (bar instanceof HTMLElement) compactWhenCrowded(bar);
+  if (bar instanceof HTMLElement) {
+    compactWhenCrowded(bar);
+    overlayControls(bar);
+  }
 }
 
 // Each page is a module of its own

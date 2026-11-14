@@ -6,7 +6,7 @@ import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
 import type { TableColumn, TableRow } from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
-import { phDownloadSimple, phPlay } from "./icons.ts";
+import { phCaretDown, phCaretUp, phDownloadSimple, phPlay } from "./icons.ts";
 import { clipUrl, type Clip } from "./recording-player.ts";
 
 /** Fields that take text: a toggle's radios don't, so keys pass them by. */
@@ -205,6 +205,171 @@ export const compactWhenCrowded = (bar: HTMLElement) => {
   for (const control of bar.querySelectorAll(":scope > * > *")) {
     observer.observe(control);
   }
+};
+
+/** A phone on its side, where a player's control bar goes over its picture. */
+const overPicture = matchMedia(
+  "(orientation: landscape) and (max-height: 32rem)",
+);
+
+/** How long the bar over the picture stays after the last touch, in milliseconds. */
+const hideAfter = 3000;
+
+/** A touch screen, which turning on its side takes the player full screen. */
+const touchScreen = matchMedia("(pointer: coarse)");
+
+/**
+ * On a phone on its side, or full screen, a player's control bar goes over
+ * its picture and acts as a video player's: it fades out once it's been left
+ * alone a moment while playing, and a tap on the picture, or moving the
+ * mouse, brings it back, the tap doing nothing else. It stays while paused or
+ * while its rows past the first are open, from a tab on its top edge. Turning
+ * a phone on its side takes the player full screen where the browser lets
+ * it, and turning it back leaves.
+ */
+export const overlayControls = (bar: HTMLElement) => {
+  const stage = bar.parentElement;
+  /** What the page puts full screen: the player, with Recordings' timeline. */
+  const around = bar.closest(".playback-view, .live-stage");
+  const player = around instanceof HTMLElement ? around : null;
+  const tab = element("gw-button");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  /** Whether the press under way only woke the bar, so does nothing else. */
+  let waking = false;
+  /** Whether turning the phone on its side put the player full screen. */
+  let turned = false;
+
+  const isOver = () =>
+    overPicture.matches || (document.fullscreenElement?.contains(bar) ?? false);
+
+  tab.className = "controls-expand";
+  tab.setAttribute("labels", "hide");
+  tab.setAttribute("appearance", "plain");
+  tab.setAttribute("variant", "neutral");
+  tab.setAttribute("size", "small");
+
+  const showTab = () => {
+    const open = bar.hasAttribute("data-expanded");
+
+    tab.setAttribute("icon", open ? phCaretDown : phCaretUp);
+    tab.setAttribute("label", open ? "Fewer controls" : "More controls");
+    tab.setAttribute("aria-expanded", String(open));
+  };
+
+  /** Paused, as Recordings' Play button says, or with its rows open. */
+  const stays = () =>
+    bar.hasAttribute("data-expanded") ||
+    (
+      bar.querySelector(".control-play")?.getAttribute("label") ?? ""
+    ).startsWith("Play");
+
+  const sleep = () => {
+    timer = undefined;
+
+    if (!isOver()) return;
+
+    if (stays()) {
+      timer = setTimeout(sleep, hideAfter);
+
+      return;
+    }
+
+    bar.toggleAttribute("data-hidden", true);
+  };
+
+  const wake = () => {
+    bar.removeAttribute("data-hidden");
+    clearTimeout(timer);
+    timer = isOver() ? setTimeout(sleep, hideAfter) : undefined;
+  };
+
+  /** Over the picture or under it, as the window and full screen have it. */
+  const place = () => {
+    stage?.toggleAttribute("data-overlay", isOver());
+    wake();
+  };
+
+  tab.addEventListener("click", () => {
+    bar.toggleAttribute("data-expanded");
+    showTab();
+    wake();
+  });
+
+  // Ahead of the picture's own presses, which play, pause or pick
+  stage?.addEventListener(
+    "pointerdown",
+    (event) => {
+      waking = isOver() && bar.hasAttribute("data-hidden");
+
+      if (waking) event.stopPropagation();
+
+      wake();
+    },
+    true,
+  );
+
+  for (const type of ["pointerup", "click", "dblclick"]) {
+    stage?.addEventListener(
+      type,
+      (event) => {
+        if (!waking) return;
+
+        event.stopPropagation();
+
+        if (type !== "pointerup") waking = false;
+      },
+      true,
+    );
+  }
+
+  // A mouse moving over the picture brings the bar back, as a video player's;
+  // a finger's only moves once it's down, which has already
+  stage?.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "mouse") wake();
+  });
+
+  document.addEventListener("keydown", wake);
+  overPicture.addEventListener("change", place);
+
+  document.addEventListener("fullscreenchange", () => {
+    if (document.fullscreenElement === null) turned = false;
+
+    place();
+  });
+
+  // Browsers mostly let a page go full screen only from a tap, so turning
+  // the phone may not be enough; then it stays as it is
+  if ("orientation" in screen) {
+    screen.orientation.addEventListener("change", () => {
+      // Only the page showing, on a phone, where full screen is allowed
+      if (
+        player === null ||
+        !touchScreen.matches ||
+        !document.fullscreenEnabled ||
+        bar.getClientRects().length === 0
+      ) {
+        return;
+      }
+
+      const sideways = screen.orientation.type.startsWith("landscape");
+
+      if (sideways && document.fullscreenElement === null) {
+        void player.requestFullscreen().then(
+          () => {
+            turned = true;
+          },
+          () => undefined,
+        );
+      } else if (!sideways && turned) {
+        turned = false;
+        void document.exitFullscreen().catch(() => undefined);
+      }
+    });
+  }
+
+  showTab();
+  bar.append(tab);
+  place();
 };
 
 /** The first `tag` element with `className`, or null. */
