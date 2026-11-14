@@ -36,7 +36,12 @@ import {
   phQuestionMark,
   phSlidersHorizontal,
 } from "./icons.ts";
-import { on, onSwipe } from "@timmo001/groundwork-ui";
+import {
+  on,
+  onSwipe,
+  transitionName,
+  withViewTransition,
+} from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
@@ -47,9 +52,7 @@ import {
   find,
   helpToggle,
   swipeIgnore,
-  transitionName,
   typingTargets,
-  withTransition,
 } from "./shared.ts";
 import {
   applyTiling,
@@ -764,7 +767,7 @@ export const livePage = (): LivePage => {
 
     const back = steer.on() && movedSolo;
 
-    withTransition(() => {
+    void withViewTransition(() => {
       if (alone && startSolo()) render();
 
       steer.toggle();
@@ -1128,7 +1131,7 @@ export const livePage = (): LivePage => {
         figure.className = "live-tile";
         figure.dataset.loading = "";
         // Its own name, so a change of layout moves it to its new place
-        figure.style.viewTransitionName = transitionName(stream.id);
+        figure.style.viewTransitionName = transitionName("camera", stream.id);
         hold.className = "live-hold";
         hold.setAttribute("aria-hidden", "true");
 
@@ -1252,7 +1255,7 @@ export const livePage = (): LivePage => {
     layout = wanted;
     solo = undefined;
     keepPlace();
-    withTransition(render);
+    void withViewTransition(render);
   };
 
   /** Smart tiling or fixed layouts, kept in this browser. */
@@ -1262,7 +1265,7 @@ export const livePage = (): LivePage => {
     tiling = next;
     keep(storageKey, { tiling });
 
-    withTransition(() => {
+    void withViewTransition(() => {
       if (grid !== null) arrangeGrid(grid);
 
       showZoom();
@@ -1276,7 +1279,7 @@ export const livePage = (): LivePage => {
 
     page = next;
     keepPlace();
-    withTransition(render);
+    void withViewTransition(render);
   };
 
   const step = (by: -1 | 1) => {
@@ -1300,7 +1303,7 @@ export const livePage = (): LivePage => {
     if (solo === undefined) return;
 
     endSolo();
-    withTransition(render);
+    void withViewTransition(render);
   };
 
   /** The picked camera alone, or the first on the page; false where there's none. */
@@ -1328,7 +1331,7 @@ export const livePage = (): LivePage => {
       return;
     }
 
-    if (startSolo()) withTransition(render);
+    if (startSolo()) void withViewTransition(render);
   };
 
   /**
@@ -1732,7 +1735,7 @@ export const livePage = (): LivePage => {
 
       paused = false;
       // Cameras added or gone slide the rest to their new places
-      withTransition(render);
+      void withViewTransition(render);
     },
     showProblems: (next) => {
       problems = next;

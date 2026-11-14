@@ -735,7 +735,7 @@ gw-table gw-sheet {
 
 /* On a phone on its side the panel is short, so the title says what Move
    mode is on one line, the hint is left to help, and the arrows close up */
-@media (orientation: landscape) and (max-height: 30rem) {
+@media (orientation: landscape) and (max-height: 500px) {
   .live-steer-hint {
     display: none;
   }
@@ -819,7 +819,7 @@ gw-table gw-sheet {
 
 [data-overlay] > .live-steer-dock {
   grid-area: 2 / 1;
-  padding-block-end: calc(var(--safe-bottom) + 4rem);
+  padding-block-end: calc(var(--gw-safe-bottom) + 4rem);
 }
 
 /* ...where the page's controls go over the panel's empty foot, rather than
@@ -840,8 +840,8 @@ gw-table gw-sheet {
 
   [data-overlay] > .live-steer-dock {
     grid-area: 1 / 2;
-    padding-inline-end: var(--safe-inline);
-    padding-block-end: var(--safe-bottom);
+    padding-inline-end: var(--gw-safe-inline);
+    padding-block-end: var(--gw-safe-bottom);
   }
 }
 
@@ -919,7 +919,7 @@ gw-table gw-sheet {
 
 /* Home and setup a row of their own over the presets, except on a phone on
    its side, where there's no height to spare */
-@media not ((orientation: landscape) and (max-height: 30rem)) {
+@media not ((orientation: landscape) and (max-height: 500px)) {
   .live-steer-bar {
     flex-wrap: wrap;
   }
@@ -1866,28 +1866,21 @@ kbd {
    can be pressed keeps out of the screen's rounded corners and the middle of
    its sides, where a punch hole or notch sits in landscape. The browser
    keeps the page clear of the cutout itself, as Kestrel doesn't opt into
-   viewport-fit=cover, but nothing reports the corners, so it's a margin of
-   its own, or the safe area's where that's wider */
+   viewport-fit=cover, but nothing reports the corners, so Groundwork's safe
+   margins keep a margin of their own, or the safe area's where that's wider */
 [data-overlay] {
-  --safe-inline: max(
-    1.5rem,
-    env(safe-area-inset-left, 0px),
-    env(safe-area-inset-right, 0px)
-  );
-  --safe-bottom: max(var(--gw-space-2), env(safe-area-inset-bottom, 0px));
-
   position: relative;
 }
 
 [data-overlay] > .live-area,
 [data-overlay] > .player-screen {
   box-sizing: border-box;
-  padding-inline: var(--safe-inline);
+  padding-inline: var(--gw-safe-inline);
 }
 
 [data-overlay] > .player-controls {
-  padding-inline: var(--safe-inline);
-  padding-block-end: var(--safe-bottom);
+  padding-inline: var(--gw-safe-inline);
+  padding-block-end: var(--gw-safe-bottom);
 }
 
 [data-overlay]:has(> .player-controls[data-hidden]) > .controls-handle {
@@ -1896,7 +1889,7 @@ kbd {
   inset-inline-start: 50%;
   z-index: 2;
   display: block;
-  padding-block-end: var(--safe-bottom);
+  padding-block-end: var(--gw-safe-bottom);
   translate: -50% 0;
   background: color-mix(
     in oklab,
@@ -1937,7 +1930,7 @@ kbd {
 [data-overlay] > .player-controls[data-compact] > .controls-expand {
   position: absolute;
   inset-block-end: 100%;
-  inset-inline-end: var(--safe-inline);
+  inset-inline-end: var(--gw-safe-inline);
   display: block;
   background: inherit;
   border-start-start-radius: var(--gw-radius-sm, 4px);
@@ -1963,7 +1956,7 @@ kbd {
 /* A phone on its side has the height for the picture or the rest, not both:
    on Recordings the player fills the window, with the cameras and the
    timeline below it */
-@media (orientation: landscape) and (max-height: 32rem) {
+@media (orientation: landscape) and (max-height: 500px) {
   .live-stage {
     min-height: 0;
   }
