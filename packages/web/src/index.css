@@ -1464,6 +1464,13 @@ gw-table gw-sheet {
   flex: 1 1 auto;
 }
 
+/* The timeline under it reaches the screen's edges too, so it keeps out of
+   the rounded corners as the bar over the picture does */
+.playback-view:fullscreen > :not(.player-stage) {
+  padding-inline: var(--gw-safe-inline);
+  padding-block-end: var(--gw-safe-bottom);
+}
+
 /* The timeline and its legend keep their height; the video gives way */
 .playback-view > :not(.player-stage) {
   flex: none;
@@ -1824,7 +1831,7 @@ gw-table gw-sheet {
    until the tab on the bar's edge opens the rest */
 [data-overlay]
   > .player-controls:is(:state(compact), [data-over]:state(split)) {
-  padding-block: var(--gw-space-1);
+  padding-block: var(--gw-space-1) var(--gw-safe-bottom);
 }
 
 [data-overlay]
