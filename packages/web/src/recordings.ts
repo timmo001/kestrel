@@ -20,7 +20,6 @@ import {
   on,
   onSwipe,
   shortcutKey,
-  typingTargets,
   type SwipeDirection,
   type TableRow,
 } from "@timmo001/groundwork-ui";
@@ -75,6 +74,7 @@ import {
   dayFormat,
   element,
   find,
+  focusOnPress,
   fullscreenToggle,
   helpToggle,
   isoDay,
@@ -1921,28 +1921,8 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
 
-  // A click in the player's card hands the focus back to the player, so the
-  // keys keep working rather than going to the button clicked. Fields keep
-  // it while they're typed in, and the keyboard's own Tab moves it as ever
-  // A ring only when Tab brings it there, not when the page does
-  const focusPlayer = () =>
-    stage?.focus({ preventScroll: true, focusVisible: false });
-
-  view?.addEventListener("pointerup", (event) => {
-    const path = event
-      .composedPath()
-      .filter((target) => target instanceof Element);
-
-    if (
-      path.some((target) =>
-        target.matches(`${typingTargets}, gw-popover, gw-sheet`),
-      )
-    ) {
-      return;
-    }
-
-    requestAnimationFrame(focusPlayer);
-  });
+  // A press anywhere in the player's card, timeline included
+  const focusPlayer = focusOnPress(view, stage);
 
   // The help button, or ?, opens the keys and gestures by the button and
   // shuts them again

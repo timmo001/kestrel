@@ -39,7 +39,6 @@ import {
   onSwipe,
   shortcutKey,
   transitionName,
-  typingTargets,
   withViewTransition,
 } from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
@@ -49,6 +48,7 @@ import {
   controlIcon,
   element,
   find,
+  focusOnPress,
   fullscreenToggle,
   helpToggle,
   swipeIgnore,
@@ -1671,27 +1671,7 @@ export const livePage = (): LivePage => {
     if (isArrow(event.key)) steer.key(event.key, false);
   });
 
-  // A click on a control hands the focus back to the cameras, so the keys
-  // keep working; fields and the help keep it
-  // A ring only when Tab brings it there, not when the page does
-  const focus = () =>
-    stage?.focus({ preventScroll: true, focusVisible: false });
-
-  stage?.addEventListener("pointerup", (event) => {
-    const path = event
-      .composedPath()
-      .filter((target) => target instanceof Element);
-
-    if (
-      path.some((target) =>
-        target.matches(`${typingTargets}, gw-popover, gw-sheet`),
-      )
-    ) {
-      return;
-    }
-
-    requestAnimationFrame(focus);
-  });
+  focusOnPress(stage, stage);
 
   // A click on the space around the cameras clears the pick, as Esc does.
   // Where the press began counts, so a drag off a tile keeps it

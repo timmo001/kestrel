@@ -3,7 +3,11 @@
  * browser's language, and recordings as table rows with Play and Download.
  */
 import { RecordingReason, type Recording } from "@timmo001/kestrel-core";
-import { type TableColumn, type TableRow } from "@timmo001/groundwork-ui";
+import {
+  type TableColumn,
+  type TableRow,
+  typingTargets,
+} from "@timmo001/groundwork-ui";
 import { Schema } from "effect";
 import { cameraLabel } from "./cameras.ts";
 import {
@@ -99,6 +103,34 @@ export const followFullscreen = (overlay: HTMLElement) => {
   document.addEventListener("fullscreenchange", () => {
     (document.fullscreenElement ?? document.body).append(overlay);
   });
+};
+
+/**
+ * A press anywhere in `area` hands the focus back to the `player`, so its
+ * keys keep working rather than going to the button pressed. Fields, popovers
+ * and sheets keep it, and the focus ring shows only when Tab brings it there.
+ * Returns the focusing, for anything else that hands the focus back.
+ */
+export const focusOnPress = (
+  area: HTMLElement | null,
+  player: HTMLElement | null,
+) => {
+  const focus = () =>
+    player?.focus({ preventScroll: true, focusVisible: false });
+
+  area?.addEventListener("pointerup", (event) => {
+    const kept = event
+      .composedPath()
+      .some(
+        (target) =>
+          target instanceof Element &&
+          target.matches(`${typingTargets}, gw-popover, gw-sheet`),
+      );
+
+    if (!kept) requestAnimationFrame(focus);
+  });
+
+  return focus;
 };
 
 /**
