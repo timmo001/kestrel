@@ -35,8 +35,11 @@ export interface RecordOptions {
   readonly folder: string;
   /** The camera's own folder within it, such as `front-door/1`. */
   readonly key: string;
-  /** The stream to record, any address ffmpeg reads, such as an MP4 stream over HTTP. */
-  readonly input: string;
+  /**
+   * The stream to record, any address ffmpeg reads, such as an MP4 stream
+   * over HTTP, asked for each time ffmpeg starts.
+   */
+  readonly input: Effect.Effect<string>;
   /** How long each file runs. */
   readonly segment: Duration.Duration;
   /** Told when ffmpeg starts, and what it says when it complains or stops. */
@@ -77,7 +80,7 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
     );
   });
 
-  const args = [
+  const args = (input: string) => [
     "-hide_banner",
     "-loglevel",
     "error",
@@ -86,7 +89,7 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
     "-rw_timeout",
     "10000000",
     "-i",
-    options.input,
+    input,
     "-map",
     "0:v:0",
     "-c",
@@ -114,8 +117,10 @@ export const record = Effect.fnUntraced(function* (options: RecordOptions) {
     Effect.gen(function* () {
       yield* days;
 
+      const input = yield* options.input;
+
       const handle = yield* spawner.spawn(
-        ChildProcess.make(options.ffmpeg, args, {
+        ChildProcess.make(options.ffmpeg, args(input), {
           // In the caller's process group, so stopping it stops ffmpeg too
           detached: false,
           stdin: "ignore",

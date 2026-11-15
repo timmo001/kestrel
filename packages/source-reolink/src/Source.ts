@@ -68,6 +68,7 @@ import {
   Semaphore,
   Stream,
 } from "effect";
+import { ownLive } from "./Live.ts";
 import { deviceReplays, type DeviceFile } from "./Replays.ts";
 import {
   addressToward,
@@ -537,6 +538,9 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
 
   // Only a hub or recorder replays its files, which isn't known until it answers
   let replaying = false;
+
+  /** How each channel's own-protocol video went last, by channel: `null` once it sent video, or why it failed. */
+  const ownVideo = new Map<number, string | null>();
 
   const unavailable = (message: string) =>
     new SourceUnavailable({ message: `${name} ${message}` });
@@ -1885,6 +1889,15 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
             main: channel.main,
             sub: channel.sub,
             sound: true,
+            record: ownLive({
+              name: channel.name,
+              host: base.hostname,
+              username,
+              password,
+              channel: channel.channel,
+              report: (problem) =>
+                Effect.sync(() => ownVideo.set(channel.channel, problem)),
+            }),
           };
 
           // Its lens zoom only changes the telephoto picture
@@ -1940,6 +1953,24 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
           ...(device.recorder
             ? [{ label: "Channels", value: String(device.channels.length) }]
             : []),
+          // How each camera's recording video came last time it was asked for
+          ...device.channels.flatMap((channel) => {
+            const problem = ownVideo.get(channel.channel);
+
+            if (problem === undefined) return [];
+
+            return [
+              {
+                label: device.recorder
+                  ? `Recording ${channel.name}`
+                  : "Recording",
+                value:
+                  problem === null
+                    ? "Over Reolink's own protocol"
+                    : `Over RTSP instead: ${problem}`,
+              },
+            ];
+          }),
         ],
         storage: Option.match(disks, {
           onNone: () => [],

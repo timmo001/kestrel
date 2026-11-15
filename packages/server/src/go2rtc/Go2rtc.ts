@@ -8,16 +8,20 @@
  * Settings page or when a recorder logs in. The config holds the sources'
  * addresses, which can carry their logins, so it's written to a private
  * temporary file rather than passed on the command line, and go2rtc's own
- * logging is kept off.
+ * logging is kept off. A stream a source reads itself, such as a camera's
+ * over its own protocol for recording, reaches go2rtc over HTTP from a port
+ * on this machine alone, with its main stream to fall back on.
  *
  * @module
  */
+import { BunHttpServer } from "@effect/platform-bun";
 import type {
   CameraId,
   CameraView,
   LiveFeed,
   LiveStreams,
   Source,
+  SourceUnavailable,
 } from "@timmo001/kestrel-core";
 import {
   Config,
@@ -31,6 +35,8 @@ import {
   Schedule,
   Stream,
 } from "effect";
+import { HttpServerRequest, HttpServerResponse } from "effect/http";
+import { NetAddress } from "effect/net";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { Sources } from "../Sources.ts";
 import { basePath } from "./Proxy.ts";
@@ -91,22 +97,41 @@ export const viewsOf = (feed: LiveFeed): Array<CameraView> =>
         }),
       ];
 
-/** Each of a camera's go2rtc streams, by name, with where it's read from. */
-const streamsOf = (feed: LiveFeed) => {
+/** The go2rtc stream a camera is recorded from, for one whose source reads it itself, such as `reolink-hub_1_record`. */
+export const recordStream = (camera: CameraId) =>
+  `${mainStream(camera)}_record`;
+
+/**
+ * Each of a camera's go2rtc streams, by name, with where it's read from: one
+ * address, or several that go2rtc tries in turn. `own` is where the server
+ * hands over a stream the source reads itself.
+ */
+const streamsOf = (feed: LiveFeed, own: (name: string) => string) => {
   const names = streamNames(feed);
 
   const others = (feed.others ?? []).flatMap((other) => {
     const main = `${names.main}_${other.key}`;
 
     return other.sub === null
-      ? [[main, other.main] as const]
-      : [[main, other.main] as const, [`${main}_sub`, other.sub] as const];
+      ? [[main, Redacted.value(other.main)] as const]
+      : [
+          [main, Redacted.value(other.main)] as const,
+          [`${main}_sub`, Redacted.value(other.sub)] as const,
+        ];
   });
 
+  const record = recordStream(feed.camera);
+
   return [
-    [names.main, feed.main] as const,
-    ...(feed.sub === null ? [] : [[`${names.main}_sub`, feed.sub] as const]),
+    [names.main, Redacted.value(feed.main)] as const,
+    ...(feed.sub === null
+      ? []
+      : [[`${names.main}_sub`, Redacted.value(feed.sub)] as const]),
     ...others,
+    // The source's own stream first, then its main stream should that fail
+    ...(feed.record === undefined
+      ? []
+      : [[record, [own(record), Redacted.value(feed.main)]] as const]),
   ];
 };
 
@@ -137,6 +162,11 @@ export class Go2rtc extends Context.Service<
   {
     /** The port go2rtc listens on, on 127.0.0.1. */
     readonly port: number;
+    /**
+     * The go2rtc stream to record a camera from: the one its source reads
+     * itself where it has one, otherwise its main stream.
+     */
+    readonly recordFrom: (camera: CameraId) => Effect.Effect<string>;
   }
 >()("@timmo001/kestrel-server/Go2rtc") {
   static readonly layer = Layer.effect(
@@ -163,6 +193,44 @@ export class Go2rtc extends Context.Service<
         Config.withDefault("ffmpeg"),
       );
 
+      /** The streams sources read themselves, by go2rtc stream name. */
+      const owned = new Map<
+        string,
+        Stream.Stream<Uint8Array, SourceUnavailable>
+      >();
+
+      // go2rtc reads them over HTTP from a port of their own on this machine
+      // alone, under a path made afresh each run, so nothing else on it can
+      const handOver = yield* BunHttpServer.make({
+        hostname: "127.0.0.1",
+        port: 0,
+        gracefulShutdownTimeout: Duration.seconds(1),
+      });
+
+      const secret = crypto.randomUUID();
+
+      yield* handOver.serve(
+        Effect.gen(function* () {
+          const request = yield* HttpServerRequest.HttpServerRequest;
+          const route = new URL(request.url, "http://kestrel").pathname;
+          const [, key, name] = route.split("/");
+          const stream = name === undefined ? undefined : owned.get(name);
+
+          return key !== secret || stream === undefined
+            ? HttpServerResponse.empty({ status: 404 })
+            : HttpServerResponse.stream(stream, {
+                contentType: "application/octet-stream",
+              });
+        }),
+      );
+
+      const handOverPort = NetAddress.isInetAddress(handOver.address)
+        ? handOver.address.port
+        : 0;
+
+      const own = (name: string) =>
+        `http://127.0.0.1:${handOverPort}/${secret}/${name}`;
+
       // JSON is valid YAML, which is what go2rtc reads.
       const configFor = (feeds: ReadonlyArray<LiveFeed>) =>
         JSON.stringify({
@@ -176,9 +244,7 @@ export class Go2rtc extends Context.Service<
           // The ffmpeg the server records with, for streams it copies
           ffmpeg: { bin: ffmpeg },
           streams: Object.fromEntries(
-            feeds.flatMap((feed) =>
-              streamsOf(feed).map(([name, url]) => [name, Redacted.value(url)]),
-            ),
+            feeds.flatMap((feed) => streamsOf(feed, own)),
           ),
         });
 
@@ -191,6 +257,17 @@ export class Go2rtc extends Context.Service<
             feedsOf(all, lastKnown),
             Schedule.spaced(checkEvery),
           ),
+        ),
+        Stream.tap((feeds) =>
+          Effect.sync(() => {
+            owned.clear();
+
+            for (const feed of feeds) {
+              if (feed.record !== undefined) {
+                owned.set(recordStream(feed.camera), feed.record);
+              }
+            }
+          }),
         ),
         Stream.map((feeds) => ({
           cameras: feeds.length,
@@ -260,7 +337,15 @@ export class Go2rtc extends Context.Service<
         Effect.forkScoped,
       );
 
-      return Go2rtc.of({ port });
+      return Go2rtc.of({
+        port,
+        recordFrom: (camera) =>
+          Effect.sync(() =>
+            owned.has(recordStream(camera))
+              ? recordStream(camera)
+              : mainStream(camera),
+          ),
+      });
     }),
   );
 }

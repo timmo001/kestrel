@@ -116,6 +116,13 @@ export interface LiveFeed {
   readonly view?: { readonly name: string; readonly zoom: boolean };
   /** Its other pictures, where it has them. */
   readonly others?: ReadonlyArray<LiveView>;
+  /**
+   * Its main stream as the source reads it itself, for recording in place of
+   * `main`, where the camera's own protocol is more sound than its RTSP: a
+   * stream go2rtc reads as it is, such as an MPEG transport stream. Each run
+   * reads it afresh, and recording falls back to `main` where it can't start.
+   */
+  readonly record?: Stream.Stream<Uint8Array, SourceUnavailable>;
 }
 
 /** Another of a camera's pictures, such as its telephoto lens. */

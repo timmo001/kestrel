@@ -1,6 +1,7 @@
 /**
  * The cameras the server records itself, from the recording settings. Each
- * picked camera's main stream is read from go2rtc on this machine as MP4,
+ * picked camera's main stream, or the one its source reads itself where it
+ * has one, is read from go2rtc on this machine as MP4, video only,
  * which go2rtc already has open, so the camera serves one connection
  * however many watch or record it, and no login reaches ffmpeg's command
  * line. MP4 rather than go2rtc's RTSP, which some cameras' streams come
@@ -27,7 +28,7 @@ import {
 } from "effect";
 import type { Job } from "./Api.ts";
 import { ownRecordingsFolder } from "./Folders.ts";
-import { Go2rtc, mainStream } from "./go2rtc/Go2rtc.ts";
+import { Go2rtc } from "./go2rtc/Go2rtc.ts";
 import { basePath } from "./go2rtc/Proxy.ts";
 import { Jobs } from "./Jobs.ts";
 import { Sources } from "./Sources.ts";
@@ -173,7 +174,14 @@ export const layer = Layer.effectDiscard(
               ffmpeg,
               folder,
               key: camera,
-              input: `http://127.0.0.1:${go2rtc.port}${basePath}/api/stream.mp4?src=${mainStream(camera)}`,
+              input: go2rtc
+                .recordFrom(camera)
+                .pipe(
+                  Effect.map(
+                    (stream) =>
+                      `http://127.0.0.1:${go2rtc.port}${basePath}/api/stream.mp4?src=${stream}&video=h264,h265`,
+                  ),
+                ),
               segment,
               report: reportRecording(camera),
             }).pipe(

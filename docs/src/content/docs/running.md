@@ -172,7 +172,11 @@ with a camera on each channel, from its `host`, `username` and `password`.
 Start the host with `https://` where its HTTP port is off. It has live view
 from each camera's RTSP main and sub streams, so turn RTSP on in the
 camera's network settings, and stills, motion and person, vehicle and animal
-detections, read every couple of seconds, and its disks or SD card. A hub
+detections, read every couple of seconds, and its disks or SD card. The
+server records its cameras over port 9000, Reolink's own protocol, since
+some cameras' RTSP main stream weaves in frames from the sub stream, and
+falls back to RTSP where that fails; the source's page on Settings says
+which it's using. A hub
 or recorder's recordings are copied into the recordings folder like a
 recorder's: each file is replayed over port 9000, Reolink's own protocol,
 and put in an MP4 with ffmpeg as it was recorded, H.265 included, so
