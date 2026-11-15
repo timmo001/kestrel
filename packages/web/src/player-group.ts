@@ -48,6 +48,11 @@ export interface GroupEvents {
   readonly onState: () => void;
   /** A tile other than the picked camera's was clicked. */
   readonly onPick: (camera: CameraId) => void;
+  /**
+   * Every camera has played all it has: whether to wait for more, as
+   * today's newest recording grows, rather than stop.
+   */
+  readonly onCaughtUp: () => boolean;
 }
 
 export interface Group extends Player {
@@ -133,6 +138,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
   let driver: Tile | undefined;
   /** Whether it should be playing, rather than paused or stopped. */
   let playing = false;
+  /** Whether it's played all there is so far and waits for more, still playing. */
+  let following = false;
   let playbackRate = 1;
   let view: View = fullView;
   /** Whether the picked camera shows alone. */
@@ -152,6 +159,19 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     return clip === undefined || offset === undefined
       ? undefined
       : toSeconds(clip.begin) + offset;
+  };
+
+  /**
+   * Where the clock is to go on from: the end of the clip keeping the time
+   * once it's played out, as its last frame can stop short of it, or else
+   * the time it's at.
+   */
+  const clockAt = () => {
+    const clip = driver?.player.clip();
+
+    return clip !== undefined && driver?.video.ended === true
+      ? toSeconds(clip.end)
+      : now();
   };
 
   /**
@@ -386,11 +406,16 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     if (moment.driver === undefined) {
       const next = nextMoment(shownTracks(), at);
 
-      // Nothing on any camera until the end of the day: stop there
+      // Nothing on any camera until the end of the day: stop there, or wait
+      // there for more, still playing, as the cameras record on today
       if (next === undefined) {
-        playing = false;
+        following = playing && events.onCaughtUp();
 
-        for (const tile of tiles.values()) tile.video.pause();
+        if (!following) {
+          playing = false;
+
+          for (const tile of tiles.values()) tile.video.pause();
+        }
 
         events.onState();
 
@@ -399,6 +424,8 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
       return align(next, true);
     }
+
+    following = false;
 
     const keeper = tiles.get(moment.driver);
     const changed = keeper !== driver;
@@ -639,6 +666,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
     driver = undefined;
     playing = false;
+    following = false;
     events.onState();
   };
 
@@ -684,7 +712,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
   return {
     setCameras: (next, pickedCamera, pending = []) => {
-      const at = now();
+      const at = clockAt();
       const wanted = new Set(next.map((track) => track.camera));
 
       const sameSet =
@@ -809,12 +837,16 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     lead: () => tiles.get(picked)?.video,
     tiles: () => [...tiles.values()],
     // Held for another camera's video, it's still playing
+    // Held for another camera's video, or waiting for more to be recorded,
+    // it's still playing
     paused: () =>
-      driver === undefined || !playing || (driver.video.paused && !held()),
+      driver === undefined ||
+      !playing ||
+      (driver.video.paused && !held() && !following),
     resume: () => {
       playing = true;
 
-      const at = now();
+      const at = clockAt();
 
       if (at !== undefined) void Promise.all(align(at, false));
 

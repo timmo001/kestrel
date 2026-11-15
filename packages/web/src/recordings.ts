@@ -177,6 +177,9 @@ const keepEvery = 2000;
 /** How often today's recordings are read again, in milliseconds. */
 const refreshEvery = 30_000;
 
+/** How often they're read while it follows today's newest as it's recorded. */
+const followEvery = 5000;
+
 /** Where this page's settings are kept, as Upkeep keeps its pages'. */
 const storageKey = "kestrel.recordings";
 
@@ -401,15 +404,21 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   /** Those and the ones that can't be played, as the table lists them. */
   let listed: ReadonlyArray<Recording> = [];
 
+  /** Whether it's played all of today recorded so far and follows on as more comes. */
+  let caughtUp = false;
+
   /** Shows `text` over the player until something else plays. */
-  const showNote = (text: string) => {
+  const showNote = (text: string, tone = "warning") => {
     if (problem === null) return;
 
+    problem.setAttribute("tone", tone);
     problem.textContent = text;
     problem.hidden = false;
   };
 
   const hideNote = () => {
+    caughtUp = false;
+
     if (problem !== null) problem.hidden = true;
   };
 
@@ -434,6 +443,23 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
           onTime: () => showTime(),
           onState: () => showState(),
           onPick: (picked) => pickCamera(picked),
+          // Played up to what today's cameras have recorded so far: on at
+          // real time, following the newest recording as it grows
+          onCaughtUp: () => {
+            if (day !== isoDay(new Date())) return false;
+
+            if (speed !== "1") setSpeed("1");
+
+            if (!caughtUp) {
+              showNote(
+                "Caught up with what's recorded so far: playing on at 1× as more comes in.",
+                "info",
+              );
+              caughtUp = true;
+            }
+
+            return true;
+          },
         });
 
   // Where it's playing is kept every few seconds, and as the page goes, so
@@ -1869,27 +1895,31 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
 
   // Today's newest recording is still being made, as one from a camera
   // recording all the time is, so the list is read again now and then and it
-  // runs on up to now, while the page shows
+  // runs on up to now, while the page shows; often, once it's caught up and
+  // following on
   let refreshing = false;
+  let refreshedAt = Date.now();
 
   setInterval(() => {
     if (
       refreshing ||
       page?.hidden !== false ||
       document.hidden ||
-      day !== isoDay(new Date())
+      day !== isoDay(new Date()) ||
+      Date.now() - refreshedAt < (caughtUp ? followEvery : refreshEvery)
     ) {
       return;
     }
 
     refreshing = true;
+    refreshedAt = Date.now();
 
     void showRecordings()
       .catch(() => undefined)
       .finally(() => {
         refreshing = false;
       });
-  }, refreshEvery);
+  }, followEvery);
 
   // Each control's key, in its tooltip and for assistive technology
   const shortcuts: ReadonlyArray<
