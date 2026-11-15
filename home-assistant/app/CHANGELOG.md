@@ -1,4 +1,1 @@
-- On the narrowest phones, the zoom gets its own row, so it no longer covers More.
-- In full screen, the timeline keeps clear of the screen's rounded corners and cutouts.
-- Both players now share their full screen button, focus return, help swipes, help sections and icons, so they behave the same.
-- Popovers no longer need their own guard against reopening when their button is pressed again.
+- After Help closes from the More menu, the player gets the focus back, so its keys keep working.
