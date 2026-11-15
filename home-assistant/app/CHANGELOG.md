@@ -1,2 +1,2 @@
-- Reolink cameras are now recorded over Reolink's own protocol on port 9000 rather than RTSP, whose main stream on some cameras weaves in frames from the sub stream. Where that can't start, recording falls back to RTSP, and the source's page in Settings says which it's using and why (timmo001/kestrel#32).
-- The docs' theme picker uses Kestrel's own theme colours.
+- A day's recordings list quickly after a restart: what's read of each recorded file is kept beside it, so the server doesn't read every file again. A busy day could take minutes on a small machine like the Home Assistant Green.
+- A Reolink camera is recorded over its own protocol from the start, rather than over RTSP when recording began before go2rtc was ready (timmo001/kestrel#32).
