@@ -14,21 +14,22 @@ stop working.
   under several brands. Their own apps and browser plugins no longer work in
   modern browsers.
 - **Any camera with a stream address**, such as RTSP, or a still picture.
-- **Reolink cameras, hubs and recorders**: live view, stills, and motion and
-  person, vehicle and animal detections. Not yet tried on real hardware
-  ([#12](https://github.com/timmo001/kestrel/issues/12)).
+- **Reolink cameras, hubs and recorders**: live view, stills, motion and
+  person, vehicle and animal detections, cameras that pan, tilt and zoom,
+  and a hub or recorder's recordings.
 - **The camera in a Bambu Lab P1 or A1 printer**, as a picture every few
-  seconds. Not yet tried on real hardware
-  ([#13](https://github.com/timmo001/kestrel/issues/13)).
+  seconds, with what it records during prints and its timelapses.
 - **Live streams on web pages**, such as a Twitch channel or a YouTube live
   stream, through [yt-dlp](https://github.com/yt-dlp/yt-dlp): live view only.
 
-On the way, behind the same pages: recording any of them itself
-([#15](https://github.com/timmo001/kestrel/issues/15)).
+The server records any of them to your own disk, and copies each source's
+own recordings in beside them.
 
 ## What it does
 
-- **Live:** every camera in 1 to 4 at once, with its own controls.
+- **Live:** every camera at once, or any number fewer at a time, with smart
+  tiling, zoom, moving cameras that pan and tilt, picture settings and their
+  sound.
 - **Recordings:** a day's timeline, with several channels played together on
   one clock, playback up to 32 times, clips, stills and MP4 downloads.
 - **Events:** motion, PIR, detections and alarms as they happen.
@@ -77,6 +78,8 @@ the settings, the API and the protocol.
   P1 or A1 printer, over its own picture feed
 - [`packages/source-web`](packages/source-web): live streams from web pages,
   such as Twitch or YouTube, through yt-dlp, for live view
+- [`packages/protocol-ftp`](packages/protocol-ftp): an upload-only FTP
+  receiver, for cameras that send their clips to the server
 - [`packages/format-mp4`](packages/format-mp4): recorded video as MP4,
   written for the browser and read back as frames
 - [`packages/nvr`](packages/nvr): records cameras' streams to disk with

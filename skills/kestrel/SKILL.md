@@ -1,6 +1,6 @@
 ---
 name: kestrel
-description: Read your cameras' status, recordings and motion or PIR events through the Kestrel server, starting with a Raysharp-made recorder, save recorded video as MP4, and see what the server is doing and how much of the machine it uses. Use when asked whether the recorder or a camera is working, what was recorded on a day, when motion or PIR was last seen, where to watch a camera live, to save footage from a time, or whether the server is copying recordings or using too much memory or CPU.
+description: Read your cameras' status, recordings and motion or PIR events through the Kestrel server, from recorders, Reolink cameras and hubs, stream cameras, Bambu Lab printers and live web pages, save recorded video as MP4, and see what the server is doing and how much of the machine it uses. Use when asked whether the recorder or a camera is working, what was recorded on a day, when motion or PIR was last seen, where to watch a camera live, to save footage from a time, or whether the server is copying recordings or using too much memory or CPU.
 ---
 
 # Kestrel

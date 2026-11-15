@@ -8,12 +8,22 @@ events and each one's health, from any browser or as an app on your phone. It
 talks to each system directly, so nothing goes through a vendor's cloud and
 old hardware stays useful after its own apps stop working.
 
-It starts with Raysharp-made recorders, which Swann, Lorex, Night Owl and
-others sell, and whose own apps and plugins have stopped working in modern
-browsers. Reolink cameras, a Bambu Lab printer's camera, any stream address
-and recording to your own disk are on the way, as
-[timmo001/kestrel#11](https://github.com/timmo001/kestrel/issues/11) sets
-out.
+It works with:
+
+- **Raysharp-made recorders**, which Swann, Lorex, Night Owl and others
+  sell, and whose own apps and plugins have stopped working in modern
+  browsers.
+- **Reolink cameras, hubs and recorders**, over their HTTP API, RTSP and
+  Reolink's own protocol.
+- **The camera in a Bambu Lab P1 or A1 printer**, as a picture every few
+  seconds, with what it records and its timelapses.
+- **Any camera with a stream address**, such as RTSP, or a still picture.
+- **Live streams on web pages**, such as a Twitch channel or a YouTube live
+  stream, through yt-dlp.
+
+The server can also record any of them to your own disk, and copies each
+source's own recordings in beside them. See [Running it](/running#your-sources)
+for what each kind of source takes.
 
 A small server sits between your cameras and the page. Browsers can't open a
 recorder's control port or play its RTSP streams, so the server holds the
@@ -45,8 +55,18 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   recording, and the timeline has a track for each. They play the full
   stream while the recorder keeps up, about 14 times real time across them,
   and the sub stream past that.
-- **Pages:** Live, Recordings, Events and Sources each have an address of
-  their own, such as `/recordings?camera=swann/1&date=2026-11-11`, or
+- **Activity:** what the server does by itself, such as copying recordings
+  from sources, recording a camera and clearing out old recordings, with
+  how far through each is, the last 7 days of errors, the recordings copied
+  lately and what each camera's recordings take on disk, and the server's
+  and the machine's memory and CPU over the last hour, against the limits
+  background work keeps to.
+- **Settings:** each source and its cameras, their names and order, which
+  cameras the server records and how long recordings are kept, the limits
+  for background work, the paired devices, and installing the page as an
+  app. Its About card shows the page's and the server's versions.
+- **Pages:** Live, Recordings, Events, Sources, Activity and Settings each
+  have an address of their own, such as `/recordings?camera=swann/1&date=2026-11-11`, or
   `/recordings?camera=swann/1&cameras=swann/1,swann/3,swann/4&date=2026-11-11`
   for several cameras together. A camera's id is its source's and its own,
   such as `swann/3` for the recorder's channel 3. Older addresses by channel
@@ -75,22 +95,102 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   bigger than its tile. Pause closes
   the streams and holds the last frames; a double click or Enter shows the
   picked camera alone, and Esc or Backspace goes back. S saves a still of it,
-  and ? shows or hides the keys. The layout, the tiling, the picked camera, each camera's zoom
+  and ? shows or hides the keys. A camera with a microphone plays its sound
+  when it's picked and its sound is on, each with its own volume. One with a
+  second view, such as a telephoto lens, plays both, the other small in a
+  corner, swapped with L. A camera that moves is steered in Move mode, and
+  one with picture settings has its hue, brightness and the rest on sliders
+  in the Picture panel. The layout, the tiling, the picked camera, each camera's zoom
   and how many cameras there were are kept in the browser, so the loading
   placeholders already sit where the cameras will.
 
+## Keys and gestures
+
+Live and Recordings list their keys, or their gestures on a touch screen,
+under the help button, which ? or a three-finger swipe up opens.
+
+### Live
+
+| Key                   | What it does                                     |
+| --------------------- | ------------------------------------------------ |
+| 1 to 9, A             | That many cameras at once, or all of them        |
+| T                     | Smart tiling, or the Layout menu's fixed layouts |
+| Arrow keys            | Pick a camera                                    |
+| Page Up, Page Down    | Previous or next cameras                         |
+| Enter or double click | The picked camera alone, and back                |
+| Esc, Backspace        | Back from one camera, or clear the pick          |
+| Space, K              | Pause or play                                    |
+| U                     | Sound on or off, where it has a microphone       |
+| S                     | Save a still                                     |
+| L                     | Swap its two views, such as wide and telephoto   |
+| P                     | Picture settings, where it has them              |
+| M                     | Start or end Move mode, for a camera that moves  |
+| Arrow keys, in Move   | Turn it while held, or drag the picture          |
+| +, -, in Move         | Zoom its lens                                    |
+
+On a touch screen, swipe left or right for the next or previous cameras, up
+or down to show or hide the controls in full screen, pinch then drag to
+zoom and move around, and double tap for the camera alone.
+
+### Recordings
+
+| Key                   | What it does                                      |
+| --------------------- | ------------------------------------------------- |
+| Space, K              | Play or pause                                     |
+| [, ]                  | Slower or faster                                  |
+| O                     | Events only, skipping what's between              |
+| .                     | Next frame                                        |
+| Left, Right           | Back or on 5 seconds                              |
+| J, L                  | Back or on 10 seconds                             |
+| Shift + Left, Right   | Back or on 30 seconds                             |
+| W, E                  | Previous or next event, from 20 seconds before it |
+| P, N                  | Previous or next recording                        |
+| Page Up, Page Down    | Pick the previous or next camera                  |
+| Enter or double click | The picked camera alone, and back                 |
+| Esc, Backspace        | Back from one camera alone                        |
+| T                     | Smart tiling, or the View menu's fixed layouts    |
+| C                     | Mark the clip's start, then its end               |
+| S                     | Save a still                                      |
+
+On a touch screen, swipe left or right to go on or back 10 seconds, two
+fingers left or right for the next or previous recording, up or down to
+show or hide the controls in full screen, and pinch then drag to zoom. On
+the timeline, drag to move through the day, tap to play from there, and
+pinch to show more or less of it.
+
+### Both
+
+| Key           | What it does                               |
+| ------------- | ------------------------------------------ |
+| Z             | Fit the picture whole, or fill its tile    |
+| +, -, 0       | Zoom in, out, or back to the whole picture |
+| Ctrl + scroll | Zoom at the pointer; drag to move around   |
+| F             | Full screen                                |
+| ?             | The keys and gestures                      |
+
 ## Parts
 
-| Part                         | What it is                                                        |
-| ---------------------------- | ----------------------------------------------------------------- |
-| `packages/core`              | What every source shares, in TypeScript with Effect               |
-| `packages/protocol-raysharp` | The Raysharp recorders' control protocol                          |
-| `packages/source-raysharp`   | Raysharp recorders as a source, over that protocol and their RTSP |
-| `packages/protocol-baichuan` | Reolink's own protocol, for recording and replaying files         |
-| `packages/server`            | The server: the [API](/api) and go2rtc                            |
-| `packages/web`               | The web client, installable on a phone                            |
-| `packages/cli`               | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents)   |
-| `docs`                       | This site                                                         |
+| Part                         | What it is                                                              |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `packages/core`              | What every source shares, in TypeScript with Effect                     |
+| `packages/protocol-raysharp` | The Raysharp recorders' control protocol                                |
+| `packages/source-raysharp`   | Raysharp recorders as a source, over that protocol and their RTSP       |
+| `packages/source-stream`     | Cameras you list by their stream addresses, or a still picture          |
+| `packages/source-reolink`    | Reolink cameras, hubs and recorders, over their HTTP API and RTSP       |
+| `packages/protocol-baichuan` | Reolink's own protocol, for recording and replaying files               |
+| `packages/source-bambu`      | The camera in a Bambu Lab P1 or A1 printer, with its recordings         |
+| `packages/source-web`        | Live streams from web pages, through yt-dlp                             |
+| `packages/protocol-ftp`      | An upload-only FTP receiver, for cameras that send their clips          |
+| `packages/format-mp4`        | Recorded video as MP4, written for the browser and read back as frames  |
+| `packages/nvr`               | Records streams to disk with ffmpeg, clears out old ones and reads them |
+| `packages/server`            | The server: the [API](/api), go2rtc and recording                       |
+| `packages/web`               | The web client, installable on a phone                                  |
+| `packages/desktop`           | The desktop app, which runs the server and keeps it in the tray         |
+| `packages/cli`               | The `kestrel` CLI, with Code Mode and MCP for [agents](/agents)         |
+| `docs`                       | This site                                                               |
+
+The [protocol](/protocol) page describes what Kestrel speaks to each kind of
+device.
 
 ## Machine-readable docs
 
