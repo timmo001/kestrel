@@ -30,6 +30,6 @@
   "devDependencies": {
     "astro": "7.4.12",
     "prettier": "3.10.1",
-    "wrangler": "4.161.0"
+    "wrangler": "4.162.0"
   }
 }
