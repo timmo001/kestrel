@@ -121,10 +121,21 @@ export interface Snap {
 }
 
 /**
+ * How far before the end of one behind a landing goes, in seconds. Its last
+ * second would play out at once and carry on to the next, back where the
+ * press or drag came from.
+ */
+const behindLead = 30;
+
+/** Where a landing behind `target` plays from: its last stretch, or its start when it's short. */
+const lastStretch = (target: Snap) =>
+  Math.max(target.start, Math.ceil(target.end) - behindLead);
+
+/**
  * The second a press at `second` picks among `targets`: in one, that
- * second; off every one, the nearest point of the nearest one, its start
- * ahead or its last second behind, however far, so a press needn't be
- * exact; with none, the second itself.
+ * second; off every one, the nearest one, its start ahead or its last
+ * stretch behind, however far, so a press needn't be exact; with none, the
+ * second itself.
  */
 export const snapTo = (second: number, targets: ReadonlyArray<Snap>) =>
   targets
@@ -134,10 +145,7 @@ export const snapTo = (second: number, targets: ReadonlyArray<Snap>) =>
       }
 
       if (second >= target.end) {
-        return {
-          at: Math.max(target.start, Math.ceil(target.end) - 1),
-          off: second - target.end,
-        };
+        return { at: lastStretch(target), off: second - target.end };
       }
 
       return { at: second, off: 0 };
@@ -159,10 +167,10 @@ export const snapToward = (
   toward: "start" | "end",
 ) => {
   const points = targets.flatMap((target) => {
-    const last = Math.max(target.start, Math.ceil(target.end) - 1);
-
     if (toward === "start") {
-      return target.start <= second ? [Math.min(second, last)] : [];
+      if (target.start > second) return [];
+
+      return [second < target.end ? second : lastStretch(target)];
     }
 
     return target.end > second ? [Math.max(second, target.start)] : [];

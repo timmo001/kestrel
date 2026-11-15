@@ -12,15 +12,16 @@ describe("snapTo", () => {
     expect(snapTo(150, targets)).toBe(150);
   });
 
-  test("a press in a gap goes to the nearest point, however far", () => {
-    // Nearer the first's end than the second's start
-    expect(snapTo(400, targets)).toBe(199);
+  test("a press in a gap goes to the nearest one, however far", () => {
+    // Nearer the first's end than the second's start: its last stretch, so
+    // it doesn't end at once and carry on to the next
+    expect(snapTo(400, targets)).toBe(170);
     // Nearer the second's start
     expect(snapTo(900, targets)).toBe(1000);
     // Before everything, the first start
     expect(snapTo(0, targets)).toBe(100);
-    // After everything, the last one's last second
-    expect(snapTo(80_000, targets)).toBe(1004);
+    // After everything, the last one, from its start as it's short
+    expect(snapTo(80_000, targets)).toBe(1000);
   });
 
   test("with nothing to snap to, the second itself", () => {
@@ -32,8 +33,9 @@ describe("snapToward", () => {
   test("a landing in a gap keeps going the way it moved", () => {
     // Nearer the first's end, but moving on goes to the second's start
     expect(snapToward(400, targets, "end")).toBe(1000);
-    // Nearer the second's start, but moving back goes to the first's end
-    expect(snapToward(900, targets, "start")).toBe(199);
+    // Nearer the second's start, but moving back goes to the first's last
+    // stretch, not its last second, which would carry on to the second
+    expect(snapToward(900, targets, "start")).toBe(170);
   });
 
   test("inside a target keeps its second", () => {
@@ -43,6 +45,6 @@ describe("snapToward", () => {
 
   test("with nothing that way, the nearest either way", () => {
     expect(snapToward(50, targets, "start")).toBe(100);
-    expect(snapToward(80_000, targets, "end")).toBe(1004);
+    expect(snapToward(80_000, targets, "end")).toBe(1000);
   });
 });
