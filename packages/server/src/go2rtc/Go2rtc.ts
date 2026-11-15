@@ -26,6 +26,7 @@ import type {
 import {
   Config,
   Context,
+  Deferred,
   Duration,
   Effect,
   FileSystem,
@@ -199,6 +200,9 @@ export class Go2rtc extends Context.Service<
         Stream.Stream<Uint8Array, SourceUnavailable>
       >();
 
+      /** Done once go2rtc first serves the streams. */
+      const serving = yield* Deferred.make<void>();
+
       // go2rtc reads them over HTTP from a port of their own on this machine
       // alone, under a path made afresh each run, so nothing else on it can
       const handOver = yield* BunHttpServer.make({
@@ -319,6 +323,8 @@ export class Go2rtc extends Context.Service<
               `go2rtc is serving ${cameras} cameras on port ${port}`,
             );
 
+            yield* Deferred.succeed(serving, undefined);
+
             const code = yield* handle.exitCode;
 
             return yield* Effect.fail(`go2rtc exited with code ${code}`);
@@ -339,11 +345,17 @@ export class Go2rtc extends Context.Service<
 
       return Go2rtc.of({
         port,
+        // Not before go2rtc has its first config, so a camera isn't recorded
+        // from its main stream only for want of knowing it has its own
         recordFrom: (camera) =>
-          Effect.sync(() =>
-            owned.has(recordStream(camera))
-              ? recordStream(camera)
-              : mainStream(camera),
+          Deferred.await(serving).pipe(
+            Effect.timeout(Duration.seconds(30)),
+            Effect.ignore,
+            Effect.map(() =>
+              owned.has(recordStream(camera))
+                ? recordStream(camera)
+                : mainStream(camera),
+            ),
           ),
       });
     }),
