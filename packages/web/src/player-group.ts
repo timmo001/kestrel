@@ -411,6 +411,11 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
 
       if (tile === undefined) continue;
 
+      tile.figure.toggleAttribute(
+        "data-repaired",
+        recording?.repaired === "mixed pictures",
+      );
+
       if (recording === undefined) {
         if (tile.player.clip() !== undefined) tile.player.stop();
 
@@ -528,12 +533,25 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       video.addEventListener(type, () => showProblem(undefined));
     }
 
+    // What the server put right in the recording playing, so a fault of the
+    // camera's own doesn't look like Kestrel's
+    const note = element("div");
+
+    const noteText =
+      "the camera mixed a second, smaller picture into this recording, so Kestrel plays the main one alone.";
+
+    note.className = "player-tile-note";
+    note.role = "note";
+    note.title = `Repaired: ${noteText}`;
+    note.append(element("strong", "Repaired:"), ` ${noteText}`);
+
     // Each camera prints its own channel on the picture; an empty tile says
     // which it is
     figure.append(
       video,
       hold,
       element("p", `${label}: nothing recorded`),
+      note,
       problem,
     );
 
@@ -615,6 +633,7 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
       tile.player.stop();
       releaseFrame(tile);
       delete tile.figure.dataset.empty;
+      tile.figure.removeAttribute("data-repaired");
     }
 
     driver = undefined;

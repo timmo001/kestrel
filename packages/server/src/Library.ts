@@ -231,6 +231,7 @@ export class Library extends Context.Service<
               end: fromSeconds(toSeconds(file.begin) + file.duration),
               reasons: reasonsOf(file.tags),
               bytes: file.bytes,
+              repaired: file.mixed ? "mixed pictures" : undefined,
             }),
           );
 

@@ -32,6 +32,12 @@ export const Recording = Schema.Struct({
   remote: Schema.optional(Schema.Boolean),
   /** `false` when it's only on a source that can't hand it over, so it's listed but can't be played. */
   playable: Schema.optional(Schema.Boolean),
+  /**
+   * What was wrong with it that the server puts right as it plays:
+   * `mixed pictures` where the camera wove its smaller picture into the
+   * main one's frames, which the server leaves out.
+   */
+  repaired: Schema.optional(Schema.Literals(["mixed pictures"])),
 });
 
 export interface Recording extends Schema.Schema.Type<typeof Recording> {}

@@ -328,11 +328,13 @@ export const reasonChips = (row: TableRow) => {
   return chips;
 };
 
-/** Where a recording is: here, on its source, or only on a source that can't hand it over. */
+/** Where a recording is: here, on its source, or only on a source that can't hand it over; and whether the server repairs it. */
 const whereOf = (recording: Recording) => {
   if (recording.playable === false) return "On source only";
 
-  return recording.remote === true ? "On source" : "Here";
+  if (recording.remote === true) return "On source";
+
+  return recording.repaired === undefined ? "Here" : "Here, repaired";
 };
 
 /**

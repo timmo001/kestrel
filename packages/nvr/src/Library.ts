@@ -28,6 +28,8 @@ export interface RecordedFile {
   /** Its tags, such as `motion`. */
   readonly tags: ReadonlyArray<string>;
   readonly bytes: number;
+  /** Whether the camera wove a second picture into it, which reading leaves out. */
+  readonly mixed: boolean;
 }
 
 /** A day with files, and every tag on them. */
@@ -38,10 +40,14 @@ export interface RecordedDay {
   readonly untagged: boolean;
 }
 
-/** Lengths read so far, by path, with the size they were read at. */
+/** What's been read of each file so far, by path, with the size it was read at. */
 const lengths = new Map<
   string,
-  { readonly bytes: number; readonly duration: number }
+  {
+    readonly bytes: number;
+    readonly duration: number;
+    readonly mixed: boolean;
+  }
 >();
 
 /** A camera's folder, or `InvalidKey` for a key that could reach outside the recordings folder. */
@@ -159,12 +165,10 @@ export const files = Effect.fnUntraced(function* (
         const bytes = Number((yield* fs.stat(file)).size);
         const known = lengths.get(file);
 
-        const duration =
-          known?.bytes === bytes
-            ? known.duration
-            : (yield* Mp4.info(file)).duration;
+        const { duration, mixed } =
+          known?.bytes === bytes ? known : yield* Mp4.info(file);
 
-        lengths.set(file, { bytes, duration });
+        lengths.set(file, { bytes, duration, mixed });
 
         return Option.some<RecordedFile>({
           path: file,
@@ -173,6 +177,7 @@ export const files = Effect.fnUntraced(function* (
           duration,
           tags: tagsOf(match),
           bytes,
+          mixed,
         });
       }).pipe(Effect.orElseSucceed(() => Option.none<RecordedFile>())),
     { concurrency: 8 },

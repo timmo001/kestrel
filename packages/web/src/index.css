@@ -501,6 +501,48 @@ gw-table gw-sheet {
   pointer-events: none;
 }
 
+/* What the server put right in the recording playing, along the bottom of
+   its tile, clear of the camera's own clock at the top */
+.player-tile:not([data-repaired]) > .player-tile-note {
+  display: none;
+}
+
+.player-tile-note {
+  position: absolute;
+  inset-inline: var(--gw-space-2);
+  inset-block-end: var(--gw-space-2);
+  display: -webkit-box;
+  inline-size: fit-content;
+  max-inline-size: calc(100% - 2 * var(--gw-space-2));
+  margin: 0 auto;
+  padding: var(--gw-space-1) var(--gw-space-2);
+  overflow: hidden;
+  border-radius: var(--gw-radius-sm, 4px);
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-size: 0.875rem;
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  pointer-events: none;
+  animation: player-note-in var(--gw-motion-normal, 200ms)
+    var(--gw-motion-easing, ease);
+}
+
+@keyframes player-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--gw-space-1));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-tile-note {
+    animation: none;
+  }
+}
+
 .live-tile figcaption,
 .player-caption {
   position: absolute;

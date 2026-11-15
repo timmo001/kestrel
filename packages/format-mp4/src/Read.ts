@@ -2,7 +2,8 @@
  * Reading MP4 files back as recorded frames, the way a source sends them:
  * H.264 or H.265 in Annex B form, each key frame starting with its
  * parameter sets, timed from when the file starts. Files still being written
- * read up to where they've got.
+ * read up to where they've got. Files a camera wove two pictures into come
+ * out as the main picture alone.
  *
  * @module
  */
@@ -14,8 +15,10 @@ import {
   Input,
   MP4,
   type EncodedPacket,
+  type InputVideoTrack,
 } from "mediabunny";
 import { Mp4Error } from "./Errors.ts";
+import * as Mixed from "./Mixed.ts";
 
 /** A file's length and picture size. */
 export interface Mp4Info {
@@ -23,6 +26,8 @@ export interface Mp4Info {
   readonly duration: number;
   readonly width: number;
   readonly height: number;
+  /** Whether the camera wove a second, smaller picture into it, which reading leaves out. */
+  readonly mixed: boolean;
 }
 
 /** The parameter sets a file keeps apart from its frames, and how long each frame's NAL lengths are. */
@@ -92,6 +97,43 @@ const hevcSets = (bytes: Uint8Array): ParameterSets => {
 const isSps = (unit: Uint8Array, hevc: boolean) =>
   hevc ? (((unit[0] ?? 0) >> 1) & 0x3f) === 33 : ((unit[0] ?? 0) & 0x1f) === 7;
 
+/** A frame's NAL units, each after its length. */
+const unitsOf = (data: Uint8Array, lengthSize: number) => {
+  const units: Array<Uint8Array> = [];
+  let at = 0;
+
+  while (at + lengthSize <= data.length) {
+    let length = 0;
+
+    for (let index = 0; index < lengthSize; index++) {
+      length = length * 256 + (data[at + index] ?? 0);
+    }
+
+    at += lengthSize;
+    units.push(data.subarray(at, at + length));
+    at += length;
+  }
+
+  return units;
+};
+
+/** NAL units each after a start code. */
+const joined = (units: ReadonlyArray<Uint8Array>) => {
+  const out = new Uint8Array(
+    units.reduce((size, unit) => size + startCode.length + unit.length, 0),
+  );
+
+  let position = 0;
+
+  for (const unit of units) {
+    out.set(startCode, position);
+    out.set(unit, position + startCode.length);
+    position += startCode.length + unit.length;
+  }
+
+  return out;
+};
+
 /** A frame's NAL units with start codes rather than lengths, and a key frame's parameter sets put in front when it lacks them. */
 const annexB = (
   data: Uint8Array,
@@ -99,37 +141,10 @@ const annexB = (
   hevc: boolean,
   key: boolean,
 ) => {
-  const units: Array<Uint8Array> = [];
-  let at = 0;
-
-  while (at + config.lengthSize <= data.length) {
-    let length = 0;
-
-    for (let index = 0; index < config.lengthSize; index++) {
-      length = length * 256 + (data[at + index] ?? 0);
-    }
-
-    at += config.lengthSize;
-    units.push(data.subarray(at, at + length));
-    at += length;
-  }
-
+  const units = unitsOf(data, config.lengthSize);
   const hasSps = units.some((unit) => isSps(unit, hevc));
-  const all = key && !hasSps ? [...config.sets, ...units] : units;
 
-  const out = new Uint8Array(
-    all.reduce((size, unit) => size + startCode.length + unit.length, 0),
-  );
-
-  let position = 0;
-
-  for (const unit of all) {
-    out.set(startCode, position);
-    out.set(unit, position + startCode.length);
-    position += startCode.length + unit.length;
-  }
-
-  return out;
+  return joined(key && !hasSps ? [...config.sets, ...units] : units);
 };
 
 /** A promise's result, or its failure as an `Mp4Error`. */
@@ -166,6 +181,72 @@ const opened = (path: string) =>
     ({ input }) => Effect.sync(() => input.dispose()),
   );
 
+/** The parameter sets a track keeps in its decoder config. */
+const setsOf = (track: InputVideoTrack) =>
+  attempt(async (): Promise<ParameterSets> => {
+    const description = (await track.getDecoderConfig())?.description;
+
+    if (description === undefined) return { lengthSize: 4, sets: [] };
+
+    return (track.codec === "hevc" ? hevcSets : avcSets)(bytesOf(description));
+  });
+
+/** How many key frames of each size a check for two pictures reads. */
+const sampled = 4;
+
+/**
+ * The repair a file needs where the camera wove two pictures into it, with
+ * the main picture's key frames from the file's index; `undefined` for a
+ * file of one picture, the usual case, which only reads the index.
+ */
+const mixedIn = (
+  track: InputVideoTrack,
+  sink: EncodedPacketSink,
+  config: ParameterSets,
+) =>
+  attempt(async () => {
+    if (track.codec !== "avc") return undefined;
+
+    const keys: Array<EncodedPacket> = [];
+    const indexOnly = { metadataOnly: true };
+
+    for (
+      let key = await sink.getFirstKeyPacket(indexOnly);
+      key !== null;
+      key = await sink.getNextKeyPacket(key, indexOnly)
+    ) {
+      keys.push(key);
+    }
+
+    const split = Mixed.splitOf(keys.map((key) => key.byteLength));
+
+    if (split === undefined) return undefined;
+
+    const main = keys.filter((key) => key.byteLength >= split);
+    const other = keys.filter((key) => key.byteLength < split);
+    const units = [...config.sets];
+
+    // Spread through the file, as which SPS comes with which frames varies
+    for (const group of [main, other]) {
+      const count = Math.min(sampled, group.length);
+
+      for (let index = 0; index < count; index++) {
+        const pick = group[Math.floor((index * group.length) / count)];
+
+        const packet =
+          pick === undefined ? null : await sink.getKeyPacket(pick.timestamp);
+
+        if (packet !== null) {
+          units.push(...unitsOf(packet.data, config.lengthSize));
+        }
+      }
+    }
+
+    const mixed = Mixed.mixedOf(units, split);
+
+    return mixed === undefined ? undefined : { ...mixed, keys: main, other };
+  });
+
 /** How long a file runs and its picture size. */
 export const info = (path: string) =>
   Effect.scoped(
@@ -177,13 +258,20 @@ export const info = (path: string) =>
         sink.getPacket(Infinity, { metadataOnly: true }),
       );
 
+      const mixed = yield* mixedIn(track, sink, yield* setsOf(track));
+
       return {
         duration: last === null ? 0 : last.timestamp + last.duration,
-        width: track.codedWidth,
-        height: track.codedHeight,
+        width: mixed?.width ?? track.codedWidth,
+        height: mixed?.height ?? track.codedHeight,
+        mixed: mixed !== undefined,
       } satisfies Mp4Info;
     }),
   );
+
+/** Of key frames in order, the last at or before `at`, or the first. */
+const keyAt = (keys: ReadonlyArray<EncodedPacket>, at: number) =>
+  keys.findLast((key) => key.timestamp <= at) ?? keys[0];
 
 /**
  * Seconds into a file of the key frame at or before `at`, where reading
@@ -195,6 +283,11 @@ export const keyFrameAt = (path: string, at: number) =>
       const { track } = yield* opened(path);
       const sink = new EncodedPacketSink(track);
       const verified = { verifyKeyPackets: true };
+      const mixed = yield* mixedIn(track, sink, yield* setsOf(track));
+
+      if (mixed !== undefined) {
+        return keyAt(mixed.keys, Math.max(at, 0))?.timestamp ?? null;
+      }
 
       const found = yield* attempt(async () => {
         const before = await sink.getKeyPacket(Math.max(at, 0), verified);
@@ -218,25 +311,131 @@ export interface ReadOptions {
   readonly every?: number | undefined;
 }
 
-/** A file's frames between two points, or with `every`, key frames only. */
+/** Of key frames in order, the one `every` seconds on from `index`, or the next when they're further apart. */
+const keyAfter = (
+  keys: ReadonlyArray<EncodedPacket>,
+  index: number,
+  every: number,
+) => {
+  const at = (keys[index]?.timestamp ?? 0) + every;
+  const ahead = keys.findLastIndex((key) => key.timestamp <= at);
+
+  return ahead > index ? ahead : index + 1;
+};
+
+/** How far before the main picture's key frame a repair starts reading, to learn the other picture's frame counter. */
+const primeLimit = 10;
+
+/** The main picture's frames of a file the camera wove two pictures into. */
+const repaired = (
+  sink: EncodedPacketSink,
+  config: ParameterSets,
+  mixed: Mixed.Mixed & {
+    readonly keys: ReadonlyArray<EncodedPacket>;
+    readonly other: ReadonlyArray<EncodedPacket>;
+  },
+  options: ReadOptions,
+  fps: number,
+): Stream.Stream<RecordedFrame, Mp4Error> => {
+  const frameOf = (
+    packet: EncodedPacket,
+    key: boolean,
+    units: ReadonlyArray<Uint8Array>,
+  ): RecordedFrame => ({
+    key,
+    codec: "h264",
+    time: options.start + Math.round(packet.timestamp * 1e6),
+    width: mixed.width,
+    height: mixed.height,
+    fps,
+    data: joined(units),
+  });
+
+  const start = keyAt(mixed.keys, Math.max(options.from, 0));
+  const every = options.every;
+
+  if (start === undefined) return Stream.empty;
+
+  if (every !== undefined) {
+    return Stream.unfold(mixed.keys.indexOf(start), (index) => {
+      const key = mixed.keys[index];
+
+      return key === undefined || key.timestamp > options.to
+        ? Effect.succeed(undefined)
+        : attempt(() => sink.getKeyPacket(key.timestamp)).pipe(
+            Effect.map((packet) => {
+              const units =
+                packet === null ? [] : unitsOf(packet.data, config.lengthSize);
+
+              return [
+                frameOf(key, true, Mixed.keyFrameOf(mixed, units)),
+                keyAfter(mixed.keys, index, every),
+              ] as const;
+            }),
+          );
+    });
+  }
+
+  // From the other picture's key frame before it, when there's one near, so
+  // both pictures' frame counters are known by the main picture's
+  const prime = mixed.other.findLast(
+    (key) =>
+      key.timestamp <= start.timestamp &&
+      start.timestamp - key.timestamp < primeLimit,
+  );
+
+  const repair = Mixed.repairer(mixed);
+
+  return Stream.fromEffect(
+    attempt(() => sink.getKeyPacket((prime ?? start).timestamp)),
+  ).pipe(
+    Stream.flatMap((first) =>
+      first === null
+        ? Stream.empty
+        : Stream.fromAsyncIterable(
+            sink.packets(first),
+            (cause) =>
+              new Mp4Error({
+                message: cause instanceof Error ? cause.message : String(cause),
+              }),
+          ),
+    ),
+    Stream.takeWhile((packet) => packet.timestamp <= options.to),
+    Stream.map((packet) => {
+      const kept = repair(
+        unitsOf(packet.data, config.lengthSize),
+        packet.byteLength,
+      );
+
+      return kept === undefined || packet.timestamp < start.timestamp
+        ? undefined
+        : frameOf(packet, kept.key, kept.units);
+    }),
+    Stream.filter((frame) => frame !== undefined),
+  );
+};
+
+/**
+ * A file's frames between two points, or with `every`, key frames only.
+ * Where the camera wove two pictures into the file, only the main
+ * picture's come out.
+ */
 export const frames = (
   options: ReadOptions,
 ): Stream.Stream<RecordedFrame, Mp4Error> =>
   Stream.unwrap(
     Effect.gen(function* () {
       const { track } = yield* opened(options.path);
-      const config = yield* attempt(() => track.getDecoderConfig());
       const hevc = track.codec === "hevc";
-      const description = config?.description;
-
-      const sets: ParameterSets =
-        description === undefined
-          ? { lengthSize: 4, sets: [] }
-          : (hevc ? hevcSets : avcSets)(bytesOf(description));
-
+      const sets = yield* setsOf(track);
       const stats = yield* attempt(() => track.computePacketStats(50));
       const sink = new EncodedPacketSink(track);
       const verified = { verifyKeyPackets: true };
+      const mixed = yield* mixedIn(track, sink, sets);
+
+      if (mixed !== undefined) {
+        return repaired(sink, sets, mixed, options, stats.averagePacketRate);
+      }
 
       const frameOf = (packet: EncodedPacket): RecordedFrame => ({
         key: packet.type === "key",
