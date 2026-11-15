@@ -157,6 +157,15 @@ export interface PlayerEvents {
 /** How far past the start of a load a seek waits for it rather than starting another. */
 const loadReach = 10;
 
+/** How long the playhead may sit still with video loaded past it before it's moved on, in milliseconds. */
+const stallLimit = 1000;
+
+/** How far a stuck playhead is moved on, in the video's seconds, more each time it sticks again. */
+const nudge = 0.1;
+
+/** The most nudges in a row, so one that never plays on stops growing. */
+const mostNudges = 5;
+
 /** Plays clips in `video`, telling `events` when one ends or stops early. */
 export const playerFor = (
   video: HTMLVideoElement,
@@ -441,6 +450,45 @@ export const playerFor = (
     if (current !== undefined && loading === undefined) resume();
   });
 
+  // At speed, Chrome can stop on a frame it can't get past with video loaded
+  // beyond it, and never says it's waiting. As hls.js does, a playhead that
+  // sits still there is moved on a little, further each time it sticks again
+  let stillAt = -1;
+  let stillSince = 0;
+  let nudges = 0;
+  let watch: ReturnType<typeof setInterval> | undefined;
+
+  const unstick = () => {
+    const time = video.currentTime;
+
+    if (
+      video.paused ||
+      video.seeking ||
+      video.ended ||
+      !isLoaded(time + nudge * (nudges + 1))
+    ) {
+      stillAt = -1;
+
+      return;
+    }
+
+    if (time !== stillAt) {
+      // Played on well past where it stuck: the next stick starts small
+      if (stillAt !== -1 && time - stillAt > 1) nudges = 0;
+
+      stillAt = time;
+      stillSince = Date.now();
+
+      return;
+    }
+
+    if (Date.now() - stillSince < stallLimit) return;
+
+    nudges = Math.min(nudges + 1, mostNudges);
+    stillSince = Date.now();
+    video.currentTime = time + nudge * nudges;
+  };
+
   const stop = () => {
     loading?.abort();
     loading = undefined;
@@ -449,6 +497,10 @@ export const playerFor = (
     buffer = undefined;
     bufferType = "";
     loadStart = -1;
+    clearInterval(watch);
+    watch = undefined;
+    stillAt = -1;
+    nudges = 0;
     video.removeAttribute("src");
     video.load();
 
@@ -490,6 +542,7 @@ export const playerFor = (
     }
 
     base = 0;
+    watch = setInterval(unstick, 250);
 
     const media = new MediaSource();
 
