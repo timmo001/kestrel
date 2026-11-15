@@ -44,6 +44,9 @@ const fromSeconds = (seconds: number): LocalTime =>
 
 const daySeconds = 86_400;
 
+/** How far before the next file's key frame the file before it stops, so none of its frames land on it. */
+const handoverMargin = 0.001;
+
 /** How long a source has to answer before the library carries on without it. */
 const remoteWait = Duration.seconds(15);
 
@@ -113,7 +116,8 @@ export class Library extends Context.Service<
     /**
      * What a camera recorded between two times, as its frames, across files
      * in order. Where files overlap, such as a camera's own clips beside
-     * Kestrel's recording, the one already playing carries on.
+     * Kestrel's recording, the next takes over at its key frame at or before
+     * the end of the one playing.
      */
     readonly video: (
       options: VideoOptions,
@@ -288,19 +292,47 @@ export class Library extends Context.Service<
             Nvr.Library.files(root, options.camera, date),
           );
 
+          const parts: Array<{
+            readonly file: Nvr.Library.RecordedFile;
+            readonly start: number;
+            readonly begin: number;
+            stop: number;
+          }> = [];
+
           let reached = from;
 
-          const parts = found.flat().flatMap((file) => {
+          for (const file of found.flat()) {
             const start = toSeconds(file.begin);
             const stop = Math.min(start + file.duration, to);
-            const begin = Math.max(start, reached);
+            let begin = Math.max(start, reached);
 
-            if (stop <= begin) return [];
+            if (stop <= begin) continue;
+
+            // Where it overlaps the file before, it takes over at its own key
+            // frame at or before that file's end, as its other frames only
+            // say what changed since. Key frames alone need none of this.
+            if (options.every === undefined && reached > start) {
+              const key = yield* Mp4.keyFrameAt(
+                file.path,
+                reached - start,
+              ).pipe(Effect.orElseSucceed(() => null));
+
+              if (key !== null) {
+                begin = start + key;
+
+                while ((parts.at(-1)?.begin ?? -Infinity) >= begin) parts.pop();
+
+                const last = parts.at(-1);
+
+                if (last !== undefined) {
+                  last.stop = Math.min(last.stop, begin - handoverMargin);
+                }
+              }
+            }
 
             reached = stop;
-
-            return [{ file, start, begin, stop }];
-          });
+            parts.push({ file, start, begin, stop });
+          }
 
           if (parts.length === 0) {
             const remote = (yield* remoteOf(options.camera))?.video;

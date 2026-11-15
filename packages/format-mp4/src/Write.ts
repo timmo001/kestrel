@@ -48,7 +48,8 @@ const longestGap = 2;
 /**
  * Writes frames as fragmented MP4, a fragment per key frame group, and
  * passes the bytes on as they're written. Frames before the first key frame,
- * and any that don't move time forward, are left out. It ends where the
+ * and any that don't move time forward, are left out, along with what
+ * follows one of those up to the next key frame. It ends where the
  * codec changes, such as at a file recorded before a camera changed to
  * H.265, as one MP4 holds one. Time runs from 0 at the first frame, with
  * gaps between files closed up, `speedUp` times faster than it was recorded.
@@ -84,6 +85,10 @@ export const toMp4 = <E>(
       let previous: RecordedFrame | undefined;
       let timestamp = 0;
 
+      // Set once a frame is left out: the frames after it say only what
+      // changed from it, so they wait for the next key frame
+      let broken = false;
+
       /** Adds the frame before this one, now that its duration is known. */
       const add = async (frame: RecordedFrame | undefined) => {
         if (previous === undefined || source === undefined) {
@@ -112,7 +117,17 @@ export const toMp4 = <E>(
             : (frame.time - previous.time) / 1e6;
 
         // Out of order or repeated, such as where two files overlap
-        if (frame !== undefined && gap <= 0) return;
+        if (frame !== undefined && gap <= 0) {
+          broken = true;
+
+          return;
+        }
+
+        if (frame !== undefined && broken) {
+          if (!frame.key) return;
+
+          broken = false;
+        }
 
         const duration =
           (gap > Math.max(longestGap, 2 * usual) ? frameLength : gap) / speedUp;

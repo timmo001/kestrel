@@ -185,6 +185,27 @@ export const info = (path: string) =>
     }),
   );
 
+/**
+ * Seconds into a file of the key frame at or before `at`, where reading
+ * from `at` starts, or of its first key frame; `null` with none.
+ */
+export const keyFrameAt = (path: string, at: number) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const { track } = yield* opened(path);
+      const sink = new EncodedPacketSink(track);
+      const verified = { verifyKeyPackets: true };
+
+      const found = yield* attempt(async () => {
+        const before = await sink.getKeyPacket(Math.max(at, 0), verified);
+
+        return before ?? (await sink.getFirstKeyPacket(verified));
+      });
+
+      return found?.timestamp ?? null;
+    }),
+  );
+
 export interface ReadOptions {
   readonly path: string;
   /** When the file starts, in microseconds since 1970, on the clock the frames should carry. */
