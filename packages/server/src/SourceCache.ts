@@ -92,19 +92,36 @@ const keepRecordings = (recordings: SourceRecordings) =>
     })),
   );
 
-/** A source that keeps what it answered for a while. */
+/**
+ * A source that keeps what it answered for a while. What it can do with
+ * recordings and clips is read from it each time, as a source can know that
+ * only once it's connected, such as a Reolink hub that replays its files.
+ */
 export const cached = Effect.fnUntraced(function* (source: Source) {
+  const cameras = yield* keep(source.cameras);
+
+  const listing =
+    source.recordings === undefined
+      ? undefined
+      : yield* keepRecordings(source.recordings);
+
   const kept: Mutable<Source> = {
     ...source,
-    cameras: yield* keep(source.cameras),
+    cameras,
+    get recordings() {
+      const now = source.recordings;
+
+      return now === undefined || listing === undefined
+        ? now
+        : { ...now, days: listing.days, list: listing.list };
+    },
+    get uploads() {
+      return source.uploads;
+    },
   };
 
   if (source.details !== undefined) {
     kept.details = yield* keep(source.details);
-  }
-
-  if (source.recordings !== undefined) {
-    kept.recordings = yield* keepRecordings(source.recordings);
   }
 
   return kept;

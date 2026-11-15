@@ -1,6 +1,7 @@
 /**
  * Checks what a source's answers are kept for: past days' recordings for
- * longer than today's, and failures not at all.
+ * longer than today's, and failures not at all, while what it can do is
+ * read from it each time.
  */
 import {
   SourceUnavailable,
@@ -8,7 +9,7 @@ import {
   type Source,
 } from "@timmo001/kestrel-core";
 import { expect, test } from "bun:test";
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 import * as TestClock from "effect/testing/TestClock";
 import { cached } from "./SourceCache.ts";
 
@@ -90,4 +91,27 @@ test("a failure is asked again", async () => {
   );
 
   expect(asked).toEqual(["2026-11-10", "2026-11-10"]);
+});
+
+test("what a source can do once it's connected shows through", async () => {
+  const { source } = counting();
+  const listing = source.recordings;
+  let replaying = false;
+
+  const hub: Source = {
+    ...source,
+    get recordings() {
+      return listing === undefined
+        ? undefined
+        : replaying
+          ? { ...listing, video: () => Effect.succeed(Stream.empty) }
+          : listing;
+    },
+  };
+
+  const kept = await run(cached(hub));
+
+  expect(kept.recordings?.video).toBeUndefined();
+  replaying = true;
+  expect(kept.recordings?.video).toBeDefined();
 });

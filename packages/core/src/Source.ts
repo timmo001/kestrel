@@ -267,7 +267,8 @@ export interface Source {
   readonly cameras: Effect.Effect<ReadonlyArray<CameraInfo>, SourceUnavailable>;
   /** Where go2rtc reads each camera's live streams; fails as `cameras` does. */
   readonly live: Effect.Effect<ReadonlyArray<LiveFeed>, SourceUnavailable>;
-  readonly recordings?: SourceRecordings;
+  /** What it recorded; a source may only offer some of it once it's connected. */
+  readonly recordings?: SourceRecordings | undefined;
   readonly events?: SourceEvents;
   readonly stills?: SourceStills;
   readonly ptz?: SourcePtz;
