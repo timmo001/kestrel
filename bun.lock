@@ -19,7 +19,7 @@
         "@fontsource-variable/jetbrains-mono": "5.3.0",
         "@fontsource-variable/mona-sans": "5.3.0",
         "@timmo001/docs-kit": "0.45.0",
-        "@timmo001/groundwork-tokens": "0.44.0",
+        "@timmo001/groundwork-tokens": "0.45.0",
         "blume": "2.2.7",
         "sharp": "0.35.5",
       },
@@ -2432,8 +2432,6 @@
     "htmlparser2/entities": ["entities@3.0.1", "", {}, "sha512-WiyBqoomrwMdFG1e0kqvASYfnlb0lp8M5o5Fw2OFq1hNZxxcNk8Ik0Xm7LxzBhuidnZB/UtBqVCgUz3kBOP51Q=="],
 
     "katex/commander": ["commander@15.1.0", "", {}, "sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ=="],
-
-    "kestrel-docs/@timmo001/groundwork-tokens": ["@timmo001/groundwork-tokens@0.44.0", "", { "dependencies": { "@effect/platform-node": "4.1.4", "@types/culori": "4.0.1", "culori": "4.0.2", "effect": "4.1.4" }, "bin": { "groundwork-tokens": "src/bin.ts" } }, "sha512-0SvRJGEqN9oLW+ZoQcHDHPlxA7NMFpRNIQaHpDd59sAZlOeHa0ul97rGIQSEVDgOXDOlCAPDTmKfcULntXncgw=="],
 
     "mermaid/marked": ["marked@16.4.2", "", { "bin": { "marked": "bin/marked.js" } }, "sha512-TI3V8YYWvkVf3KJe1dRkpnjs68JUPyEa5vjKrp1XEEJUAOaQc+Qj+L1qWbPd0SJuAdQkFU0h73sXXqwDYxsiDA=="],
 
