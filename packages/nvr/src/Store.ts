@@ -6,7 +6,16 @@
  *
  * @module
  */
-import { Effect, Exit, FileSystem, Path, Stream } from "effect";
+import {
+  Clock,
+  Duration,
+  Effect,
+  Exit,
+  FileSystem,
+  Option,
+  Path,
+  Stream,
+} from "effect";
 import {
   InvalidKey,
   dayPattern,
@@ -18,6 +27,9 @@ import {
 
 /** What a file is called while it's being written. */
 const partial = ".part";
+
+/** How long a part written file goes untouched before it's taken as left behind. */
+const abandoned = Duration.minutes(10);
 
 export interface SaveOptions {
   /** The folder every camera's recordings go in. */
@@ -100,17 +112,36 @@ export const save = <E, R>(
     return file;
   });
 
-/** Deletes files left part written in a folder's day folders, such as by a stop part way through a copy. */
+/**
+ * Deletes files left part written in a folder's day folders, such as by a
+ * stop part way through a copy: those nothing has written to for 10 minutes,
+ * so a copy or a clip a camera is sending right now is left to finish.
+ */
 export const clearPartial = Effect.fnUntraced(function* (folder: string) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
 
   if (!(yield* fs.exists(folder))) return 0;
 
-  const left = (yield* fs.readDirectory(folder, { recursive: true })).filter(
+  const now = yield* Clock.currentTimeMillis;
+
+  const parts = (yield* fs.readDirectory(folder, { recursive: true })).filter(
     (entry) =>
       entry.endsWith(`.mp4${partial}`) &&
       dayPattern.test(path.basename(path.dirname(entry))),
+  );
+
+  const left = yield* Effect.filter(parts, (entry) =>
+    fs.stat(path.join(folder, entry)).pipe(
+      Effect.map((info) =>
+        Option.match(info.mtime, {
+          onNone: () => true,
+          onSome: (modified) =>
+            now - modified.getTime() > Duration.toMillis(abandoned),
+        }),
+      ),
+      Effect.orElseSucceed(() => false),
+    ),
   );
 
   yield* Effect.forEach(
