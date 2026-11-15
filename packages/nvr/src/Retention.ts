@@ -13,7 +13,13 @@
 // oxlint-disable-next-line timmo-effect/prefer-platform-services -- Effect's FileSystem can't read a disk's size or free space
 import { statfs } from "node:fs/promises";
 import { Clock, Data, Effect, FileSystem, Option, Path } from "effect";
-import { dayPattern, filePattern, isContinuous, marker } from "./Layout.ts";
+import {
+  dayPattern,
+  filePattern,
+  isContinuous,
+  lengthsFile,
+  marker,
+} from "./Layout.ts";
 
 const hour = 3_600_000;
 
@@ -228,13 +234,15 @@ export const prune = Effect.fnUntraced(function* (options: RetentionOptions) {
     { discard: true },
   );
 
-  // Day folders left empty go too
+  // Day folders left empty go too, with what was kept of their files
   yield* Effect.forEach(
     new Set(removing.map((file) => path.dirname(file.path))),
     (folder) =>
       fs.readDirectory(folder).pipe(
         Effect.flatMap((names) =>
-          names.length === 0 ? fs.remove(folder) : Effect.void,
+          names.every((name) => name.startsWith(lengthsFile))
+            ? fs.remove(folder, { recursive: true })
+            : Effect.void,
         ),
         Effect.ignore,
       ),

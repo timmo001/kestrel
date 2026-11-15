@@ -2,17 +2,20 @@
  * Reading the recordings folder back: the days a camera has files on, and
  * each file on a day with when it starts and ends and its tags. A file's end
  * comes from reading its length, kept while the file's size stays the same,
- * so a file still being written is read again as it grows.
+ * so a file still being written is read again as it grows. What's read is
+ * kept in each day folder too, so a restart doesn't read every file again,
+ * which takes minutes for a busy day on a small machine.
  *
  * @module
  */
 import * as Mp4 from "@timmo001/kestrel-format-mp4";
-import { Effect, FileSystem, Option, Path } from "effect";
+import { Effect, FileSystem, Option, Path, Schema } from "effect";
 import {
   InvalidKey,
   dayPattern,
   filePattern,
   isKey,
+  lengthsFile,
   marker,
 } from "./Layout.ts";
 
@@ -40,15 +43,23 @@ export interface RecordedDay {
   readonly untagged: boolean;
 }
 
+const Length = Schema.Struct({
+  bytes: Schema.Finite,
+  duration: Schema.Finite,
+  mixed: Schema.Boolean,
+});
+
+type Length = typeof Length.Type;
+
+/** A day folder's kept lengths, by file name. */
+const Lengths = Schema.fromJsonString(Schema.Record(Schema.String, Length));
+
+const decodeLengths = Schema.decodeUnknownOption(Lengths);
+
+const encodeLengths = Schema.encodeSync(Lengths);
+
 /** What's been read of each file so far, by path, with the size it was read at. */
-const lengths = new Map<
-  string,
-  {
-    readonly bytes: number;
-    readonly duration: number;
-    readonly mixed: boolean;
-  }
->();
+const lengths = new Map<string, Length>();
 
 /** A camera's folder, or `InvalidKey` for a key that could reach outside the recordings folder. */
 const cameraFolder = (folder: string, key: string) =>
@@ -152,6 +163,16 @@ export const files = Effect.fnUntraced(function* (
   if (!dayPattern.test(date)) return [];
 
   const dayFolder = path.join(yield* cameraFolder(folder, key), date);
+  const keptFile = path.join(dayFolder, lengthsFile);
+
+  const kept = yield* fs.readFileString(keptFile).pipe(
+    Effect.map(decodeLengths),
+    Effect.orElseSucceed(() => Option.none()),
+    Effect.map(Option.getOrElse((): Record<string, Length> => ({}))),
+  );
+
+  // Whether any file was read afresh, so what's kept needs writing again
+  let changed = false;
 
   const found = yield* Effect.forEach(
     (yield* namesIn(dayFolder)).toSorted(),
@@ -163,10 +184,14 @@ export const files = Effect.fnUntraced(function* (
 
         const file = path.join(dayFolder, name);
         const bytes = Number((yield* fs.stat(file)).size);
-        const known = lengths.get(file);
+        const known = lengths.get(file) ?? kept[name];
 
         const { duration, mixed } =
           known?.bytes === bytes ? known : yield* Mp4.info(file);
+
+        if (known?.bytes !== bytes || kept[name]?.bytes !== bytes) {
+          changed = true;
+        }
 
         lengths.set(file, { bytes, duration, mixed });
 
@@ -183,5 +208,27 @@ export const files = Effect.fnUntraced(function* (
     { concurrency: 8 },
   );
 
-  return found.flatMap((file) => Option.toArray(file));
+  const recorded = found.flatMap((file) => Option.toArray(file));
+
+  if (changed) {
+    // Written aside and moved into place, so a reader never sees half of it
+    const part = `${keptFile}.${crypto.randomUUID()}`;
+
+    const contents = encodeLengths(
+      Object.fromEntries(
+        recorded.map(({ path: file, bytes, duration, mixed }) => [
+          path.basename(file),
+          { bytes, duration, mixed },
+        ]),
+      ),
+    );
+
+    yield* fs.writeFileString(part, contents).pipe(
+      Effect.andThen(fs.rename(part, keptFile)),
+      Effect.catch(() => fs.remove(part, { force: true })),
+      Effect.ignore,
+    );
+  }
+
+  return recorded;
 });

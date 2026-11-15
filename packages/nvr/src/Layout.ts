@@ -11,6 +11,9 @@ import { Data } from "effect";
 /** The file each camera's folder holds, so clearing out only ever touches those. */
 export const marker = ".kestrel-recordings";
 
+/** The file each day folder keeps what's been read of its files in, so a restart doesn't read them all again. */
+export const lengthsFile = ".kestrel-lengths.json";
+
 export const dayPattern = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A file's start time and any tags, such as `14-02-33.motion+pir.mp4`. */
