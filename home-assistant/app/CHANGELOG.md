@@ -1,2 +1,2 @@
-- Popovers and sheets keep Tab inside while open, and Escape closes them, from Groundwork 0.45.0.
-- Small buttons, table headers and segmented controls have 44px touch areas on touch screens.
+- Sources says when a connected source has no details to show, rather than showing only its name.
+- The desktop app uses Groundwork 0.45.0.
