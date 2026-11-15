@@ -1529,6 +1529,9 @@ gw-table gw-sheet {
   --timeline-bar: max(2.25rem, var(--timeline-rows, 1) * 1.25rem);
   --timeline-height: calc(var(--timeline-bar) + 1.25rem);
   position: relative;
+  /* Over the controls above it, which stack over the picture, so the times
+     that rise out of the bar under the pointer and while dragging show */
+  z-index: 2;
   min-width: 0;
 }
 
