@@ -1,1 +1,2 @@
-- A recording that sticks on one frame at speed, with video loaded past it, now moves on by itself, as hls.js does, rather than freezing until it's moved.
+- Playing on from one recording into the next where they overlap, such as a camera's motion clips over its continuous recording, no longer leaves the picture black while the player loops between them.
+- Groundwork's PWA and tokens packages are updated to 0.49.0.
