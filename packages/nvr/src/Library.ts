@@ -26,8 +26,13 @@ export interface RecordedFile {
   readonly date: string;
   /** When it starts, local time, such as `2026-11-12T14:02:33`. */
   readonly begin: string;
-  /** How long it runs, in seconds. */
+  /** How long it really ran, in seconds. */
   readonly duration: number;
+  /**
+   * How many real seconds each of its own took: above 1 where the camera's
+   * clock ran slow, so its frames are spread out to fill the time.
+   */
+  readonly stretch: number;
   /** Its tags, such as `motion`. */
   readonly tags: ReadonlyArray<string>;
   readonly bytes: number;
@@ -151,6 +156,39 @@ export const days = Effect.fnUntraced(function* (
   return found.flatMap((day) => Option.toArray(day));
 });
 
+/** How much longer than its own timing a file must have run to be stretched, and by at least how many seconds. */
+const slowAfter = { ratio: 1.25, seconds: 10 };
+
+/** Past this stretch the file was more likely copied or touched since than recorded that slowly. */
+const stretchLimit = 4;
+
+/**
+ * How many real seconds each second of a file Kestrel recorded took. Some
+ * cameras' RTSP times frames at a rate they don't keep up, as in the dark,
+ * so a file's own timing runs short of the time it took. ffmpeg writes each
+ * file as the video arrives, so when it last changed is when it really
+ * ended. Copies keep their source's timing and aren't stretched, nor are
+ * files that only lag by a fragment still to come.
+ */
+const stretchOf = (
+  begin: string,
+  duration: number,
+  tags: ReadonlyArray<string>,
+  modified: Option.Option<Date>,
+) => {
+  if (tags.length > 0 || duration <= 0 || Option.isNone(modified)) return 1;
+
+  // Without an offset, a date and time is read as local time
+  const real = (modified.value.getTime() - new Date(begin).getTime()) / 1000;
+  const stretch = real / duration;
+
+  return stretch >= slowAfter.ratio &&
+    real - duration >= slowAfter.seconds &&
+    stretch <= stretchLimit
+    ? stretch
+    : 1;
+};
+
 /** A camera's files on a day, such as `2026-11-12`, earliest first. A file that can't be read is left out. */
 export const files = Effect.fnUntraced(function* (
   folder: string,
@@ -183,7 +221,8 @@ export const files = Effect.fnUntraced(function* (
         if (match === null) return Option.none<RecordedFile>();
 
         const file = path.join(dayFolder, name);
-        const bytes = Number((yield* fs.stat(file)).size);
+        const info = yield* fs.stat(file);
+        const bytes = Number(info.size);
         const known = lengths.get(file) ?? kept[name];
 
         const { duration, mixed } =
@@ -195,12 +234,17 @@ export const files = Effect.fnUntraced(function* (
 
         lengths.set(file, { bytes, duration, mixed });
 
+        const begin = `${date}T${match[1]}:${match[2]}:${match[3]}`;
+        const tags = tagsOf(match);
+        const stretch = stretchOf(begin, duration, tags, info.mtime);
+
         return Option.some<RecordedFile>({
           path: file,
           date,
-          begin: `${date}T${match[1]}:${match[2]}:${match[3]}`,
-          duration,
-          tags: tagsOf(match),
+          begin,
+          duration: duration * stretch,
+          stretch,
+          tags,
           bytes,
           mixed,
         });

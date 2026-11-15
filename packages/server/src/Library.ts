@@ -315,11 +315,11 @@ export class Library extends Context.Service<
             if (options.every === undefined && reached > start) {
               const key = yield* Mp4.keyFrameAt(
                 file.path,
-                reached - start,
+                (reached - start) / file.stretch,
               ).pipe(Effect.orElseSucceed(() => null));
 
               if (key !== null) {
-                begin = start + key;
+                begin = start + key * file.stretch;
 
                 while ((parts.at(-1)?.begin ?? -Infinity) >= begin) parts.pop();
 
@@ -355,13 +355,18 @@ export class Library extends Context.Service<
           }
 
           return Stream.fromIterable(parts).pipe(
-            Stream.flatMap((part) =>
+            // Plans are in real seconds; a stretched file reads in its own
+            Stream.flatMap(({ file, start, begin, stop }) =>
               Mp4.frames({
-                path: part.file.path,
-                start: part.start * 1e6,
-                from: part.begin - part.start,
-                to: part.stop - part.start,
-                every: options.every,
+                path: file.path,
+                start: start * 1e6,
+                from: (begin - start) / file.stretch,
+                to: (stop - start) / file.stretch,
+                every:
+                  options.every === undefined
+                    ? undefined
+                    : options.every / file.stretch,
+                stretch: file.stretch,
               }),
             ),
           );

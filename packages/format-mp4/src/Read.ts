@@ -364,7 +364,17 @@ export interface ReadOptions {
   readonly to: number;
   /** Key frames only, one per this many seconds. */
   readonly every?: number | undefined;
+  /**
+   * How many real seconds each of the file's own took, where its camera's
+   * clock ran slow: frames are timed by it, so they fill the real time.
+   * `from`, `to` and `every` stay in the file's own seconds.
+   */
+  readonly stretch?: number | undefined;
 }
+
+/** When a packet was recorded, in microseconds since 1970, spread out by any stretch. */
+const timeOf = (options: ReadOptions, packet: EncodedPacket) =>
+  options.start + Math.round(packet.timestamp * (options.stretch ?? 1) * 1e6);
 
 /** Of key frames in order, the one `every` seconds on from `index`, or the next when they're further apart. */
 const keyAfter = (
@@ -399,10 +409,10 @@ const repaired = (
   ): RecordedFrame => ({
     key,
     codec: "h264",
-    time: options.start + Math.round(packet.timestamp * 1e6),
+    time: timeOf(options, packet),
     width: mixed.width,
     height: mixed.height,
-    fps,
+    fps: fps / (options.stretch ?? 1),
     data: joined(units),
   });
 
@@ -495,10 +505,10 @@ export const frames = (
       const frameOf = (packet: EncodedPacket): RecordedFrame => ({
         key: packet.type === "key",
         codec: hevc ? "h265" : "h264",
-        time: options.start + Math.round(packet.timestamp * 1e6),
+        time: timeOf(options, packet),
         width: track.codedWidth,
         height: track.codedHeight,
-        fps: stats.averagePacketRate,
+        fps: stats.averagePacketRate / (options.stretch ?? 1),
         data: annexB(packet.data, sets, hevc, packet.type === "key"),
       });
 
