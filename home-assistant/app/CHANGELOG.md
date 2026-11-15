@@ -1,3 +1,2 @@
-## Fixes
-
-- Front Door recordings where the camera mixed a second, smaller picture into the main one now play cleanly. The server drops the stray frames as it reads each file, without re-encoding, and the player says so on the tile; the recordings table marks these clips as repaired (timmo001/kestrel#30).
+- Reolink cameras are now recorded over Reolink's own protocol on port 9000 rather than RTSP, whose main stream on some cameras weaves in frames from the sub stream. Where that can't start, recording falls back to RTSP, and the source's page in Settings says which it's using and why (timmo001/kestrel#32).
+- The docs' theme picker uses Kestrel's own theme colours.
