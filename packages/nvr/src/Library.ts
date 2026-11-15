@@ -260,9 +260,10 @@ export const files = Effect.fnUntraced(function* (
 
     const contents = encodeLengths(
       Object.fromEntries(
-        recorded.map(({ path: file, bytes, duration, mixed }) => [
+        // Its own length, not stretched, so it's stretched again when read
+        recorded.map(({ path: file, bytes, duration, stretch, mixed }) => [
           path.basename(file),
-          { bytes, duration, mixed },
+          { bytes, duration: duration / stretch, mixed },
         ]),
       ),
     );
