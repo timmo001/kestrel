@@ -1,3 +1,1 @@
-- The time under the pointer on the timeline, and the one shown while dragging, now show in full over the controls above it.
-- A recording's Repaired note sits just above the controls while they're over the picture, and moves down with them.
-- Groundwork 0.48.0.
+- A recording that has loaded to its end now ends there, rather than asking the server for time past its end and showing "The server answered 404" at fast speeds.
