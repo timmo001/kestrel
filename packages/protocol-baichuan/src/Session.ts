@@ -1,7 +1,8 @@
 /**
  * One logged-in connection to a Reolink camera, hub or recorder on its own
- * protocol: it matches replies to requests, and replays recorded files as
- * the media stream they hold, which its HTTP API can't always hand over.
+ * protocol: it matches replies to requests, replays recorded files as
+ * the media stream they hold, which its HTTP API can't always hand over, and
+ * streams live video the same way.
  * The connection logs out and closes with the scope it was opened in.
  *
  * @module
@@ -77,12 +78,23 @@ export class ReplayRefused extends Schema.TaggedError<ReplayRefused>()(
   }
 }
 
+/** The device turned live video down. */
+export class LiveRefused extends Schema.TaggedError<LiveRefused>()(
+  "LiveRefused",
+  { status: Schema.Number },
+) {
+  override get message() {
+    return `It refused to send live video (${this.status})`;
+  }
+}
+
 export type SessionError =
   | LoginRefused
   | ProtocolError
   | RequestTimedOut
   | ConnectionClosed
-  | ReplayRefused;
+  | ReplayRefused
+  | LiveRefused;
 
 export interface SessionOptions {
   readonly host: string;
@@ -104,6 +116,14 @@ export interface ReplayOptions {
   readonly idle?: Duration.Input | undefined;
 }
 
+export interface LiveOptions {
+  /** Its channel, from 0. */
+  readonly channel: number;
+  readonly stream?: "main" | "sub" | undefined;
+  /** How long a pause fails the stream, 10 seconds by default. */
+  readonly idle?: Duration.Input | undefined;
+}
+
 export interface Session {
   /** Its device type, such as `ipc` or `homehub`, and how many channels it has. */
   readonly device: { readonly type: string; readonly channels: number };
@@ -115,11 +135,21 @@ export interface Session {
   readonly replay: (
     options: ReplayOptions,
   ) => Stream.Stream<Uint8Array, SessionError>;
+  /**
+   * A channel's live video as its media stream (see `Media.decoder`), in
+   * the pieces it comes in, until it's no longer read; it fails when the
+   * device stops sending. It's asked for as neolink does.
+   */
+  readonly live: (
+    options: LiveOptions,
+  ) => Stream.Stream<Uint8Array, SessionError>;
 }
 
 const Command = {
   login: 1,
   logout: 2,
+  live: 3,
+  liveStop: 4,
   replay: 5,
   replayStop: 7,
 } as const;
@@ -133,6 +163,7 @@ const lastHandle = 239;
 
 const defaultTimeout = Duration.seconds(20);
 const defaultIdle = Duration.seconds(3);
+const defaultLiveIdle = Duration.seconds(10);
 
 /** How many of a replay's messages wait to be read before the connection is left unread. */
 const replayBacklog = 32;
@@ -208,6 +239,25 @@ const stopXml = (options: ReplayOptions) => {
   ].join("\n");
 };
 
+/**
+ * Asks for live video, or with `start` false stops it. The official client
+ * gives the sub stream handle 256, as neolink found.
+ */
+const liveXml = (options: LiveOptions, start: boolean) => {
+  const stream = options.stream ?? "main";
+
+  return [
+    xmlHead,
+    "<body>",
+    '<Preview version="1.1">',
+    `<channelId>${options.channel}</channelId>`,
+    `<handle>${stream === "sub" ? 256 : 0}</handle>`,
+    ...(start ? [`<streamType>${stream}Stream</streamType>`] : []),
+    "</Preview>",
+    "</body>",
+  ].join("\n");
+};
+
 /** Logs in over an open socket. */
 export const open = Effect.fnUntraced(function* (
   socket: Socket.Socket,
@@ -222,6 +272,8 @@ export const open = Effect.fnUntraced(function* (
   const write = (yield* socket.writer).write;
   const pending = new Map<string, Deferred.Deferred<Frame, SessionError>>();
   const replays = new Map<number, Queue.Queue<Frame, SessionError>>();
+  /** Live streams' queues, by the message number they were asked for with. */
+  const lives = new Map<number, Queue.Queue<Frame, SessionError>>();
   let aes: Cipher | undefined;
   let message = 0;
   let handle = lastHandle;
@@ -229,6 +281,12 @@ export const open = Effect.fnUntraced(function* (
 
   const keyOf = (cmd: number, channel: number, number: number) =>
     `${cmd}:${channel}:${number}`;
+
+  const nextNumber = () => {
+    message = (message + 1) % 65536;
+
+    return message;
+  };
 
   const send = (frame: Uint8Array) =>
     Effect.suspend(() => write(frame)).pipe(Effect.mapError(closedBy));
@@ -261,10 +319,7 @@ export const open = Effect.fnUntraced(function* (
       }
 
       const channel = options.channel ?? deviceChannel;
-
-      message = (message + 1) % 65536;
-
-      const number = options.number ?? message;
+      const number = options.number ?? nextNumber();
       const key = keyOf(options.cmd, channel, number);
       const reply = yield* Deferred.make<Frame, SessionError>();
 
@@ -296,6 +351,13 @@ export const open = Effect.fnUntraced(function* (
 
     if (replay !== undefined) {
       return Queue.offer(replay, frame).pipe(Effect.asVoid);
+    }
+
+    const live =
+      frame.cmd === Command.live ? lives.get(frame.message) : undefined;
+
+    if (live !== undefined) {
+      return Queue.offer(live, frame).pipe(Effect.asVoid);
     }
 
     const waiting = pending.get(keyOf(frame.cmd, frame.channel, frame.message));
@@ -333,6 +395,8 @@ export const open = Effect.fnUntraced(function* (
         }
 
         for (const replay of replays.values()) yield* Queue.fail(replay, error);
+
+        for (const live of lives.values()) yield* Queue.fail(live, error);
         pending.clear();
       }),
     ),
@@ -482,12 +546,78 @@ export const open = Effect.fnUntraced(function* (
     );
   };
 
+  const live: Session["live"] = (options) => {
+    const number = nextNumber();
+    const streamType = options.stream === "sub" ? 1 : 0;
+
+    const ask = (cmd: number, start: boolean) =>
+      send(
+        encodeFrame({
+          cmd,
+          channel: options.channel,
+          message: number,
+          streamType,
+          messageClass: MessageClass.modern,
+          payload: sealed(liveXml(options, start), options.channel),
+        }),
+      );
+
+    return Stream.unwrap(
+      Effect.gen(function* () {
+        const queue = yield* Queue.bounded<Frame, SessionError>(replayBacklog);
+
+        lives.set(number, queue);
+
+        yield* ask(Command.live, true);
+
+        const first = yield* Queue.take(queue).pipe(
+          Effect.timeoutOrElse({
+            duration: timeout,
+            orElse: () =>
+              Effect.fail(new RequestTimedOut({ cmd: Command.live })),
+          }),
+        );
+
+        if (first.status !== 200) {
+          return yield* new LiveRefused({ status: first.status });
+        }
+
+        // Live video has no end, so a pause means it's stopped sending
+        const next = Queue.take(queue).pipe(
+          Effect.timeoutOrElse({
+            duration: options.idle ?? defaultLiveIdle,
+            orElse: () =>
+              Effect.fail(
+                new ConnectionClosed({ message: "It stopped sending video" }),
+              ),
+          }),
+          Effect.map((frame) => [mediaOf(frame)] as const),
+        );
+
+        return Stream.fromPull(Effect.succeed(next));
+      }),
+    ).pipe(
+      Stream.ensuring(
+        Effect.gen(function* () {
+          const queue = lives.get(number);
+
+          lives.delete(number);
+
+          if (queue !== undefined) yield* Queue.shutdown(queue);
+
+          if (isOpen) yield* ask(Command.liveStop, false).pipe(Effect.ignore);
+        }),
+      ),
+    );
+  };
+
   return {
     device: {
       type: element(info, "type") ?? "",
       channels: Number(element(info, "channelNum") ?? 1),
     },
     replay,
+    live,
   } satisfies Session;
 });
 

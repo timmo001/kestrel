@@ -1,6 +1,6 @@
 /**
  * A client for Reolink's own protocol on port 9000, known as Baichuan: log
- * in, and replay recorded files as their media stream.
+ * in, replay recorded files and stream live video as their media stream.
  *
  * @module
  */

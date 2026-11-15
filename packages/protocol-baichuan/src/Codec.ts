@@ -72,6 +72,8 @@ export const encodeFrame = (options: {
   readonly cmd: number;
   readonly channel: number;
   readonly message: number;
+  /** Which of a camera's streams it's about, as live view says: 0 for main, 1 for sub. */
+  readonly streamType?: number;
   readonly status?: number;
   readonly messageClass: number;
   readonly extension?: Uint8Array;
@@ -86,6 +88,7 @@ export const encodeFrame = (options: {
   fields.setUint32(4, options.cmd, true);
   fields.setUint32(8, extension.length + options.payload.length, true);
   fields.setUint8(12, options.channel & 0xff);
+  fields.setUint8(13, options.streamType ?? 0);
   fields.setUint16(14, options.message & 0xffff, true);
   fields.setUint16(16, options.status ?? 0, true);
   fields.setUint16(18, options.messageClass, true);
