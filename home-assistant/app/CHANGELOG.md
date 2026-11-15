@@ -1,3 +1,3 @@
-- Stretched recordings stay stretched after the server restarts or lists the day again.
-- Short gaps in recorded video keep their length, so stretched recordings stay on the clock and end where they should.
-- A recording that runs out of loaded video right at its end now loads the rest rather than waiting, so fast playback moves on to the next file.
+- The time under the pointer on the timeline, and the one shown while dragging, now show in full over the controls above it.
+- A recording's Repaired note sits just above the controls while they're over the picture, and moves down with them.
+- Groundwork 0.48.0.
