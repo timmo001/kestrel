@@ -1,2 +1,1 @@
-- Sources says when a connected source has no details to show, rather than showing only its name.
-- The desktop app uses Groundwork 0.45.0.
+- Recordings no longer break up or flicker where one recording file runs into the next: playback now moves to the next file at its own key frame. Fixes timmo001/kestrel#30.
