@@ -1,1 +1,1 @@
-- Recordings no longer break up or flicker where one recording file runs into the next: playback now moves to the next file at its own key frame. Fixes timmo001/kestrel#30.
+- Recordings from a Reolink hub play again, and are copied into the recordings folder again.
