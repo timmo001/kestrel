@@ -1,1 +1,1 @@
-- Recordings from a Reolink hub play again, and are copied into the recordings folder again.
+- Dragging or pressing behind an event with Events only on now lands in its last 30 seconds, so playback no longer carries straight on back to where you came from.
