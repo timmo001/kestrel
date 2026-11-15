@@ -1511,7 +1511,7 @@ export const livePage = (): LivePage => {
 
   fullscreenToggle(fullscreenButton, stage);
 
-  const help = helpToggle(shortcutsPopover, helpButton);
+  const help = helpToggle(shortcutsPopover, helpButton, stage);
 
   // On a touch screen: one finger across the cameras moves on or back a
   // page, and three up or down open or close the help

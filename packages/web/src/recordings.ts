@@ -1924,7 +1924,12 @@ export const recordingsPage = (options: RecordingsOptions): RecordingsPage => {
   // The help button, or ?, opens the keys and gestures by the button and
   // shuts them again
   setIcon(helpButton, phQuestionMark);
-  const helpWired = helpToggle(find("gw-popover", "shortcuts"), helpButton);
+
+  const helpWired = helpToggle(
+    find("gw-popover", "shortcuts"),
+    helpButton,
+    stage,
+  );
 
   help = helpWired;
 

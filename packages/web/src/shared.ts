@@ -38,11 +38,18 @@ export const swipeIgnore = `${barDragIgnore}, .player-controls`;
 export const helpToggle = (
   popover: HTMLElementTagNameMap["gw-popover"] | null,
   button: HTMLElementTagNameMap["gw-button"] | null,
+  player: HTMLElement | null = null,
 ) => {
   let open = false;
 
   popover?.addEventListener("close", () => {
     open = false;
+
+    // With its button folded into More, the focus it goes back to is lost,
+    // so the player takes it and its keys keep working
+    if (button !== null && !button.checkVisibility()) {
+      player?.focus({ preventScroll: true, focusVisible: false });
+    }
   });
 
   const toggle = () => {
