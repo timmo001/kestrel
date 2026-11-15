@@ -510,7 +510,11 @@ gw-table gw-sheet {
 .player-tile-note {
   position: absolute;
   inset-inline: var(--gw-space-2);
-  inset-block-end: var(--gw-space-2);
+  /* Just above the controls while they're over the picture, moving down
+     with them as they go */
+  inset-block-end: calc(
+    var(--gw-overlay-controls-height, 0px) + var(--gw-space-2)
+  );
   display: -webkit-box;
   inline-size: fit-content;
   max-inline-size: calc(100% - 2 * var(--gw-space-2));
@@ -526,6 +530,8 @@ gw-table gw-sheet {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   pointer-events: none;
+  transition: inset-block-end var(--gw-motion-normal, 200ms)
+    var(--gw-motion-easing-enter, ease);
   animation: player-note-in var(--gw-motion-normal, 200ms)
     var(--gw-motion-easing, ease);
 }
@@ -539,6 +545,7 @@ gw-table gw-sheet {
 
 @media (prefers-reduced-motion: reduce) {
   .player-tile-note {
+    transition: none;
     animation: none;
   }
 }
