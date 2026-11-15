@@ -1,2 +1,1 @@
-- A day's recordings list quickly after a restart: what's read of each recorded file is kept beside it, so the server doesn't read every file again. A busy day could take minutes on a small machine like the Home Assistant Green.
-- A Reolink camera is recorded over its own protocol from the start, rather than over RTSP when recording began before go2rtc was ready (timmo001/kestrel#32).
+- A clip a camera sends over FTP is no longer lost when a copy pass from a source runs while it arrives: only part-written files nothing has written to for 10 minutes are cleared away.
