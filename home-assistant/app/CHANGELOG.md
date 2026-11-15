@@ -1,1 +1,1 @@
-- Fast playback that catches up with what today's cameras have recorded so far now drops to 1× and follows the newest recording as it grows, with a "Caught up" note, rather than stopping.
+- A recording that sticks on one frame at speed, with video loaded past it, now moves on by itself, as hls.js does, rather than freezing until it's moved.
