@@ -1,1 +1,2 @@
-- After Help closes from the More menu, the player gets the focus back, so its keys keep working.
+- Popovers and sheets keep Tab inside while open, and Escape closes them, from Groundwork 0.45.0.
+- Small buttons, table headers and segmented controls have 44px touch areas on touch screens.
