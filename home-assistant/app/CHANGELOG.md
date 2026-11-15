@@ -1,1 +1,3 @@
-- Recordings a camera timed too fast, such as the Front Door's RTSP files at dusk, are now spread out to fill the time they really took, so they play at normal speed.
+- Stretched recordings stay stretched after the server restarts or lists the day again.
+- Short gaps in recorded video keep their length, so stretched recordings stay on the clock and end where they should.
+- A recording that runs out of loaded video right at its end now loads the rest rather than waiting, so fast playback moves on to the next file.
