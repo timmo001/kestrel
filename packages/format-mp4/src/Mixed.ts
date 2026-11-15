@@ -181,24 +181,38 @@ const sliceOf = (unit: Uint8Array, frameBits: number) => {
 
 /**
  * Where a file's key frames come in two sizes, at least `keyGap` times
- * apart, the size between them; `undefined` when they don't.
+ * apart, the size between them; `undefined` when they don't. The two are
+ * found by Otsu's method on the sizes' logarithms, so a few odd key frames,
+ * such as one the camera cut short, don't pass for a picture of their own.
  */
 export const splitOf = (sizes: ReadonlyArray<number>) => {
-  const sorted = sizes.toSorted((a, b) => a - b);
-  let widest = 0;
+  const logs = sizes
+    .flatMap((size) => (size > 0 ? [Math.log(size)] : []))
+    .toSorted((a, b) => a - b);
+
+  const total = logs.reduce((sum, each) => sum + each, 0);
+  let below = 0;
+  let best = 0;
   let split: number | undefined;
 
-  for (let index = 1; index < sorted.length; index++) {
-    const below = sorted[index - 1] ?? 0;
-    const above = sorted[index] ?? 0;
+  for (let index = 1; index < logs.length; index++) {
+    const low = logs[index - 1] ?? 0;
+    const high = logs[index] ?? 0;
 
-    if (below > 0 && above / below > widest) {
-      widest = above / below;
-      split = Math.sqrt(above * below);
+    below += low;
+
+    const apart = (total - below) / (logs.length - index) - below / index;
+
+    const spread = index * (logs.length - index) * apart ** 2;
+
+    if (spread > best) {
+      best = spread;
+      split =
+        high - low >= Math.log(keyGap) ? Math.exp((low + high) / 2) : undefined;
     }
   }
 
-  return widest >= keyGap ? split : undefined;
+  return split;
 };
 
 /**
@@ -271,6 +285,14 @@ export const repairer = (mixed: Mixed) => {
     );
 
     if (fits.length === 1) return fits[0];
+
+    // Carrying on neither while one's counter isn't known yet, as at the
+    // start of a file, it's that one's
+    const unknown = (["main", "other"] as const).filter(
+      (picture) => !next.has(picture),
+    );
+
+    if (fits.length === 0 && unknown.length === 1) return unknown[0];
 
     const main = usual.get("main");
     const other = usual.get("other");
