@@ -26,8 +26,23 @@ the server; see [Linux services](/running#linux-services).
 <Tabs syncKey="method">
 <Tab title="Arch Linux">
 
-`kestrel-nvr-bin` is in the unofficial `timmo` pacman repository, for x86_64.
-Add it before the other repository sections in `/etc/pacman.conf`:
+Install `kestrel-nvr-bin` from the `timmo` pacman repository, which has
+ready-built, signed packages, or from the AUR. Only released versions are
+packaged, so there's no `-git` package.
+
+**From the pacman repository**
+
+Add its signing key, check the fingerprint is
+`F94469C08E3B717014E2815FA026A3671E9151DA`, then trust it:
+
+```sh
+curl -fsSLO https://packages.timmo.dev/timmo-arch-repo.asc
+sudo pacman-key --add timmo-arch-repo.asc
+sudo pacman-key --finger F94469C08E3B717014E2815FA026A3671E9151DA
+sudo pacman-key --lsign-key F94469C08E3B717014E2815FA026A3671E9151DA
+```
+
+Add the repository to `/etc/pacman.conf`, above the other repositories:
 
 ```ini title="/etc/pacman.conf"
 [timmo]
@@ -35,19 +50,38 @@ SigLevel = PackageRequired DatabaseOptional TrustedOnly
 Server = https://packages.timmo.dev/$arch
 ```
 
+Then install it, for x86_64:
+
 ```sh
 sudo pacman -Syu kestrel-nvr-bin
 ```
 
-It's in the AUR too, for x86_64 and aarch64:
+`pacman -Syu` keeps it up to date with the rest of your system. These are
+unofficial packages, not supported by Arch Linux.
+
+**From the AUR**
+
+The [kestrel-nvr-bin](https://aur.archlinux.org/packages/kestrel-nvr-bin)
+package installs the release's archive with an AUR helper such as
+[yay](https://github.com/Jguer/yay), for x86_64 and aarch64:
 
 ```sh
 yay -S kestrel-nvr-bin
 ```
 
-The desktop app's libraries (`webkit2gtk-4.1`, `gtk3` and
-`libayatana-appindicator`) and `ffmpeg` are optional, so a box with no
-desktop takes the package for `kestrel serve` alone.
+**From a release**
+
+Each [release](https://github.com/timmo001/kestrel/releases) has the
+x86_64 package as `kestrel-nvr-bin-<version>-1-x86_64.pkg.tar.zst`:
+
+```sh
+sudo pacman -U kestrel-nvr-bin-*-x86_64.pkg.tar.zst
+```
+
+It conflicts with the AUR's `kestrel`, a file encryption tool, since both
+have a `kestrel` command. The desktop app's libraries (`webkit2gtk-4.1`,
+`gtk3` and `libayatana-appindicator`) and `ffmpeg` are optional, so a box
+with no desktop takes the package for `kestrel serve` alone.
 
 </Tab>
 <Tab title="Debian / Ubuntu">
