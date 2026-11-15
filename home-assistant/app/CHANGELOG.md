@@ -1,2 +1,1 @@
-- Listing a day's recordings reads only each file's index: it read about 30 MB of every 5 minute file before, so a busy day took minutes the first time on a small machine like the Home Assistant Green.
-- A recording that runs past midnight shows its length rather than 0 s.
+- Recordings where the camera mixed in a second, smaller picture play smoothly again: the repair kept only the main picture's key frames and a frame or two after each, so playback froze after a few seconds. It now keeps every frame of the main picture.
