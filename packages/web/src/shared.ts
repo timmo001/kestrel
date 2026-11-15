@@ -17,7 +17,7 @@ import {
   phDownloadSimple,
   phPlay,
 } from "./icons.ts";
-import { clipUrl, type Clip } from "./recording-player.ts";
+import { clipUrl, toSeconds, type Clip } from "./recording-player.ts";
 
 /**
  * What a drag on a player already moves, so a touch starting there never
@@ -285,8 +285,9 @@ export const seconds = (time: string) => {
   return hours * 3600 + minutes * 60 + rest;
 };
 
+/** How long from `begin` to `end`, which may be on the next day. */
 const duration = (begin: string, end: string) => {
-  const total = Math.max(seconds(end) - seconds(begin), 0);
+  const total = Math.max(Math.round(toSeconds(end) - toSeconds(begin)), 0);
   const minutes = Math.floor(total / 60);
 
   return minutes > 0 ? `${minutes} min ${total % 60} s` : `${total} s`;
