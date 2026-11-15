@@ -1,1 +1,1 @@
-- Recordings where the camera mixed in a second, smaller picture play smoothly again: the repair kept only the main picture's key frames and a frame or two after each, so playback froze after a few seconds. It now keeps every frame of the main picture.
+- Recordings a camera timed too fast, such as the Front Door's RTSP files at dusk, are now spread out to fill the time they really took, so they play at normal speed.
