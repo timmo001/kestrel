@@ -8,14 +8,17 @@
  * @module
  */
 import type { RecordedFrame } from "@timmo001/kestrel-core";
-import { Effect, Stream } from "effect";
+import { Effect, FileSystem, Predicate, Stream } from "effect";
+import type { PlatformError } from "effect/PlatformError";
 import {
+  CustomSource,
   EncodedPacketSink,
   FilePathSource,
   Input,
   MP4,
   type EncodedPacket,
   type InputVideoTrack,
+  type Source,
 } from "mediabunny";
 import { Mp4Error } from "./Errors.ts";
 import * as Mixed from "./Mixed.ts";
@@ -157,14 +160,52 @@ const attempt = <A>(run: () => Promise<A>) =>
       }),
   });
 
-/** A file's H.264 or H.265 track, closed with the scope. */
-const opened = (path: string) =>
+/**
+ * A file read for its index alone, reading only the bytes asked for. A
+ * recording is in fragments of a second or two, and the usual source pads
+ * each read of a fragment's header to 192 KB, so reading a 5 minute file's
+ * index read some 30 MB of it.
+ */
+const indexSource = Effect.fnUntraced(function* (path: string) {
+  const fs = yield* FileSystem.FileSystem;
+  const file = yield* fs.open(path);
+  const size = Number((yield* file.stat).size);
+
+  /** Fills `buffer` from `start` on, as a read may stop short. */
+  const fill = (
+    buffer: Uint8Array,
+    start: number,
+    done: number,
+  ): Effect.Effect<Uint8Array, Mp4Error | PlatformError> =>
+    done === buffer.length
+      ? Effect.succeed(buffer)
+      : file
+          .read(buffer.subarray(done), { position: BigInt(start + done) })
+          .pipe(
+            Effect.flatMap((read) =>
+              read === 0
+                ? Effect.fail(
+                    new Mp4Error({
+                      message: `${path} ended at byte ${start + done}`,
+                    }),
+                  )
+                : fill(buffer, start, done + read),
+            ),
+          );
+
+  return new CustomSource({
+    getSize: () => size,
+    read: (start, end) =>
+      Effect.runPromise(fill(new Uint8Array(end - start), start, 0)),
+    prefetchProfile: "none",
+  });
+});
+
+/** An input's H.264 or H.265 track, with the input disposed of with the scope. */
+const trackOf = (path: string, source: Source) =>
   Effect.acquireRelease(
     attempt(async () => {
-      const input = new Input({
-        source: new FilePathSource(path),
-        formats: [MP4],
-      });
+      const input = new Input({ source, formats: [MP4] });
 
       const track = await input.getPrimaryVideoTrack().catch((error) => {
         input.dispose();
@@ -179,6 +220,20 @@ const opened = (path: string) =>
       return { input, track };
     }),
     ({ input }) => Effect.sync(() => input.dispose()),
+  );
+
+/** A file's H.264 or H.265 track, closed with the scope. */
+const opened = (path: string) => trackOf(path, new FilePathSource(path));
+
+/** A file's H.264 or H.265 track for reading its index, closed with the scope. */
+const openedIndex = (path: string) =>
+  indexSource(path).pipe(
+    Effect.mapError((error) =>
+      Predicate.isTagged(error, "Mp4Error")
+        ? error
+        : new Mp4Error({ message: error.message }),
+    ),
+    Effect.flatMap((source) => trackOf(path, source)),
   );
 
 /** The parameter sets a track keeps in its decoder config. */
@@ -251,7 +306,7 @@ const mixedIn = (
 export const info = (path: string) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { track } = yield* opened(path);
+      const { track } = yield* openedIndex(path);
       const sink = new EncodedPacketSink(track);
 
       const last = yield* attempt(() =>
@@ -280,7 +335,7 @@ const keyAt = (keys: ReadonlyArray<EncodedPacket>, at: number) =>
 export const keyFrameAt = (path: string, at: number) =>
   Effect.scoped(
     Effect.gen(function* () {
-      const { track } = yield* opened(path);
+      const { track } = yield* openedIndex(path);
       const sink = new EncodedPacketSink(track);
       const verified = { verifyKeyPackets: true };
       const mixed = yield* mixedIn(track, sink, yield* setsOf(track));
