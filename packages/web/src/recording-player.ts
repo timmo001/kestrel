@@ -329,7 +329,10 @@ export const playerFor = (
           await settle(target);
           media.endOfStream();
         }
-      } else if (!isLoaded(video.currentTime)) {
+      } else if (
+        !isLoaded(video.currentTime) ||
+        video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA
+      ) {
         resume();
       }
     } catch (error) {
@@ -404,14 +407,11 @@ export const playerFor = (
     if (current !== undefined) events.onEnded(current);
   });
 
+  // Out of video with no load under way: more is needed, even where the
+  // playhead is within a frame or two of the end of what's loaded, which
+  // counts as loaded for a seek
   video.addEventListener("waiting", () => {
-    if (
-      current !== undefined &&
-      loading === undefined &&
-      !isLoaded(video.currentTime)
-    ) {
-      resume();
-    }
+    if (current !== undefined && loading === undefined) resume();
   });
 
   const stop = () => {
