@@ -384,9 +384,36 @@ export const playerFor = (
    * from the next second instead.
    */
   const resume = () => {
+    const clip = current;
+
+    if (clip === undefined) return;
+
     const until = loadedUntil() * view.speedUp;
 
-    void load(Math.floor(until) <= loadStart ? Math.ceil(until + 0.5) : until);
+    const from =
+      Math.floor(until) <= loadStart ? Math.ceil(until + 0.5) : until;
+
+    // Nothing of the clip is left to load, so the video ends where it is
+    // rather than asking the server for time past the clip's end
+    if (from >= toSeconds(clip.end) - toSeconds(clip.begin) - 1) {
+      void finish();
+
+      return;
+    }
+
+    void load(from);
+  };
+
+  /** Ends the video at the end of what's loaded, so it plays out and ends. */
+  const finish = async () => {
+    const media = source;
+    const target = buffer;
+
+    if (media?.readyState !== "open" || target === undefined) return;
+
+    await settle(target);
+
+    if (source === media && media.readyState === "open") media.endOfStream();
   };
 
   /** Whether the load under way starts at or just before `time`, so will reach it soon. */
