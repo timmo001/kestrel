@@ -25,7 +25,7 @@ const parsed = parseTheme(
 
 if ("failure" in parsed) throw new Error(String(parsed.failure));
 
-const { theme, checks } = runtimeTheme(parsed.success);
+const { theme, css: tokens, checks } = runtimeTheme(parsed.success);
 const misses = checks.filter((check) => !check.passes);
 
 if (misses.length > 0) {
@@ -41,9 +41,11 @@ const to = css.indexOf(end);
 if (from === -1 || to < from) throw new Error("theme.css has no markers");
 
 // Formatted as the repository formats CSS, so a run changes nothing unless
-// the theme does
+// the theme does. Its own tokens come last: the picker's select and segmented
+// control take their colours from `[data-gw-theme]` rules, which Groundwork
+// only has for its own themes
 const rendered = await format(
-  `${css.slice(0, from + start.length)}\n${blumeThemeCss(theme)}\n${blumeThemesCss([theme])}\n${css.slice(to)}`,
+  `${css.slice(0, from + start.length)}\n${blumeThemeCss(theme)}\n${blumeThemesCss([theme])}\n${tokens}\n${css.slice(to)}`,
   { ...(await resolveConfig("theme.css")), filepath: "theme.css" },
 );
 
