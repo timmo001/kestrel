@@ -537,8 +537,9 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     // camera's own doesn't look like Kestrel's
     const note = element("div");
 
+    // Short enough for two lines on a phone's tile, as the clamp hides the rest
     const noteText =
-      "the camera mixed a second, smaller picture into this recording, so Kestrel plays the main one alone.";
+      "the camera mixed in a second picture; Kestrel left it out.";
 
     note.className = "player-tile-note";
     note.role = "note";
