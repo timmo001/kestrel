@@ -1,1 +1,2 @@
-- A clip a camera sends over FTP is no longer lost when a copy pass from a source runs while it arrives: only part-written files nothing has written to for 10 minutes are cleared away.
+- Listing a day's recordings reads only each file's index: it read about 30 MB of every 5 minute file before, so a busy day took minutes the first time on a small machine like the Home Assistant Green.
+- A recording that runs past midnight shows its length rather than 0 s.
