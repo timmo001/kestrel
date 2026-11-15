@@ -182,6 +182,8 @@ export const playerFor = (
   let bufferType = "";
   /** Where the video's time 0 is in the clip: 0, unless the browser plays the MP4 directly from a later start. */
   let base = 0;
+  /** Where in the clip it started playing, in seconds. */
+  let startedFrom = 0;
   let objectUrl = "";
   /** The stream and speed-up: a second of the video is `view.speedUp` seconds of the clip. */
   let view = fullView;
@@ -521,6 +523,7 @@ export const playerFor = (
     );
 
     current = clip;
+    startedFrom = start;
 
     // Without Media Source Extensions, such as on an iPhone, the browser
     // plays the MP4 as it arrives, seeking only within what has loaded. The
@@ -565,8 +568,16 @@ export const playerFor = (
     if (autoplay) await video.play().catch(() => undefined);
   };
 
-  /** Seconds into the clip at the playhead. */
-  const offset = () => base + video.currentTime * view.speedUp;
+  /**
+   * Seconds into the clip at the playhead. Until the clip has any video, the
+   * video's time can still be the last clip's, which put the clock in
+   * another recording and loaded that, over and over, so it's where the
+   * clip started
+   */
+  const offset = () =>
+    video.readyState === HTMLMediaElement.HAVE_NOTHING
+      ? startedFrom
+      : base + video.currentTime * view.speedUp;
 
   return {
     play,

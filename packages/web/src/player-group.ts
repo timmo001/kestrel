@@ -836,7 +836,6 @@ export const playerGroup = (grid: HTMLElement, events: GroupEvents): Group => {
     video: () => driver?.video,
     lead: () => tiles.get(picked)?.video,
     tiles: () => [...tiles.values()],
-    // Held for another camera's video, it's still playing
     // Held for another camera's video, or waiting for more to be recorded,
     // it's still playing
     paused: () =>
