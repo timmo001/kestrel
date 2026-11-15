@@ -42,8 +42,13 @@ export const avcCodec = (data: Uint8Array) => {
  */
 export const hevcCodec = "hvc1.1.6.L150.90";
 
-/** Gaps longer than this, such as between motion clips, play as one frame. */
-const longestGap = 2;
+/**
+ * Gaps longer than this, such as between motion clips, play as one frame.
+ * Shorter ones keep their length, so the video stays on the clock: a
+ * camera's own dropouts run to a second or so, and up to four times that
+ * where a file's frames are spread out to fill the time it took.
+ */
+const longestGap = 5;
 
 /**
  * Writes frames as fragmented MP4, a fragment per key frame group, and
