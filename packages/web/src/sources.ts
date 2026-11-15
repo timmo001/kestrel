@@ -127,6 +127,8 @@ const sourceSection = (
       ),
     );
     parts.push(grid, camerasTable(details));
+  } else if (source.connection.connected) {
+    parts.push(element("p", "Connected. This source has no details to show."));
   }
 
   section.className = "source";
