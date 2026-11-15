@@ -150,7 +150,7 @@ neolink and nodelink-js clients: replaying a hub or recorder's files, which
 its HTTP API can't always hand over, and live video for recording, since
 some cameras' RTSP main stream weaves in frames from the sub stream.
 
-### Framing
+### The message header
 
 Every message starts with `f0 de bc 0a`, then, little-endian, the command
 (4 bytes), the body's size (4), the channel (1), the stream (1, 0 for main
