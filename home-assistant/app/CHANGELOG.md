@@ -1,1 +1,1 @@
-- A recording that has loaded to its end now ends there, rather than asking the server for time past its end and showing "The server answered 404" at fast speeds.
+- Fast playback that catches up with what today's cameras have recorded so far now drops to 1× and follows the newest recording as it grows, with a "Caught up" note, rather than stopping.
