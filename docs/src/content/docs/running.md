@@ -468,5 +468,7 @@ If it doesn't come up without a saved login, `op run` may be waiting for
 | `KESTREL_RECORDINGS`       | `recordings` in the state folder | Where the server's own recordings go                                |
 | `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                  |
 | `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links            |
+| `KESTREL_ANNOUNCE`         | `true`                           | Whether it announces itself over mDNS; `false` keeps it quiet       |
 | `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets             |
+| `KESTREL_INGRESS_FROM`     | The Supervisor's address         | The only address the ingress port answers                           |
 | `KESTREL_APP_OPTIONS`      | None                             | The Home Assistant app's options file, which the app sets           |

@@ -19,6 +19,8 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/sources/kinds`                             | Each kind of source the server runs and the settings it takes                 |
 | `GET /api/sources/settings`                          | Every source's settings and the camera labels, no secrets                     |
 | `PUT /api/sources/settings`                          | Saves them and restarts the sources that changed                              |
+| `GET /api/sources/:source/uploads`                   | Whether its cameras send their clips to Kestrel now; see below                |
+| `PUT /api/sources/:source/uploads`                   | Points its cameras at Kestrel, or stops them sending; see below               |
 | `GET /api/attention`                                 | What needs you, each an `alert` or `passive`, with its source                 |
 | `GET /api/cameras`                                   | Each camera: its id, name and what it can do                                  |
 | `GET /api/cameras/:source/:camera/recordings?date=…` | A camera's recordings on one day, such as `2026-11-11`                        |
@@ -34,6 +36,7 @@ recorder's channel 3, and its routes take the two as path segments.
 | `GET /api/health`                                    | 204 while the server is up                                                    |
 | `GET /api/activity/jobs`                             | Each background job's state, progress, last run and last error                |
 | `GET /api/activity/usage`                            | Memory, CPU and disk use against the limits, and the last hour's readings     |
+| `GET /api/activity/log?…`                            | The activity log, newest first: jobs' errors and finished runs                |
 | `GET /api/devices/server`                            | The server's lasting `id` and its `name`                                      |
 | `POST /api/devices/pair`                             | Pairs a device with a one-time code; see below                                |
 | `POST /api/devices/code`                             | A new one-time code, and the link a QR code carries                           |
@@ -261,6 +264,62 @@ now, as `GET` on the same route does: `hue`, `brightness`, `contrast`,
 A change takes effect on the live picture at once and stays, as one made on
 the camera or recorder itself would. Raysharp recorders and Reolink cameras
 have picture settings, each Reolink camera where it says it has them.
+
+## Clips cameras send
+
+A source whose cameras can send their clips to Kestrel themselves, such as
+a Reolink camera on its own, has them on or off at
+`/api/sources/:source/uploads`. `GET` gives `{ on, last }`: whether the
+camera sends to this server now, and when its last clip came, as an ISO
+time, or `null` when none has since the server started. `PUT` takes
+`{ "on": true }` or `{ "on": false }` and answers with how it went:
+`on`, `tested`, the camera's own test of the connection (`true`, `false`,
+or `null` for a camera without one) and a `message` to show. A source that
+can't send clips returns 404 with `NotSupported`, and one that isn't
+connected 503 with `SourceUnavailable`. Where the server couldn't open its
+FTP port, such as when another program has it, `GET` says `on` is `false`
+and turning it on returns 503 saying so.
+
+Turning it on gives the camera the server's FTP receiver, on
+`KESTREL_FTP_PORT` (7381 by default) with data on the ten ports from 7390,
+and a login the server makes for that source and keeps in `uploads.json`
+in the state folder. The camera is given the server by its DNS name where
+the network has one, so it finds the server again after its address
+changes. Each clip it sends is kept in the recordings folder as a motion
+clip, from the time in its name, and anything else is read and dropped.
+
+## Activity
+
+`/api/activity/jobs` lists what the server does by itself. Each job has its
+`id` (`copy`, `clear-out` or `record:<camera>`, such as `record:swann/3`),
+its `kind` (`copy`, `record` or `clear-out`), its `name`, and its `state`:
+`idle` until it's next due, `running`, `waiting` for the machine to have
+room, or `failed`. `detail` says what it's doing in a few words, and
+`since` when it went into its state. `progress` gives how far through this
+pass it is (`done`, `total` and `bytes`). A copy also has its `sources`,
+each with how many it has `copied`, how many are `left` and the `bytes`,
+and `recent`, the recordings it copied most lately, newest first. `lastRun`
+and `lastError` give when and what, where there's been one.
+
+`/api/activity/usage` gives the `limits` background work keeps to, `holdUp`
+saying why it's waiting where it is, the reading `now`, each of Kestrel's
+`processes` (the server, go2rtc and each ffmpeg) with its memory and CPU,
+the `disk` the recordings folder is on, and the last hour's readings in
+`history`, oldest first. A reading has the machine's `memory`,
+`memoryFree`, `swapUsed`, `cores` and `load`, `memoryPressure` and
+`diskPressure`, the share of the last 10 seconds something waited for
+memory or the disks (0 off Linux), and `kestrelMemory` and `kestrelCpu`,
+what the server, go2rtc and ffmpeg use together. Memory is in bytes and
+CPU a percentage of one core. The disk has its `folder`, `total` and
+`free`, what `recordings` take, what they're `allowed`, the `diskShare`
+from Settings, and each camera's `files` and `bytes`.
+
+`/api/activity/log` is the activity log, newest first: each job's errors
+and finished runs, each with when it was (`at`), the `job` and its `name`,
+its `level`, `info` or `error`, and the `message`. `job` and `level` pick
+one job or level, and `limit` how many come back, from 1 to 5000, 200 by
+default. The server keeps the last 7 days, up to 5 MB, in `activity.jsonl`
+in the state folder, so it outlasts a restart.
 
 ## Push
 

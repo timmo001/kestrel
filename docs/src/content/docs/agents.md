@@ -4,7 +4,7 @@ description: The kestrel CLI, its Code Mode manifest and MCP server, and the ski
 ---
 
 The `kestrel` CLI in `packages/cli` reads your cameras through the server's
-[API](/api). Every command takes `--json`. They only read from the sources;
+[API](/api). Every command that prints takes `--json`. They only read from the sources;
 `download` also writes the file it saves, and `pair` saves the CLI's token.
 
 | Command                                                | Returns                                                     |
@@ -25,6 +25,10 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
 | `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |
 | `kestrel servers`                                      | The Kestrel servers on this network, found over mDNS        |
+| `kestrel serve`                                        | Runs the server with no window; see [Running it](/running)  |
+| `kestrel agent tools --json`                           | The Code Mode manifest; see below                           |
+| `kestrel agent call <tool>`                            | Runs one tool with its input as JSON on stdin               |
+| `kestrel mcp`                                          | Serves the read-only tools over MCP on stdio                |
 
 `-c` takes a camera's id, such as `swann/1`; while there's one source, its
 camera's own id, such as `1`, is enough. `details` shows the only source
