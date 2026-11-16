@@ -216,6 +216,11 @@ gw-table gw-sheet {
   display: none;
 }
 
+/* A window or frame has no phone's corners to keep the cameras clear of */
+:root[data-embed] [data-overlay] > .live-area {
+  padding-inline: 0;
+}
+
 /* Its name, unless the embed leaves it out */
 .live-stage[data-no-caption] .live-tile figcaption {
   display: none;
