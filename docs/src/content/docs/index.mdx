@@ -68,9 +68,22 @@ sessions, passes on what they report, and runs go2rtc for the video. See
 - **Pages:** Live, Recordings, Events, Sources, Activity and Settings each
   have an address of their own, such as `/recordings?camera=swann/1&date=2026-11-11`, or
   `/recordings?camera=swann/1&cameras=swann/1,swann/3,swann/4&date=2026-11-11`
-  for several cameras together. A camera's id is its source's and its own,
-  such as `swann/3` for the recorder's channel 3. Older addresses by channel
-  number still work.
+  for several cameras together. Live takes the same: `/?camera=swann/1`
+  shows that camera alone, and `/?cameras=swann/1,swann/3` those cameras,
+  without changing where Live is left for next time. A camera's id is its
+  source's and its own, such as `swann/3` for the recorder's channel 3.
+  Older addresses by channel number still work.
+- **Embed:** `/embed` is Live on its own, with nothing of the app around it,
+  for an iframe on a dashboard or a window of its own. It takes `camera` and
+  `cameras` as Live does, and keeps nothing in the browser. Its controls are
+  all there until `hide` leaves some out, as a comma list: `controls` (the
+  whole bar), `caption` (each camera's name), `layout`, `pause`, `sound`,
+  `zoom`, `lens` (a second view in the corner), `picture`, `move`,
+  `capture`, `help` and `fullscreen`, with their keys and gestures. `all`
+  leaves out every one, for the plain video, such as
+  `/embed?camera=swann/1&hide=all`. Give the iframe `allow="fullscreen"` for
+  its full screen button. A browser that isn't paired yet pairs in the
+  embed, and goes back to it after.
 - **Events:** motion, PIR, video loss and disk events as each source reports
   them, and today's motion and PIR clips found by search.
 - **Live view:** the cameras with a signal through go2rtc, all at once (A)
