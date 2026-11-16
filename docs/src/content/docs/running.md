@@ -449,6 +449,51 @@ After changing the server, restart it with `mise run serve:server:restart`.
 If it doesn't come up without a saved login, `op run` may be waiting for
 1Password to be unlocked.
 
+## Backups
+
+A backup holds everything a server needs to come back as it was: the
+sources and their logins (`sources.json`, and `recorder.env` where there's
+one), the server's id, its paired devices and owner token, push
+subscriptions, the uploads it's been sent, the activity log, and the
+recordings. Make one in the Backups panel on the Settings page, or with
+`kestrel backups make` (see [Agents](/agents)). It takes every camera's
+recordings by default; leave them out, or keep to some cameras or days.
+This machine's own CLI and desktop app connections, and files the server
+makes again, such as go2rtc's config, stay out.
+
+A backup is a `.kestrel-backup` file: a tar archive with
+`kestrel-backup.json`, saying what's in it, first. It's made as it's read,
+so a download starts at once, however large. It holds the sources' logins,
+so lock it with a passphrase unless it's kept somewhere only you can read.
+A locked one is encrypted with AES-256-GCM, from a key scrypt makes of the
+passphrase, and can't be opened, or cut short without it showing, without
+it. There's no way to get a passphrase back.
+
+Download it, or keep it in `backups` in the server's state folder, where
+the Backups panel lists it to download, restore or delete. Copy the ones
+you keep somewhere else too, so they outlast the machine. Kestrel doesn't
+make backups by itself.
+
+Restore one kept on the server, or upload a file, in the Backups panel or
+with `kestrel backups restore`. The settings, the server's id and its paired
+devices become the backup's, so devices it knew stay paired, and a browser
+it didn't has to pair again. Recordings already here are kept beside the
+backup's by default, keeping the one here where both have a file;
+replacing them deletes Kestrel's camera folders first, never anything else
+in the recordings folder. The backup is read and checked in full before
+anything changes, so a wrong passphrase or a damaged file leaves the
+server as it was. The server then starts again and puts it in place before
+it reads anything, and the page loads again once it's back. Recordings go
+in the recordings folder the backup's settings name, or this server's own
+where that folder isn't on this machine. One backup or restore runs at a
+time, as the `backup` or `restore` job on the Activity page.
+
+On Home Assistant, a Home Assistant backup of the app takes its settings
+and paired devices, but its recordings are in the media folder, which a
+Home Assistant backup only takes when it includes Media. A Kestrel backup
+takes both. Kestrel backups kept on the server are left out of Home
+Assistant's backups of the app, as they're copies already.
+
 ## Settings
 
 | Variable                   | Default                          | What it sets                                                        |

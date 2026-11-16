@@ -21,6 +21,11 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel devices remove <id>`                          | Unpairs a device                                            |
 | `kestrel jobs`                                         | What the server does by itself, and how each is getting on  |
 | `kestrel usage`                                        | The server's memory, CPU and disk use against its limits    |
+| `kestrel backups`                                      | The backups kept on the server                              |
+| `kestrel backups make`                                 | Downloads a backup here, or keeps one on the server         |
+| `kestrel backups get <name>`                           | Downloads a backup kept on the server                       |
+| `kestrel backups remove <name>`                        | Deletes a backup kept on the server                         |
+| `kestrel backups restore <file or name>`               | Restores a backup, and the server starts again              |
 | `kestrel pair`                                         | A one-time code and QR code for another device              |
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
 | `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |
@@ -36,6 +41,17 @@ with details unless `-s` names one. `download` takes times of day on
 `--date`, such as `21:46` or `21:46:30`, or full ones such as
 `2026-11-11T21:46:30`. `--sub` saves the small sub stream, and `-o` names the
 file; by default it's named after the camera and start.
+
+`backups make` downloads the backup to this folder, or with `--keep` makes
+it in the server's backups folder. Recordings go in unless
+`--no-recordings` leaves them out; `--camera`, given once for each, keeps
+to some cameras, and `--from` and `--to` to some days. `--lock` locks it
+with a passphrase. `backups restore` takes a backup file here, or the name
+of one kept on the server, and keeps the server's recordings beside the
+backup's unless `--replace` deletes them first. A passphrase never goes on
+the command line: it comes from `KESTREL_BACKUP_PASSPHRASE`, or is typed
+in when that's not set. See [Backups](/running#backups) for what a backup
+holds.
 
 It talks to `KESTREL_SERVER` with the token in `KESTREL_TOKEN` where
 they're set. Otherwise it uses the server and token `kestrel pair` saved
@@ -59,19 +75,22 @@ Run it from the repository with `bun packages/cli/src/cli.ts`.
 `kestrel agent tools --json` prints the Code Mode manifest: every tool, its
 input as JSON Schema and whether it reads or writes, and
 `kestrel agent call <tool>` runs one with its input as JSON on stdin,
-printing what the command prints with `--json`. `download`, `pair` and
-`config_copy` are the writes, since they save a file, a token or another
-server's settings. `kestrel mcp` serves the other operations over MCP on
+printing what the command prints with `--json`. `download`, `pair`,
+`config_copy` and the `backup_` tools are the writes, since they save a
+file, a token, another server's settings or a backup, or restore one.
+`kestrel mcp` serves the other operations over MCP on
 stdio, as read-only tools; a video file means nothing in an MCP reply, and
-pairing and copying are for a person to do, so those stay out of it.
+pairing, copying and backups are for a person to do, so those stay out of
+it, apart from `backups`, which lists them.
 
 ## OpenCode
 
 The plugin in `opencode-plugin/` turns the manifest into the `kestrel` Code
 Mode namespace, running each tool through the `kestrel` command on the
 `PATH`, so its tools always match the installed version. Writes ask first:
-`download` once for each camera, unless you always allow it, and `pair` and
-`config_copy` every time. Add it to OpenCode's config:
+`download` once for each camera, unless you always allow it, and `pair`,
+`config_copy`, `backup_make`, `backup_remove` and `backup_restore` every
+time. Add it to OpenCode's config:
 
 ```json
 {

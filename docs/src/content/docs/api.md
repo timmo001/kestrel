@@ -291,8 +291,9 @@ clip, from the time in its name, and anything else is read and dropped.
 ## Activity
 
 `/api/activity/jobs` lists what the server does by itself. Each job has its
-`id` (`copy`, `clear-out` or `record:<camera>`, such as `record:swann/3`),
-its `kind` (`copy`, `record` or `clear-out`), its `name`, and its `state`:
+`id` (`copy`, `clear-out`, `record:<camera>`, such as `record:swann/3`,
+`backup` or `restore`), its `kind` (`copy`, `record`, `clear-out`, `backup`
+or `restore`), its `name`, and its `state`:
 `idle` until it's next due, `running`, `waiting` for the machine to have
 room, or `failed`. `detail` says what it's doing in a few words, and
 `since` when it went into its state. `progress` gives how far through this
@@ -320,6 +321,35 @@ its `level`, `info` or `error`, and the `message`. `job` and `level` pick
 one job or level, and `limit` how many come back, from 1 to 5000, 200 by
 default. The server keeps the last 7 days, up to 5 MB, in `activity.jsonl`
 in the state folder, so it outlasts a restart.
+
+## Backups
+
+[Backups](/running#backups) are made, kept and restored under
+`/api/backups`. One backup or restore runs at a time, as the `backup` or
+`restore` job; starting another while one runs fails with 400.
+
+| Endpoint                                 | Does                                                                          |
+| ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `GET /api/backups/`                      | The backups kept on the server, newest first                                  |
+| `POST /api/backups/`                     | Starts making one in the backups folder, and returns its `name`               |
+| `POST /api/backups/download`             | A one-time `path` that downloads a new backup as it's made, for 5 minutes     |
+| `GET /api/backups/download/:code`        | The backup, streamed as it's made                                             |
+| `GET /api/backups/files/:name`           | A kept backup, as a file to save                                              |
+| `DELETE /api/backups/files/:name`        | Deletes a kept backup; 204                                                    |
+| `POST /api/backups/files/:name/restore`  | Restores a kept backup; 204, then the server starts again                     |
+| `POST /api/backups/restore?recordings=…` | Restores the backup the request's body carries; 204, then the server restarts |
+
+Each kept backup has its `name`, its size in `bytes`, when it was
+`modified` and whether it's `locked`. Making one takes `recordings`, `false`
+to leave them out, `cameras` to keep to some, by id, `from` and `to` to
+keep to some days, and a `passphrase` to lock it. Restoring takes
+`recordings`, `merge` (the default) to keep the recordings here beside the
+backup's or `replace` to delete them first, and a locked backup's
+`passphrase`. An uploaded backup sends its passphrase in the
+`x-kestrel-passphrase` header, encoded as a URI component, so it stays out
+of the address. A wrong passphrase or a damaged backup fails with 400 and
+changes nothing. A download link is a path under the server's address, so a
+browser can save the backup without holding it in memory, and works once.
 
 ## Push
 
