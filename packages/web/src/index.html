@@ -198,6 +198,15 @@
                 label="Capture"
                 data-overflow
               ></gw-button>
+              <!-- The picked camera in a floating window that plays on
+                     whatever the app does, where the browser has one -->
+              <gw-button
+                slot="end"
+                class="live-pip"
+                label="Picture in picture"
+                data-overflow
+                hidden
+              ></gw-button>
               <!-- In More when the bar is tight, as ? opens it too -->
               <gw-button
                 slot="end"
@@ -252,6 +261,8 @@
                     <dd>Sound on or off, where it has a microphone</dd>
                     <dt><kbd>S</kbd></dt>
                     <dd>Save a still</dd>
+                    <dt><kbd>I</kbd></dt>
+                    <dd>Picture in picture, which plays on other pages too</dd>
                     <dt><kbd>L</kbd></dt>
                     <dd>Swap its two views, such as wide and telephoto</dd>
                     <dt><kbd>P</kbd></dt>

@@ -94,6 +94,7 @@ export const liveFeatures = [
   "picture",
   "move",
   "capture",
+  "pip",
   "help",
   "fullscreen",
 ] as const;

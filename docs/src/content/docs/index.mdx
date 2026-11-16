@@ -79,7 +79,8 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   all there until `hide` leaves some out, as a comma list: `controls` (the
   whole bar), `caption` (each camera's name), `layout`, `pause`, `sound`,
   `zoom`, `lens` (a second view in the corner), `picture`, `move`,
-  `capture`, `help` and `fullscreen`, with their keys and gestures. `all`
+  `capture`, `pip` (picture in picture), `help` and `fullscreen`, with their
+  keys and gestures. `all`
   leaves out every one, for the plain video, such as
   `/embed?camera=swann/1&hide=all`. Give the iframe `allow="fullscreen"` for
   its full screen button. A browser that isn't paired yet pairs in the
@@ -108,7 +109,10 @@ sessions, passes on what they report, and runs go2rtc for the video. See
   bigger than its tile. Pause closes
   the streams and holds the last frames; a double click or Enter shows the
   picked camera alone, and Esc or Backspace goes back. S saves a still of it,
-  and ? shows or hides the keys. A camera with a microphone plays its sound
+  I puts it in a picture in picture window, where the browser has one, that
+  plays on wherever the app goes and with the tab in the background until
+  it's closed (live cameras only, one at a time), and ? shows or hides the
+  keys. A camera with a microphone plays its sound
   when it's picked and its sound is on, each with its own volume. One with a
   second view, such as a telephoto lens, plays both, the other small in a
   corner, swapped with L. A camera that moves is steered in Move mode, and
@@ -135,6 +139,7 @@ under the help button, which ? or a three-finger swipe up opens.
 | Space, K              | Pause or play                                    |
 | U                     | Sound on or off, where it has a microphone       |
 | S                     | Save a still                                     |
+| I                     | Picture in picture, which plays on other pages   |
 | L                     | Swap its two views, such as wide and telephoto   |
 | P                     | Picture settings, where it has them              |
 | M                     | Start or end Move mode, for a camera that moves  |

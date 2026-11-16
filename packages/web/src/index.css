@@ -1502,6 +1502,19 @@ gw-table gw-sheet {
   white-space: nowrap;
 }
 
+/* The player in the picture in picture window, kept in the viewport but out
+   of sight, so the browser goes on playing it */
+.pip-host {
+  position: fixed;
+  inset-block-end: 0;
+  inset-inline-start: 0;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* The keyboard controls and the timeline's colours, in Groundwork's key
    lists */
 .shortcuts,

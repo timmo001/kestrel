@@ -43,6 +43,7 @@ const names = [
   "magnifying-glass-minus",
   "magnifying-glass-plus",
   "pause",
+  "picture-in-picture",
   "play",
   "question-mark",
   "scissors",

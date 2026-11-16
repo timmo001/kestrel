@@ -16,7 +16,8 @@
  * camera's view, zoom and sound and how many cameras there were are kept in
  * this browser, so the placeholders take the cameras' places before they're
  * known. A camera whose source can't be reached says why over its tile. The
- * players only run while the page shows, so a hidden page streams nothing.
+ * players only run while the page shows, so a hidden page streams nothing,
+ * apart from the camera in the picture in picture window, which plays on.
  * The address can show some cameras alone, without moving where Live was
  * left, and an embed can leave out any of the controls, keeping nothing.
  */
@@ -32,6 +33,7 @@ import {
   phMagnifyingGlassMinus,
   phMagnifyingGlassPlus,
   phPause,
+  phPictureInPicture,
   phPlay,
   phQuestionMark,
   phSlidersHorizontal,
@@ -45,6 +47,14 @@ import {
 } from "@timmo001/groundwork-ui";
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
+import {
+  closePip,
+  onPipChange,
+  openPip,
+  pipCamera,
+  pipEnabled,
+  setPipSound,
+} from "./pip.ts";
 import { steering, type SteerTile } from "./ptz.ts";
 import type { LiveFeature } from "./router.ts";
 import {
@@ -74,6 +84,8 @@ interface LivePlayer extends HTMLElement {
   src: string;
   /** Closes the stream, without reconnecting. */
   ondisconnect: () => void;
+  /** Keeps the stream open while the page is hidden. */
+  background: boolean;
 }
 
 declare global {
@@ -92,6 +104,10 @@ interface VideoRtcModule {
  * `/go2rtc/api/ws`, kept under the path the page is served from.
  */
 const go2rtcUrl = (path: string) => serverUrl(path.replace(/^\//, ""));
+
+/** A go2rtc stream's WebSocket address, which a player plays from, by its name. */
+const streamAddress = (name: string) =>
+  go2rtcUrl(`${go2rtcPath}api/ws?src=${encodeURIComponent(name)}`).href;
 
 /**
  * Defines `dvr-live` from go2rtc's own `video-rtc.js`, served beside it, so
@@ -338,6 +354,7 @@ export const livePage = (): LivePage => {
   const zoomInButton = find("gw-button", "live-zoom-in");
   const fitToggle = find("gw-segmented", "live-fit");
   const captureButton = find("gw-button", "live-capture");
+  const pipButton = find("gw-button", "live-pip");
   const pictureButton = find("gw-button", "live-picture");
   const soundDivider = find("gw-divider", "live-sound-divider");
   const volume = find("gw-volume", "live-volume");
@@ -649,12 +666,15 @@ export const livePage = (): LivePage => {
   setIcon(zoomOutButton, phMagnifyingGlassMinus, "Zoom out (−)");
   setIcon(zoomInButton, phMagnifyingGlassPlus, "Zoom in (+)");
   setIcon(captureButton, phCamera, "Save a still (S)");
+  setIcon(pipButton, phPictureInPicture, "Picture in picture (I)");
   setIcon(pictureButton, phSlidersHorizontal, "Picture settings (P)");
   setIcon(helpButton, phQuestionMark, "Help (?)");
   zoomOutButton?.setAttribute("aria-keyshortcuts", "-");
   zoomFitButton?.setAttribute("aria-keyshortcuts", "0");
   zoomInButton?.setAttribute("aria-keyshortcuts", "+");
   captureButton?.setAttribute("aria-keyshortcuts", "s");
+  pipButton?.setAttribute("aria-keyshortcuts", "i");
+  pipButton?.toggleAttribute("toggle", true);
   pictureButton?.setAttribute("aria-keyshortcuts", "p");
   pictureButton?.toggleAttribute("toggle", true);
   volume?.setAttribute("aria-keyshortcuts", "u");
@@ -723,13 +743,15 @@ export const livePage = (): LivePage => {
   const setSound = (camera: Camera, sound: { on: boolean; volume: number }) => {
     sounds.set(camera.id, sound);
     remember({ sounds: Object.fromEntries(sounds) });
+    setPipSound(camera.id, sound);
     showSound();
   };
 
   /**
    * Plays the picked camera's sound alone, where it's on, from the view it
-   * shows big, at its own volume, and keeps every other player quiet. Sound
-   * and its volume show where any camera has sound.
+   * shows big, at its own volume, and keeps every other player quiet, and
+   * its own too while the picture in picture window plays it. Sound and its
+   * volume show where any camera has sound.
    */
   const showSound = () => {
     const tile = soundTile();
@@ -743,7 +765,10 @@ export const livePage = (): LivePage => {
         if (video === null) continue;
 
         video.volume = soundOf(each.stream).volume / 100;
-        video.muted = each !== heard || player !== each.player;
+        video.muted =
+          each !== heard ||
+          player !== each.player ||
+          pipCamera() === each.stream.id;
       }
     }
 
@@ -897,6 +922,8 @@ export const livePage = (): LivePage => {
     if (playButton !== null) playButton.disabled = streams.length === 0;
 
     if (captureButton !== null) captureButton.disabled = tiles.length === 0;
+
+    showPip();
   };
 
   const showPicked = () => {
@@ -913,6 +940,7 @@ export const livePage = (): LivePage => {
     steer.show();
     picture.show();
     showPicture();
+    showPip();
     showZoom();
     showSound();
   };
@@ -1025,9 +1053,7 @@ export const livePage = (): LivePage => {
       { capture: true, once: true },
     );
 
-    player.src = go2rtcUrl(
-      `${go2rtcPath}api/ws?src=${encodeURIComponent(streamFor(live, size()).name)}`,
-    ).href;
+    player.src = streamAddress(streamFor(live, size()).name);
   };
 
   /** Each player's last frame from before a pause, by player. */
@@ -1172,6 +1198,36 @@ export const livePage = (): LivePage => {
     }
   };
 
+  /**
+   * On the page a player makes its video: the page's controls stand in for
+   * the video's own, and it starts quiet until its sound is picked.
+   */
+  const prepare = (player: LivePlayer) => {
+    const video = player.querySelector("video");
+
+    if (video === null) return;
+
+    video.controls = false;
+    video.muted = true;
+
+    // The browser mutes sound that started without a click or a key, so
+    // it's held back until the next one, still on for that camera
+    video.addEventListener("volumechange", () => {
+      const shown = soundTile();
+
+      if (
+        video.muted &&
+        !soundHeld &&
+        shown?.player === player &&
+        soundOf(shown.stream).on &&
+        pipCamera() !== shown.stream.id
+      ) {
+        soundHeld = true;
+        showSound();
+      }
+    });
+  };
+
   /** Puts the page's worth of cameras in the grid, and starts them unless paused. */
   const render = () => {
     if (grid === null || !shown()) return;
@@ -1282,32 +1338,9 @@ export const livePage = (): LivePage => {
 
     stopWaiting();
 
-    // On the page each player makes its video: the page's controls stand in
-    // for the video's own, and it starts quiet until its sound is picked
     for (const tile of tiles) {
       for (const player of [tile.player, tile.inset]) {
-        const video = player?.querySelector("video") ?? null;
-
-        if (video === null) continue;
-
-        video.controls = false;
-        video.muted = true;
-
-        // The browser mutes sound that started without a click or a key, so
-        // it's held back until the next one, still on for that camera
-        video.addEventListener("volumechange", () => {
-          const shown = soundTile();
-
-          if (
-            video.muted &&
-            !soundHeld &&
-            shown?.player === player &&
-            soundOf(shown.stream).on
-          ) {
-            soundHeld = true;
-            showSound();
-          }
-        });
+        if (player !== null) prepare(player);
       }
 
       if (!paused) connect(tile);
@@ -1561,6 +1594,103 @@ export const livePage = (): LivePage => {
     );
   };
 
+  /** The camera the picture in picture window is for: the picked one, or the first shown. */
+  const pipTile = () => {
+    const tile =
+      tiles.find((shownTile) => shownTile.stream.id === picked) ?? tiles[0];
+
+    return tile?.player === null ? undefined : tile;
+  };
+
+  /**
+   * Picture in picture, where the browser has it and any camera plays live,
+   * pressed while the camera it's for is in the window.
+   */
+  const showPip = () => {
+    if (pipButton === null) return;
+
+    const tile = pipTile();
+    const open = tile !== undefined && pipCamera() === tile.stream.id;
+
+    pipButton.hidden =
+      !has("pip") ||
+      !pipEnabled() ||
+      !streams.some((stream) => stream.live !== null);
+    pipButton.disabled = tile === undefined;
+    pipButton.pressed = open;
+    setIcon(
+      pipButton,
+      phPictureInPicture,
+      open ? "Close picture in picture (I)" : "Picture in picture (I)",
+    );
+  };
+
+  /**
+   * The picked camera, or the first shown, into the picture in picture
+   * window, where it plays on whatever the app does, or out of it again.
+   * Playing, its player goes over as it is, so the window opens at once,
+   * and the tile starts another, its last frame up until that plays.
+   * Paused, the window starts its own, from the main stream.
+   */
+  const togglePip = () => {
+    const tile = pipTile();
+    const old = tile?.player ?? null;
+
+    if (tile === undefined || old === null) return;
+
+    if (pipCamera() === tile.stream.id) {
+      void closePip();
+
+      return;
+    }
+
+    const sound =
+      has("sound") && hasSound(tile.stream) ? soundOf(tile.stream) : quiet;
+
+    const view = tile.stream.views.find(
+      (shownView) => shownView.key === old.dataset["view"],
+    );
+
+    const fresh = livePlayer(tile.stream, view);
+    const video = old.querySelector("video");
+
+    if (
+      paused ||
+      video === null ||
+      video.readyState < HTMLMediaElement.HAVE_METADATA
+    ) {
+      const live = liveOfPlayer(tile, old);
+
+      if (live === null) return;
+
+      fresh.src = streamAddress(live.main);
+      void openPip(tile.stream.id, fresh, sound);
+
+      return;
+    }
+
+    const frame = frameOf(tile, old);
+
+    tile.player = fresh;
+    placeViews(tile);
+    prepare(fresh);
+
+    if (frame !== undefined) {
+      held.set(fresh, frame);
+      showHeld(tile);
+    }
+
+    connectPlayer(tile, fresh);
+    void openPip(tile.stream.id, old, sound);
+    showZoom();
+    showSound();
+  };
+
+  onPipChange(() => {
+    showPip();
+    showSound();
+  });
+
   const pager = cameraPager({
     onLayout: setLayout,
     onTiling: setTiling,
@@ -1588,6 +1718,7 @@ export const livePage = (): LivePage => {
 
   playButton?.addEventListener("click", togglePause);
   captureButton?.addEventListener("click", capture);
+  pipButton?.addEventListener("click", togglePip);
 
   fullscreenToggle(fullscreenButton, stage);
 
@@ -1694,6 +1825,7 @@ export const livePage = (): LivePage => {
     ["-", () => steer.zoomStep(-1) || (has("zoom") && zoom.step(-1))],
     ["0", zoom.whole],
     ["s", capture],
+    ["i", togglePip],
     ["m", toggleMove],
     ["p", () => picture.toggle()],
     ["u", toggleSound],
@@ -1730,6 +1862,7 @@ export const livePage = (): LivePage => {
     ["0", "zoom"],
     ["z", "zoom"],
     ["s", "capture"],
+    ["i", "pip"],
     ["m", "move"],
     ["p", "picture"],
     ["u", "sound"],
@@ -1815,6 +1948,7 @@ export const livePage = (): LivePage => {
     "zoom",
     "picture",
     "capture",
+    "pip",
     "help",
     "fullscreen",
   ];
@@ -1829,8 +1963,8 @@ export const livePage = (): LivePage => {
       [
         zoomDivider,
         has("zoom") &&
-          (["picture", "capture", "help", "fullscreen"] as const).some((part) =>
-            has(part),
+          (["picture", "capture", "pip", "help", "fullscreen"] as const).some(
+            (part) => has(part),
           ),
       ],
       [captureButton, has("capture")],
@@ -1843,6 +1977,7 @@ export const livePage = (): LivePage => {
 
     stage?.toggleAttribute("data-no-caption", !has("caption"));
     showPicture();
+    showPip();
     showSound();
   };
 
