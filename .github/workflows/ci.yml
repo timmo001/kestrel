@@ -19,30 +19,16 @@ permissions:
 
 jobs:
   check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up mise
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
-
-      - name: Check
-        run: mise run check
+    uses: timmo001/workflows/.github/workflows/run-mise-task.yml@36ba6651f1296cce685ede8ac38b9574c9291028 # master
+    with:
+      name: Check
+      task: check
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-
-      - name: Set up mise
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
-
-      - name: Test
-        run: mise run test
+    uses: timmo001/workflows/.github/workflows/run-mise-task.yml@36ba6651f1296cce685ede8ac38b9574c9291028 # master
+    with:
+      name: Test
+      task: test
 
   actionlint:
     uses: timmo001/workflows/.github/workflows/lint-actionlint.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
