@@ -70,8 +70,71 @@ export interface RecordingsSearch extends Schema.Schema.Type<
   typeof RecordingsSearch
 > {}
 
+/**
+ * The Live page: the cameras to show alone, in the address, such as
+ * `?camera=swann/1` for one or `?cameras=swann/1,swann/3` for several, the
+ * picked one first. Without either, every camera shows.
+ */
+export const LiveSearch = Schema.Struct({
+  camera: Schema.optional(CameraId),
+  cameras: Schema.optional(CameraList),
+});
+
+export interface LiveSearch extends Schema.Schema.Type<typeof LiveSearch> {}
+
+/** The Live page's parts an embed can leave out. */
+export const liveFeatures = [
+  "controls",
+  "caption",
+  "layout",
+  "pause",
+  "sound",
+  "zoom",
+  "lens",
+  "picture",
+  "move",
+  "capture",
+  "help",
+  "fullscreen",
+] as const;
+
+export type LiveFeature = (typeof liveFeatures)[number];
+
+const isLiveFeature = Schema.is(Schema.Literals(liveFeatures));
+
+/**
+ * Parts to leave out as a comma list, such as `zoom,capture`, or `all` for
+ * none of them, the plain video. Names it doesn't know are skipped, so an
+ * embed from a newer version still shows.
+ */
+const FeatureList = Schema.String.pipe(
+  Schema.decodeTo(Schema.Array(Schema.Literals(liveFeatures)), {
+    decode: SchemaGetter.transform((text: string) =>
+      text === "all"
+        ? [...liveFeatures]
+        : text.split(",").filter((name) => isLiveFeature(name)),
+    ),
+    encode: SchemaGetter.transform((parts: ReadonlyArray<string>) =>
+      parts.join(","),
+    ),
+  }),
+);
+
+/**
+ * The embed: Live alone, without the app around it, for a page of your own
+ * or a dashboard. The cameras as on Live, and the parts to leave out.
+ */
+export const EmbedSearch = Schema.Struct({
+  ...LiveSearch.fields,
+  hide: Schema.optional(FeatureList),
+});
+
+export interface EmbedSearch extends Schema.Schema.Type<typeof EmbedSearch> {}
+
 export const routes = {
-  live: route("/", NoParams, NoSearch),
+  live: route("/", NoParams, LiveSearch),
+  /** Live alone, for an iframe or a window of its own. */
+  embed: route("/embed", NoParams, EmbedSearch),
   recordings: route("/recordings", NoParams, RecordingsSearch),
   events: route("/events", NoParams, NoSearch),
   sources: route("/sources", NoParams, NoSearch),

@@ -17,6 +17,8 @@
  * this browser, so the placeholders take the cameras' places before they're
  * known. A camera whose source can't be reached says why over its tile. The
  * players only run while the page shows, so a hidden page streams nothing.
+ * The address can show some cameras alone, without moving where Live was
+ * left, and an embed can leave out any of the controls, keeping nothing.
  */
 import type { Camera, CameraView, LiveStreams } from "@timmo001/kestrel-core";
 import { go2rtcPath } from "@timmo001/kestrel-server/api";
@@ -44,6 +46,7 @@ import {
 import { cameraPager, layoutsFor, type Layout } from "./pager.ts";
 import { pictureSettings, type PictureTile } from "./picture.ts";
 import { steering, type SteerTile } from "./ptz.ts";
+import type { LiveFeature } from "./router.ts";
 import {
   element,
   find,
@@ -298,7 +301,21 @@ const fileTime = () => {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
 };
 
+/** What Live shows, from its address or an embed's. */
+export interface LiveOptions {
+  /** The cameras to show alone, in this order, else every camera. */
+  readonly cameras?: ReadonlyArray<Camera["id"]> | undefined;
+  /** The camera picked among them, or alone without `cameras`. */
+  readonly camera?: Camera["id"] | undefined;
+  /** The parts left out, such as the controls or the zoom. */
+  readonly hide?: ReadonlyArray<LiveFeature> | undefined;
+  /** Shown on its own, such as in an iframe: nothing done in it is kept. */
+  readonly embed?: boolean;
+}
+
 export interface LivePage {
+  /** Shows the cameras and parts an address asks for, as it changes. */
+  readonly open: (options: LiveOptions) => void;
   /** Shows the cameras that play live and have a signal, once the page is the one shown. */
   readonly show: (cameras: ReadonlyArray<Camera>) => Promise<void>;
   /** Shows why a source's cameras can't be seen over their tiles, by source id; those left out are cleared. */
@@ -327,9 +344,33 @@ export const livePage = (): LivePage => {
   const helpButton = find("gw-button", "live-help");
   const fullscreenButton = find("gw-button", "live-fullscreen");
   const shortcutsPopover = find("gw-popover", "live-shortcuts");
+  const controlBar = stage?.querySelector(":scope > .player-controls") ?? null;
+  const pagerRow = find("gw-row", "live-pager");
+  const zoomPill = stage?.querySelector(".zoom-pill") ?? null;
+  const zoomDivider = zoomPill?.nextElementSibling ?? null;
   const section = stage?.closest("section");
 
+  /** The parts left out, from the address. */
+  let off: ReadonlySet<LiveFeature> = new Set();
+
+  const has = (feature: LiveFeature) => !off.has(feature);
+
+  /** Whether it's an embed, which keeps nothing in this browser. */
+  let embedded = false;
+
+  /** The cameras the address shows alone, in its order, else every camera. */
+  let only: ReadonlyArray<Camera["id"]> | undefined;
+
+  /** The last options opened, so the same address doesn't start again. */
+  let opened = "";
+
   const saved = kept();
+
+  /** Keeps a change for next time, except in an embed. */
+  const remember = (part: Parameters<typeof keep>[1]) => {
+    if (!embedded) keep(storageKey, part);
+  };
+
   let layout: Layout = saved.layout;
   let tiling: Tiling = saved.tiling;
   let page = saved.page;
@@ -337,7 +378,20 @@ export const livePage = (): LivePage => {
   let picked = saved.layout === 1 ? saved.picked : undefined;
   /** Where to go back to from one camera alone, by Enter or a double click. */
   let solo: { readonly layout: Layout; readonly page: number } | undefined;
+
+  /** Where Live was before the address showed some cameras alone, to go back to. */
+  let before:
+    | {
+        readonly layout: Layout;
+        readonly page: number;
+        readonly picked: Camera["id"] | undefined;
+      }
+    | undefined;
+
   let paused = false;
+  /** Every camera that shows, with a picture or a still. */
+  let all: ReadonlyArray<Camera> = [];
+  /** The cameras the page shows: every one, or those the address asks for. */
   let streams: ReadonlyArray<Camera> = [];
   let tiles: ReadonlyArray<Tile> = [];
   /** Why each source's cameras can't be seen, by source id. */
@@ -378,6 +432,9 @@ export const livePage = (): LivePage => {
     single: viewsFrom(saved.singleViews),
   };
 
+  /** Each camera whole, for an address that leaves zoom out. */
+  const wholeViews = new Map<string, PictureView>();
+
   /** The zooms the page shows now, by how many cameras it shows at once. */
   const viewsNow = () => (size() === 1 ? views.single : views.tiles);
 
@@ -392,7 +449,7 @@ export const livePage = (): LivePage => {
     );
 
   const keepViews = () =>
-    keep(storageKey, {
+    remember({
       views: keptOf(views.tiles),
       singleViews: keptOf(views.single),
     });
@@ -427,8 +484,11 @@ export const livePage = (): LivePage => {
 
   const shown = () => section?.hidden === false;
 
-  /** How many cameras there are, or were last time until they're known. */
-  const count = () => (loaded ? streams.length : saved.count);
+  /**
+   * How many cameras there are, or until they're known, how many the
+   * address asks for or there were last time.
+   */
+  const count = () => (loaded ? streams.length : (only?.length ?? saved.count));
 
   /** How many cameras a page shows. */
   const size = () => (layout === "all" ? Math.max(count(), 1) : layout);
@@ -592,15 +652,21 @@ export const livePage = (): LivePage => {
   fullscreenButton?.setAttribute("aria-keyshortcuts", "f");
   playButton?.setAttribute("aria-keyshortcuts", "Space k");
 
-  const keepPlace = () =>
-    keep(storageKey, { layout, page, picked: picked ?? null });
+  // Cameras the address shows alone don't move where Live was left
+  const keepPlace = () => {
+    if (only === undefined) {
+      remember({ layout, page, picked: picked ?? null });
+    }
+  };
 
   /** The picked camera's tile, as steering sees it, for a camera that moves. */
   const steerTile = (): SteerTile | undefined => {
     const tile = tiles.find((shownTile) => shownTile.stream.id === picked);
     const controls = tile?.stream.controls.ptz ?? null;
 
-    if (tile === undefined || controls === null) return undefined;
+    if (tile === undefined || controls === null || !has("move")) {
+      return undefined;
+    }
 
     return {
       id: tile.stream.id,
@@ -615,7 +681,7 @@ export const livePage = (): LivePage => {
     const tile = tiles.find((shownTile) => shownTile.stream.id === picked);
     const controls = tile?.stream.controls.picture ?? null;
 
-    return tile === undefined || controls === null
+    return tile === undefined || controls === null || !has("picture")
       ? undefined
       : { id: tile.stream.id, controls };
   };
@@ -624,16 +690,18 @@ export const livePage = (): LivePage => {
   const showPicture = () => {
     if (pictureButton === null) return;
 
-    pictureButton.hidden = !streams.some(
-      (stream) => stream.controls.picture !== null,
-    );
+    pictureButton.hidden =
+      !has("picture") ||
+      !streams.some((stream) => stream.controls.picture !== null);
     pictureButton.disabled = pictureTile() === undefined;
     pictureButton.pressed = picture.open();
   };
 
-  /** The picked camera's tile, for a camera with sound. */
+  /** The picked camera's tile, for a camera with sound, unless sound's left out. */
   const soundTile = () =>
-    tiles.find((tile) => tile.stream.id === picked && hasSound(tile.stream));
+    has("sound")
+      ? tiles.find((tile) => tile.stream.id === picked && hasSound(tile.stream))
+      : undefined;
 
   /** A camera's sound, as kept, or off at full volume, its volume in the slider's 5% steps. */
   const soundOf = (camera: Camera) => {
@@ -644,7 +712,7 @@ export const livePage = (): LivePage => {
 
   const setSound = (camera: Camera, sound: { on: boolean; volume: number }) => {
     sounds.set(camera.id, sound);
-    keep(storageKey, { sounds: Object.fromEntries(sounds) });
+    remember({ sounds: Object.fromEntries(sounds) });
     showSound();
   };
 
@@ -669,7 +737,7 @@ export const livePage = (): LivePage => {
       }
     }
 
-    const any = streams.some(hasSound);
+    const any = has("sound") && streams.some(hasSound);
 
     if (soundDivider !== null) soundDivider.hidden = !any;
 
@@ -1032,7 +1100,7 @@ export const livePage = (): LivePage => {
     if (key === camera.views[0]?.key) lenses.delete(camera.id);
     else lenses.set(camera.id, key);
 
-    keep(storageKey, { lenses: Object.fromEntries(lenses) });
+    remember({ lenses: Object.fromEntries(lenses) });
 
     const tile = tiles.find((shownTile) => shownTile.stream.id === camera.id);
 
@@ -1115,8 +1183,9 @@ export const livePage = (): LivePage => {
         const player =
           stream.live === null ? null : livePlayer(stream, shownView);
 
+        // Its other view in the corner, unless the address leaves it out
         const inset =
-          player !== null && otherView !== undefined
+          player !== null && otherView !== undefined && has("lens")
             ? livePlayer(stream, otherView)
             : null;
 
@@ -1149,7 +1218,8 @@ export const livePage = (): LivePage => {
 
         figure.addEventListener("dblclick", () => {
           pick(stream.id);
-          toggleSolo();
+
+          if (has("layout")) toggleSolo();
         });
 
         const tile: Tile = { stream, figure, player, picture, hold, inset };
@@ -1257,7 +1327,7 @@ export const livePage = (): LivePage => {
     if (next === tiling) return;
 
     tiling = next;
-    keep(storageKey, { tiling });
+    remember({ tiling });
 
     void withViewTransition(() => {
       if (grid !== null) arrangeGrid(grid);
@@ -1519,7 +1589,13 @@ export const livePage = (): LivePage => {
     onSwipe(
       stage,
       (swipe) => {
-        if (help.swipe(swipe) || swipe.fingers !== 1) return;
+        if (
+          (has("help") && help.swipe(swipe)) ||
+          swipe.fingers !== 1 ||
+          !has("layout")
+        ) {
+          return;
+        }
 
         if (swipe.direction === "left") step(1);
         else if (swipe.direction === "right") step(-1);
@@ -1565,7 +1641,9 @@ export const livePage = (): LivePage => {
 
       return tile === undefined ? undefined : zoomTileOf(tile);
     },
-    views: viewsNow,
+    // Left out, each picture shows whole, whatever it was kept at
+    views: () => (has("zoom") ? viewsNow() : wholeViews),
+    off: () => !has("zoom"),
     zoomOut: zoomOutButton,
     zoomFit: zoomFitButton,
     zoomIn: zoomInButton,
@@ -1601,9 +1679,9 @@ export const livePage = (): LivePage => {
     ],
     ["Backspace", leaveSolo],
     // In Move mode, the lens zooms where it changes the picture shown
-    ["+", () => steer.zoomStep(1) || zoom.step(1)],
-    ["=", () => steer.zoomStep(1) || zoom.step(1)],
-    ["-", () => steer.zoomStep(-1) || zoom.step(-1)],
+    ["+", () => steer.zoomStep(1) || (has("zoom") && zoom.step(1))],
+    ["=", () => steer.zoomStep(1) || (has("zoom") && zoom.step(1))],
+    ["-", () => steer.zoomStep(-1) || (has("zoom") && zoom.step(-1))],
     ["0", zoom.whole],
     ["s", capture],
     ["m", toggleMove],
@@ -1623,6 +1701,31 @@ export const livePage = (): LivePage => {
     ),
     ["a", () => setLayout("all")],
     ["t", () => setTiling(tiling === "smart" ? "fixed" : "smart")],
+  ]);
+
+  /** The part each key works, so its key does nothing once that's left out. */
+  const keyParts = new Map<string, LiveFeature>([
+    [" ", "pause"],
+    ["k", "pause"],
+    ["PageUp", "layout"],
+    ["PageDown", "layout"],
+    ["Enter", "layout"],
+    ["Backspace", "layout"],
+    ["a", "layout"],
+    ["t", "layout"],
+    ...Array.from(
+      { length: keyedLayouts },
+      (_, index): [string, LiveFeature] => [String(index + 1), "layout"],
+    ),
+    ["0", "zoom"],
+    ["z", "zoom"],
+    ["s", "capture"],
+    ["m", "move"],
+    ["p", "picture"],
+    ["u", "sound"],
+    ["l", "lens"],
+    ["f", "fullscreen"],
+    ["?", "help"],
   ]);
 
   /** The arrow keys, which steer the camera in Move mode while they're held. */
@@ -1650,11 +1753,18 @@ export const livePage = (): LivePage => {
     }
 
     const action = keys.get(key ?? "");
+    const part = keyParts.get(key ?? "");
 
     // Enter on a control presses it, as it should
     const onControl = event.target !== stage && event.target !== document.body;
 
-    if (action === undefined || (key === "Enter" && onControl)) return;
+    if (
+      action === undefined ||
+      (part !== undefined && !has(part)) ||
+      (key === "Enter" && onControl)
+    ) {
+      return;
+    }
 
     event.preventDefault();
     action();
@@ -1687,27 +1797,115 @@ export const livePage = (): LivePage => {
     if (!pressedOnCamera) unpick();
   });
 
+  /** The parts on the control bar, which goes once they're all left out. */
+  const barParts: ReadonlyArray<LiveFeature> = [
+    "layout",
+    "pause",
+    "sound",
+    "zoom",
+    "picture",
+    "capture",
+    "help",
+    "fullscreen",
+  ];
+
+  /** Shows the controls for the parts the address leaves in, and only those. */
+  const showParts = () => {
+    const parts: ReadonlyArray<readonly [Element | null, boolean]> = [
+      [pagerRow, has("layout")],
+      [playButton, has("pause")],
+      [zoomPill, has("zoom")],
+      // Between the zoom and the buttons after it, while both show
+      [
+        zoomDivider,
+        has("zoom") &&
+          (["picture", "capture", "help", "fullscreen"] as const).some((part) =>
+            has(part),
+          ),
+      ],
+      [captureButton, has("capture")],
+      [helpButton, has("help")],
+      [fullscreenButton, has("fullscreen")],
+      [controlBar, has("controls") && barParts.some((part) => has(part))],
+    ];
+
+    for (const [part, kept] of parts) part?.toggleAttribute("hidden", !kept);
+
+    stage?.toggleAttribute("data-no-caption", !has("caption"));
+    showPicture();
+    showSound();
+  };
+
+  /** The cameras to show: every one, or those the address asks for, in its order. */
+  const choose = () => {
+    streams =
+      only === undefined
+        ? all
+        : only.flatMap((id) => all.filter((camera) => camera.id === id));
+
+    // A paged layout as big as the cameras there are now shows them all
+    if (!layoutsFor(streams.length).includes(layout)) layout = "all";
+  };
+
   placeholders();
   showControls();
 
   return {
+    open: (options) => {
+      const key = JSON.stringify(options);
+
+      if (key === opened) return;
+
+      opened = key;
+      embedded = options.embed === true;
+      off = new Set(options.hide);
+
+      const next =
+        options.cameras ??
+        (options.camera === undefined ? undefined : [options.camera]);
+
+      // The cameras an address shows alone start all at once, the one it
+      // picks marked out, and leaving them goes back to where Live was. An
+      // embed starts the same way, never where Live was left
+      if (next !== undefined || embedded) {
+        before ??= embedded ? undefined : { layout, page, picked };
+        layout = "all";
+        page = 0;
+        picked = options.camera ?? (next?.length === 1 ? next[0] : undefined);
+      } else if (before !== undefined) {
+        ({ layout, page, picked } = before);
+        before = undefined;
+      }
+
+      only = next;
+      solo = undefined;
+      showParts();
+
+      if (!loaded) {
+        placeholders();
+
+        return;
+      }
+
+      choose();
+
+      if (shown()) void withViewTransition(render);
+    },
     show: async (cameras) => {
       await definePlayer(go2rtcPath);
 
       // Where the source can't tell whether there's a picture, it's tried;
       // a camera with only a still picture shows that
-      streams = cameras.filter(
+      all = cameras.filter(
         (camera) =>
           (camera.live !== null || camera.still) && camera.signal !== false,
       );
 
       loaded = true;
-
-      // A paged layout as big as the cameras there are now shows them all
-      if (!layoutsFor(streams.length).includes(layout)) layout = "all";
+      choose();
 
       // Kept for next time's placeholders
-      keep(storageKey, { count: streams.length });
+      remember({ count: all.length });
 
       paused = false;
 

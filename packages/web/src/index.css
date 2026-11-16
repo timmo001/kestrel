@@ -184,6 +184,43 @@ gw-table gw-sheet {
   border-radius: 0;
 }
 
+/* The embed: the cameras and their controls are all there is, filling the
+   frame or window edge to edge, with nothing of the app around them */
+:root[data-embed] :is(gw-app-bar, gw-banner, .attention) {
+  display: none;
+}
+
+:root[data-embed],
+:root[data-embed] body {
+  margin: 0;
+  background: #000;
+}
+
+:root[data-embed] gw-page {
+  padding: 0;
+}
+
+:root[data-embed] gw-page::part(page) {
+  width: 100%;
+}
+
+:root[data-embed] .live-stage {
+  --fill-height: 100dvh;
+
+  min-height: 0;
+  border-radius: 0;
+}
+
+/* One camera alone needs no ring to say it's picked */
+:root[data-embed] .live-tile:only-child::after {
+  display: none;
+}
+
+/* Its name, unless the embed leaves it out */
+.live-stage[data-no-caption] .live-tile figcaption {
+  display: none;
+}
+
 /* The space for a grid of cameras, which it measures itself against */
 .live-area {
   display: grid;

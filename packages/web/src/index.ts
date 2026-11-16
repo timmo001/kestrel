@@ -2,8 +2,9 @@
  * The page script, the app's shell: the fonts, the theme and the
  * components, the connection banner and what needs you, then the app bar's
  * pages (Live, Recordings, Events, Sources and Activity), one shown at a time from the
- * address, each from a module of its own. The service worker keeps the
- * shell so the app starts offline.
+ * address, each from a module of its own, and Live's embed, Live with nothing
+ * of the app around it. The service worker keeps the shell so the app starts
+ * offline.
  */
 // Settings saved under the app's old name, carried over before any are read
 import "./renamed.ts";
@@ -263,7 +264,7 @@ const reloadCameras = async () => {
 
   if (list !== null) await showSources(list);
 
-  if (currentPage === "live") await live.show(known);
+  if (showsLive(currentPage)) await live.show(known);
 };
 
 // Settings: started on its own, so a source that can't connect can be fixed
@@ -279,9 +280,24 @@ void backupsPanel().start();
 
 void aboutPanel().start();
 
+/** Where the browser was sent to pair from, such as an embed, to go back to. */
+const pairFromKey = "kestrel:pair-from";
+
 // Pairing: once paired, the app starts again with the server's cookie, so
-// every page loads as a paired browser
-const pair = pairPage({ onPaired: () => location.assign(href("live")) });
+// every page loads as a paired browser, back where it was sent from
+const pair = pairPage({
+  onPaired: () => {
+    const from = sessionStorage.getItem(pairFromKey);
+
+    sessionStorage.removeItem(pairFromKey);
+
+    location.assign(
+      from !== null && new URL(from, location.href).origin === location.origin
+        ? from
+        : href("live"),
+    );
+  },
+});
 
 // Another version: the server was updated since the browser kept this page.
 // It moves onto the new release once by itself, and says so where that
@@ -314,7 +330,10 @@ onUnpaired(() => {
 
   if (offline !== null) offline.open = false;
 
-  if (currentPage !== "pair") navigate(href("pair"), { replace: true });
+  if (currentPage !== "pair") {
+    sessionStorage.setItem(pairFromKey, location.href);
+    navigate(href("pair"), { replace: true });
+  }
 });
 
 /** Today on the first source's clock where there's one, or the browser's. */
@@ -338,6 +357,7 @@ type Page = Location["name"];
 const isPage = Schema.is(
   Schema.Literals([
     "live",
+    "embed",
     "recordings",
     "events",
     "sources",
@@ -350,6 +370,7 @@ const isPage = Schema.is(
 
 const pageTitles: Record<Page, string> = {
   live: "Live",
+  embed: "Live",
   recordings: "Recordings",
   events: "Events",
   sources: "Sources",
@@ -359,6 +380,10 @@ const pageTitles: Record<Page, string> = {
   notFound: "Page not found",
 };
 
+/** Whether a page shows Live: Live itself, or its embed. */
+const showsLive = (page: Page | undefined) =>
+  page === "live" || page === "embed";
+
 const pages = [...document.querySelectorAll("section.page")];
 const navLinks = [...document.querySelectorAll("a.nav-link")];
 let currentPage: Page | undefined;
@@ -366,6 +391,7 @@ let currentPage: Page | undefined;
 // Each link's icon, before its name
 const pageIcons: Record<Page, string> = {
   live: phVideoCamera,
+  embed: phVideoCamera,
   recordings: phFilmStrip,
   events: phBellRinging,
   sources: phHardDrives,
@@ -386,22 +412,31 @@ const showPage = (location: Location) => {
   const page = location.name;
   const left = currentPage;
 
-  // The Recordings page follows its search, such as a new day, in place
+  // The Recordings page follows its search, such as a new day, in place,
+  // and Live its cameras
   if (location.name === "recordings") recordings.open(location.search);
+
+  if (location.name === "live") live.open(location.search);
+
+  if (location.name === "embed") live.open({ ...location.search, embed: true });
 
   if (page === left) return;
 
   currentPage = page;
 
+  // The embed is Live alone, with nothing of the app around it
+  document.documentElement.toggleAttribute("data-embed", page === "embed");
+
   // After the old page is captured, so it leaves as it was
   const swap = () => {
     for (const section of pages) {
       if (section instanceof HTMLElement) {
-        section.hidden = section.dataset.page !== page;
+        section.hidden =
+          section.dataset.page !== (page === "embed" ? "live" : page);
       }
     }
 
-    if (left === "live") live.stop();
+    if (showsLive(left) && !showsLive(page)) live.stop();
 
     if (left === "recordings") recordings.pause();
 
@@ -412,9 +447,9 @@ const showPage = (location: Location) => {
     // Arriving at a player, the keyboard controls work straight away
     if (page === "recordings") requestAnimationFrame(recordings.focus);
 
-    if (page === "live") requestAnimationFrame(live.focus);
+    if (showsLive(page)) requestAnimationFrame(live.focus);
 
-    if (page === "live" && cameras !== undefined) void live.show(cameras);
+    if (showsLive(page) && cameras !== undefined) void live.show(cameras);
 
     if (page === "pair") pair.open();
   };
@@ -450,8 +485,9 @@ const showPage = (location: Location) => {
 
   document.title = `${pageTitles[page]} · Kestrel`;
 
-  // A browser being paired gets on with that before it's offered the app
-  install.hold(page === "pair");
+  // A browser being paired gets on with that before it's offered the app,
+  // and an embed is never offered it
+  install.hold(page === "pair" || page === "embed");
 };
 
 AtomRegistry.make().subscribe(currentLocation, showPage, { immediate: true });
@@ -663,7 +699,7 @@ const start = async () => {
   // Live doesn't wait on the sources' details, and starts its players again
   // only where the cameras changed since they were kept
   await Promise.all([
-    currentPage === "live" && !Equal.equals(known, kept)
+    showsLive(currentPage) && !Equal.equals(known, kept)
       ? live.show(known)
       : undefined,
     showSources(list).then(() => {
@@ -682,7 +718,7 @@ const kept = keptCameras();
 if (kept !== undefined) {
   cameras = kept;
 
-  if (currentPage === "live") void live.show(kept);
+  if (showsLive(currentPage)) void live.show(kept);
 }
 
 void start();

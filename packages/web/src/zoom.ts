@@ -56,6 +56,8 @@ export interface ZoomOptions {
   readonly steers?: (tile: ZoomTile, gesture: "drag" | "wheel") => boolean;
   /** A zoom changed, for the page to keep. */
   readonly onChange?: () => void;
+  /** Whether the page leaves zoom out, so the wheel and drags pass by. */
+  readonly off?: () => boolean;
 }
 
 export interface PictureZoom {
@@ -298,6 +300,7 @@ export const pictureZoom = (options: ZoomOptions): PictureZoom => {
       if (
         !event.ctrlKey ||
         tile === undefined ||
+        options.off?.() === true ||
         options.steers?.(tile, "wheel") === true
       ) {
         return;
@@ -328,6 +331,7 @@ export const pictureZoom = (options: ZoomOptions): PictureZoom => {
 
     if (
       tile === undefined ||
+      options.off?.() === true ||
       !tile.figure.hasAttribute("data-movable") ||
       options.steers?.(tile, "drag") === true ||
       event
