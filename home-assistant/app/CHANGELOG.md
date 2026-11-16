@@ -1,28 +1,18 @@
-Kestrel can back itself up and restore, with everything in: settings and logins, the server's id, paired devices and recordings. Restoring onto a new machine brings the server back as it was, with the devices you'd paired still paired.
+Live can show a single camera, or a few, from its address, and there's a new embed page for putting live cameras on a dashboard or in a window of their own, with each of its controls left in or out.
 
-## Backups
+## Live
 
-- The Settings page has a Backups panel. Make a backup with every camera's recordings (the default), none, or only some cameras or days, then download it or keep it on the server.
-- A backup can be locked with a passphrase. It holds your sources' logins, so lock it unless it's kept somewhere only you can read. A locked one is encrypted with AES-256-GCM, and there's no way to get a lost passphrase back.
-- A backup is made as it's downloaded, so the download starts straight away, however many recordings it holds.
-- Backups kept on the server are listed to download, restore or delete. Copy the ones you keep somewhere else too, so they outlast the machine.
-- Kestrel only makes backups when you ask; there's no schedule.
+- Live takes `camera` and `cameras` in its address, as Recordings does: `/?camera=swann/1` shows that camera alone, and `/?cameras=swann/1,swann/3` those cameras in that order, with `camera` picking one of them.
+- Showing cameras from the address doesn't change where Live is left for next time. Going back to Live from the app bar brings back the layout, page and picked camera from before.
 
-## Restoring
+## Embed
 
-- Restore a backup kept on the server, or upload one, from the Backups panel. The upload shows its progress, and the page loads again once the server's back.
-- Recordings already on the server are kept beside the backup's by default, or replaced, which deletes only Kestrel's own camera folders first.
-- The backup is read and checked in full before anything changes, so a wrong passphrase or a damaged file leaves the server as it was. The server then starts again and puts it in place before it reads anything.
-- Where the backup's recordings folder isn't on this machine, its recordings go in this server's own folder.
-- A backup or restore shows on the Activity page while it runs, and only one runs at a time.
+- `/embed` is Live on its own, with no app bar, banners or page around it, filling the frame or window edge to edge. It takes `camera` and `cameras` as Live does.
+- Every control is there until `hide` leaves some out, as a comma list: `controls` (the whole bar), `caption` (each camera's name), `layout`, `pause`, `sound`, `zoom`, `lens` (a second view in the corner), `picture`, `move`, `capture`, `help` and `fullscreen`. Leaving one out turns off its keys and gestures too. `hide=all` leaves out every one, for the plain video, such as `/embed?camera=swann/1&hide=all`.
+- An embed keeps nothing in the browser, so changing its layout, zoom or sound never changes the app's.
+- A browser that isn't paired yet pairs in the embed, and goes back to it once it is. Pairing from any other page also goes back to where it was sent from.
+- Give an iframe `allow="fullscreen"` for its full screen button to work.
 
-## Home Assistant
+## Other changes
 
-- A Home Assistant backup of the app only takes recordings when it includes Media, as they're in the media folder. A Kestrel backup takes both.
-- Backups kept in the app are left out of Home Assistant's backups of it, as they're copies already.
-- Large uploads through the sidebar are streamed to the app, rather than held in memory on the way.
-
-## CLI and agents
-
-- `kestrel backups` lists the backups on the server, and `kestrel backups make`, `get`, `remove` and `restore` do the rest, with `--no-recordings`, `--camera`, `--from`, `--to`, `--lock`, `--keep` and `--replace`. The passphrase comes from `KESTREL_BACKUP_PASSPHRASE` or is typed in, never on the command line.
-- The `backups` tool lists them in Code Mode and MCP, and `backup_make`, `backup_get`, `backup_remove` and `backup_restore` are Code Mode writes. Making, deleting and restoring always ask first.
+- Groundwork's packages are updated to 0.51.0, and the shared lint rules to 0.7.1.
