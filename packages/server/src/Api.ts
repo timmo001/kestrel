@@ -2,7 +2,7 @@
  * The server's HTTP API, shared by the server, the web client and the CLI
  * so each side encodes and decodes the same shapes. Each group is named
  * after its path: sources, attention, cameras, recordings, events, the
- * server's health, its jobs and usage, and the paired devices. A camera's routes take its id as two path segments, so
+ * server's health, its jobs and usage, the paired devices and backups. A camera's routes take its id as two path segments, so
  * `swann/3` reads as itself, such as `/api/cameras/swann/3/recordings`.
  *
  * @module
@@ -374,12 +374,13 @@ export type CopySource = typeof CopySource.Type;
 
 /**
  * Work the server does by itself: copying recordings from sources,
- * recording a camera, or clearing out old recordings.
+ * recording a camera, clearing out old recordings, or making or restoring a
+ * backup.
  */
 export const Job = Schema.Struct({
   /** Such as `copy`, `clear-out` or `record:swann/3`. */
   id: Schema.String,
-  kind: Schema.Literals(["copy", "record", "clear-out"]),
+  kind: Schema.Literals(["copy", "record", "clear-out", "backup", "restore"]),
   name: Schema.String,
   state: JobState,
   /** What it's doing or waiting for, in a few words. */
@@ -588,6 +589,143 @@ export class DevicesGroup extends HttpApiGroup.make("devices")
   )
   .prefix("/api/devices") {}
 
+/** What goes in a backup. Settings and the server's own files always do. */
+export const BackupRequest = Schema.Struct({
+  /** Whether recordings go in; they do unless this is `false`. */
+  recordings: Schema.optional(Schema.Boolean),
+  /** Only these cameras' recordings, by id, such as `swann/3`; every camera's by default. */
+  cameras: Schema.optional(Schema.Array(Schema.String)),
+  /** Only recordings from this day on. */
+  from: Schema.optional(LocalDate),
+  /** Only recordings up to and including this day. */
+  to: Schema.optional(LocalDate),
+  /** Locks the backup with this passphrase, which restoring it then needs. */
+  passphrase: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
+});
+
+export interface BackupRequest extends Schema.Schema.Type<
+  typeof BackupRequest
+> {}
+
+/** A backup in the server's backups folder. */
+export const BackupFile = Schema.Struct({
+  /** Such as `kestrel-2026-11-15T23-40-12.kestrel-backup`. */
+  name: Schema.String,
+  bytes: Schema.Number,
+  /** When it was made, as an ISO time. */
+  modified: Schema.String,
+  /** Whether it's locked with a passphrase. */
+  locked: Schema.Boolean,
+});
+
+export interface BackupFile extends Schema.Schema.Type<typeof BackupFile> {}
+
+/** What a restore does with the recordings already here: keeps them beside the backup's, or drops them. */
+export const RestoreMode = Schema.Literals(["merge", "replace"]);
+
+export type RestoreMode = typeof RestoreMode.Type;
+
+export const RestoreRequest = Schema.Struct({
+  /** `merge` by default. */
+  recordings: Schema.optional(RestoreMode),
+  /** The passphrase a locked backup needs. */
+  passphrase: Schema.optional(Schema.String),
+});
+
+export interface RestoreRequest extends Schema.Schema.Type<
+  typeof RestoreRequest
+> {}
+
+/**
+ * The header an uploaded backup's passphrase comes in, encoded as a URI
+ * component, so it stays out of the address and the request log.
+ */
+export const passphraseHeader = "x-kestrel-passphrase";
+
+/** What a backup locked with a passphrase starts with, so one can be told apart before it's sent. */
+export const lockedMark = "KESTRELX";
+
+/** A backup that can't be made or restored, such as one with the wrong passphrase. */
+export class BackupError extends Schema.TaggedError<BackupError>()(
+  "BackupError",
+  { message: Schema.String },
+  { httpApiStatus: 400 },
+) {}
+
+/** No backup has that name, or a download link that's used or past its time. */
+export class UnknownBackup extends Schema.TaggedError<UnknownBackup>()(
+  "UnknownBackup",
+  { message: Schema.String },
+  { httpApiStatus: 404 },
+) {}
+
+const backupName = { name: Schema.String };
+
+const backupStream = HttpApiSchema.WithHeaders(
+  HttpApiSchema.StreamUint8Array({ contentType: "application/octet-stream" }),
+  { "content-disposition": Schema.String },
+);
+
+/**
+ * Backups of the settings, the server's own files, such as its id and
+ * paired devices, and the recordings: made in the backups folder or
+ * downloaded, and restored from either. A restore restarts the server.
+ */
+export class BackupsGroup extends HttpApiGroup.make("backups")
+  .add(
+    /** The backups in the backups folder, newest first. */
+    HttpApiEndpoint.get("list", "/", { success: Schema.Array(BackupFile) }),
+    /** Starts making a backup in the backups folder, as the `backup` job, and says its name. */
+    HttpApiEndpoint.post("create", "/", {
+      payload: BackupRequest,
+      success: Schema.Struct(backupName),
+      error: BackupError,
+    }),
+    /**
+     * A one-time path, under the server's address, that downloads a new
+     * backup as it's made, for 5 minutes.
+     */
+    HttpApiEndpoint.post("link", "/download", {
+      payload: BackupRequest,
+      success: SignInLink,
+    }),
+    HttpApiEndpoint.get("download", "/download/:code", {
+      params: { code: Schema.String },
+      success: backupStream,
+      error: UnknownBackup,
+    }),
+    /** A backup from the backups folder, as a file to save. */
+    HttpApiEndpoint.get("file", "/files/:name", {
+      params: backupName,
+      success: backupStream,
+      error: UnknownBackup,
+    }),
+    HttpApiEndpoint.delete("remove", "/files/:name", {
+      params: backupName,
+      error: UnknownBackup,
+    }),
+    /**
+     * Starts restoring a backup from the backups folder, as the `restore`
+     * job; the server restarts once it's read.
+     */
+    HttpApiEndpoint.post("restore", "/files/:name/restore", {
+      params: backupName,
+      payload: RestoreRequest,
+      error: [UnknownBackup, BackupError],
+    }),
+    /**
+     * Restores the backup this request carries, with its passphrase in
+     * `x-kestrel-passphrase`; the server restarts once it's read.
+     */
+    HttpApiEndpoint.post("upload", "/restore", {
+      query: { recordings: Schema.optional(RestoreMode) },
+      headers: { [passphraseHeader]: Schema.optional(Schema.String) },
+      payload: HttpApiSchema.StreamUint8Array(),
+      error: BackupError,
+    }),
+  )
+  .prefix("/api/backups") {}
+
 export class Api extends HttpApi.make("kestrel")
   .add(SourcesGroup)
   .add(AttentionGroup)
@@ -596,7 +734,8 @@ export class Api extends HttpApi.make("kestrel")
   .add(EventsGroup)
   .add(SystemGroup)
   .add(ActivityGroup)
-  .add(DevicesGroup) {}
+  .add(DevicesGroup)
+  .add(BackupsGroup) {}
 
 /** The cookie a paired browser signs in with. */
 export const sessionCookie = "kestrel_session";

@@ -7,11 +7,9 @@
  * `KESTREL_RAYSHARP_USERNAME` and `KESTREL_RAYSHARP_PASSWORD`.
  */
 import { BunRuntime, BunServices } from "@effect/platform-bun";
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import { Server } from "./index.ts";
 
 BunRuntime.runMain(
-  Layer.launch(Layer.unwrap(Server.fromEnvironment)).pipe(
-    Effect.provide(BunServices.layer),
-  ),
+  Server.fromEnvironment.pipe(Effect.provide(BunServices.layer)),
 );

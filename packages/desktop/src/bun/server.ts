@@ -170,20 +170,16 @@ const local = (options: Options, share: boolean) =>
       ),
     );
 
-    yield* Layer.build(
-      Server.layer({
+    yield* Server.run(
+      {
         // Shared, it listens on the network, where pairing guards it
         hostname: share ? "::" : "127.0.0.1",
         port: options.port,
         web: options.web,
-      }),
+      },
+      (sources) => Ref.set(running, Option.some(sources)),
     ).pipe(
-      Effect.flatMap((context) =>
-        Ref.set(running, Option.some(Context.get(context, Sources))),
-      ),
-      Effect.andThen(Effect.never),
       Effect.ensuring(Ref.set(running, Option.none())),
-      Effect.scoped,
       Effect.sandbox,
       Effect.tapError((cause) =>
         Effect.logError("The server stopped", Cause.pretty(cause)).pipe(

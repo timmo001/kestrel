@@ -9,6 +9,8 @@
 import { BunHttpServer } from "@effect/platform-bun";
 import {
   Config,
+  Context,
+  Deferred,
   Effect,
   FileSystem,
   Layer,
@@ -31,6 +33,8 @@ import {
 import { ActivityLog } from "./ActivityLog.ts";
 import * as Announce from "./Announce.ts";
 import { Attention } from "./Attention.ts";
+import { Backups } from "./Backups.ts";
+import * as Restore from "./backup/Restore.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Go2rtc } from "./go2rtc/Go2rtc.ts";
 import * as Proxy from "./go2rtc/Proxy.ts";
@@ -40,6 +44,7 @@ import { Jobs } from "./Jobs.ts";
 import { Library } from "./Library.ts";
 import { Push } from "./Push.ts";
 import * as Recording from "./Recording.ts";
+import { Restart } from "./Restart.ts";
 import { Sources } from "./Sources.ts";
 import * as Sync from "./Sync.ts";
 import { Uploads } from "./Uploads.ts";
@@ -319,15 +324,15 @@ const connect = HttpRouter.add("GET", `/${connectPath}*`, (request) =>
 );
 
 /**
- * The server as `kestrel serve` and `mise run serve:server` run it, set from
- * the environment: `KESTREL_HOST`, all addresses (`::`) by default, so other
- * devices reach it once paired; `KESTREL_PORT` or `PORT`, 7380 by default;
- * `KESTREL_WEB`, the built web client, `packages/web/dist` beside this
- * package by default; and for the Home Assistant app, `KESTREL_INGRESS_PORT`,
- * with `KESTREL_INGRESS_FROM` for where ingress comes from, the Supervisor by
- * default, and `KESTREL_APP_OPTIONS` for the app's options file.
+ * The server's settings from the environment: `KESTREL_HOST`, all addresses
+ * (`::`) by default, so other devices reach it once paired; `KESTREL_PORT`
+ * or `PORT`, 7380 by default; `KESTREL_WEB`, the built web client,
+ * `packages/web/dist` beside this package by default; and for the Home
+ * Assistant app, `KESTREL_INGRESS_PORT`, with `KESTREL_INGRESS_FROM` for
+ * where ingress comes from, the Supervisor by default, and
+ * `KESTREL_APP_OPTIONS` for the app's options file.
  */
-export const fromEnvironment = Effect.gen(function* () {
+export const optionsFromEnvironment = Effect.gen(function* () {
   const path = yield* Path.Path;
 
   const hostname = yield* Config.String("KESTREL_HOST").pipe(
@@ -353,22 +358,26 @@ export const fromEnvironment = Effect.gen(function* () {
 
   const appOptions = yield* Config.option(Config.String("KESTREL_APP_OPTIONS"));
 
-  return layer({
+  return {
     hostname,
     port,
     web,
     ingressPort: Option.getOrUndefined(ingressPort),
     ingressFrom: Option.getOrUndefined(ingressFrom),
     appOptions: Option.getOrUndefined(appOptions),
-  });
+  } satisfies ServeOptions;
 });
 
 const gracefulShutdownTimeout = "2 seconds";
 
+/** The largest request Bun takes, 1 TiB, so a backup with its recordings can be uploaded to restore. */
+const maxRequestBodySize = 2 ** 40;
+
 /**
  * Serves the API and the web client over plain HTTP, with the sources behind
  * it. The sources stay in what it provides, for a host in the same process,
- * such as the desktop app, to read without going through HTTP.
+ * such as the desktop app, to read without going through HTTP. It needs a
+ * way to restart; `run` gives it one.
  */
 export const layer = (options: ServeOptions) =>
   Layer.mergeAll(
@@ -390,6 +399,7 @@ export const layer = (options: ServeOptions) =>
           // default 20 seconds for open requests held up every stop with a
           // page open
           gracefulShutdownTimeout,
+          maxRequestBodySize,
         }),
       ),
     ),
@@ -412,6 +422,7 @@ export const layer = (options: ServeOptions) =>
               hostname: options.hostname,
               port: options.ingressPort,
               gracefulShutdownTimeout,
+              maxRequestBodySize,
             }),
           ),
         ),
@@ -419,6 +430,7 @@ export const layer = (options: ServeOptions) =>
     Layer.merge(Recording.layer),
     Layer.merge(Sync.layer),
     Layer.merge(Announce.layer(options)),
+    Layer.provide(Backups.layer),
     Layer.provide([
       Go2rtc.layer,
       Attention.layer,
@@ -436,3 +448,51 @@ export const layer = (options: ServeOptions) =>
     // Last, so the routes and go2rtc share one connection to each source.
     Layer.provideMerge(Sources.layer),
   );
+
+/**
+ * Runs the server until it's stopped, putting a staged restore in place
+ * before each start. When asked to restart, such as by a restore, it stops
+ * everything and starts again in this process, telling `started` each time
+ * it's up, with the sources it runs.
+ */
+export const run = (
+  options: ServeOptions,
+  started: (sources: Sources["Service"]) => Effect.Effect<void> = () =>
+    Effect.void,
+) =>
+  Effect.gen(function* () {
+    while (true) {
+      yield* Restore.applyPending;
+
+      const restarting = yield* Deferred.make<void>();
+
+      const restart = Layer.succeed(
+        Restart,
+        Restart.of({
+          request: Deferred.succeed(restarting, undefined).pipe(Effect.asVoid),
+        }),
+      );
+
+      yield* Effect.scoped(
+        Effect.gen(function* () {
+          const context = yield* Layer.build(
+            layer(options).pipe(Layer.provide(restart)),
+          );
+
+          yield* started(Context.get(context, Sources));
+          yield* Deferred.await(restarting);
+          // So the request that asked gets its answer first
+          yield* Effect.sleep("1 second");
+          yield* Effect.logInfo("Restarting the server");
+        }),
+      );
+    }
+  });
+
+/**
+ * The server as `kestrel serve` and `mise run serve:server` run it, set from
+ * the environment (see `optionsFromEnvironment`).
+ */
+export const fromEnvironment = optionsFromEnvironment.pipe(
+  Effect.flatMap((options) => run(options)),
+);

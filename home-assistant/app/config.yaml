@@ -17,11 +17,18 @@ host_network: true
 # only answers the Supervisor.
 ingress: true
 ingress_port: 8099
+# Streams request bodies to the app, so a large backup uploads through Home
+# Assistant without the Supervisor holding it all in memory
+ingress_stream: true
 panel_icon: mdi:cctv
 panel_title: Kestrel
 watchdog: http://[HOST]:7380/api/health
 # Seconds to stop in, so each camera's recording finishes its file
 timeout: 30
+# Kestrel's own backups kept in the app's data are copies already, and can
+# hold every recording, so Home Assistant's backups of the app leave them out
+backup_exclude:
+  - state/backups/*
 # Recordings go in Home Assistant's media folder, so they show in its media
 # browser and stay out of the app's backups
 map:

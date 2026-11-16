@@ -28,8 +28,15 @@ import {
   HttpApiSecurity,
 } from "effect/http-api";
 import { ActivityLog } from "./ActivityLog.ts";
-import { Api, connectPath, PairingRefused, sessionCookie } from "./Api.ts";
+import {
+  Api,
+  connectPath,
+  PairingRefused,
+  passphraseHeader,
+  sessionCookie,
+} from "./Api.ts";
 import { Attention } from "./Attention.ts";
+import { Backups, type Download } from "./Backups.ts";
 import { cookieOptions, Devices, tokenOf } from "./Devices.ts";
 import { Identity } from "./Identity.ts";
 import { streamNames, viewsOf } from "./go2rtc/Go2rtc.ts";
@@ -411,6 +418,66 @@ const DevicesHandlers = HttpApiBuilder.group(
   }),
 );
 
+/** A backup as a file to save, under its own name. */
+const asFile = (download: Download) =>
+  HttpApiSchema.withHeaders({
+    // Headers are already sent by the time anything fails, so a failure
+    // ends the download early and is only logged
+    body: download.data.pipe(
+      Stream.tapError((error) =>
+        Effect.logWarning(
+          `The download of ${download.name} stopped: ${error.message}`,
+        ),
+      ),
+    ),
+    headers: {
+      "content-disposition": `attachment; filename="${download.name}"`,
+    },
+  });
+
+const BackupsHandlers = HttpApiBuilder.group(
+  Api,
+  "backups",
+  Effect.fn(function* (handlers) {
+    const backups = yield* Backups;
+
+    return handlers
+      .handle("list", () => backups.list)
+      .handle("create", ({ payload }) =>
+        backups.create(payload).pipe(Effect.map((name) => ({ name }))),
+      )
+      .handle("link", ({ payload }) =>
+        backups
+          .link(payload)
+          .pipe(
+            Effect.map((code) => ({ path: `api/backups/download/${code}` })),
+          ),
+      )
+      .handle("download", ({ params }) =>
+        backups.download(params.code).pipe(Effect.map(asFile)),
+      )
+      .handle("file", ({ params }) =>
+        backups.file(params.name).pipe(Effect.map(asFile)),
+      )
+      .handle("remove", ({ params }) => backups.remove(params.name))
+      .handle("restore", ({ params, payload }) =>
+        backups.restore(params.name, {
+          recordings: payload.recordings ?? "merge",
+          passphrase: payload.passphrase,
+        }),
+      )
+      .handle("upload", ({ headers, payload, query }) =>
+        backups.upload(payload, {
+          recordings: query.recordings ?? "merge",
+          passphrase:
+            headers[passphraseHeader] === undefined
+              ? undefined
+              : decodeURIComponent(headers[passphraseHeader]),
+        }),
+      );
+  }),
+);
+
 /** The API's routes, needing the `Sources`, `Attention`, `Devices`, `Identity`, `Jobs` and `Usage`. */
 export const routes = HttpApiBuilder.layer(Api, {
   openapiPath: "/api/openapi.json",
@@ -424,5 +491,6 @@ export const routes = HttpApiBuilder.layer(Api, {
     SystemHandlers,
     ActivityHandlers,
     DevicesHandlers,
+    BackupsHandlers,
   ]),
 );
