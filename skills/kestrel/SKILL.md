@@ -9,10 +9,12 @@ Prefer the `kestrel` Code Mode namespace, then the MCP server
 (`kestrel mcp`); fall back to the CLI with `--json`. They talk to the
 server at `KESTREL_SERVER`, else the one `kestrel pair` saved, else
 `http://127.0.0.1:7380`. Every operation only reads from the sources;
-`download` writes a file here, `pair` saves a token and `config copy`
-(`config_copy` in Code Mode) replaces another server's settings, so
-they're the writes: Code Mode asks the person before each, and MCP leaves
-them out. Only run `config copy` when the person asks for it.
+`download` writes a file here, `pair` saves a token,
+`config copy` (`config_copy` in Code Mode) replaces another server's
+settings, and the `backup_` tools make, download, delete or restore
+backups, so they're the writes: Code Mode asks the person before each, and
+MCP leaves them out. Only run `config copy`, `backup_make`,
+`backup_remove` or `backup_restore` when the person asks for it.
 
 A server only answers paired devices. When a call says this CLI needs
 pairing, tell the person: they get a code from Settings, Devices on a
@@ -61,7 +63,8 @@ for the recorder's channel 3.
 7. For what the server does by itself and how much of the machine it
    uses, such as when the person asks whether it's copying, why it's slow or
    whether it's using too much memory: `jobs` lists each job (`copy` from
-   sources, `record:<camera>`, `clear-out`) with its `state` (`idle`,
+   sources, `record:<camera>`, `clear-out`, and `backup` or `restore` while
+   one runs) with its `state` (`idle`,
    `running`, `waiting` or `failed`), what it's doing, progress, last run
    and last error, and `recent` for the recordings copied lately. `usage`
    gives the server's memory and CPU with go2rtc and ffmpeg against its
@@ -69,5 +72,17 @@ for the recorder's channel 3.
    `holdUp`, why background work is waiting, if it is. Copying and clearing
    out wait while the server or the machine is past a limit; live view and
    recording never do. The limits are changed on the Settings page.
+8. `backups` lists the backups kept on the server, each with its size, when
+   it was made and whether it's locked. Only when the person asks:
+   `backup_make` makes one, with every camera's recordings unless told
+   otherwise, and downloads it (`output` names the file) or keeps it on
+   the server (`keep`); `backup_get` downloads a kept one; `backup_remove`
+   deletes one; `backup_restore` restores a kept one by name or a file
+   here, keeping the recordings already there unless `replace` is asked
+   for, and the server starts again. A locked backup's passphrase comes
+   from `KESTREL_BACKUP_PASSPHRASE`; never ask for it in chat or print it,
+   and when it isn't set, tell the person to run
+   `kestrel backups make --lock` or `kestrel backups restore` in a terminal
+   themselves.
 
 Times are the recorder's own clock, with no time zone.

@@ -21,7 +21,12 @@ import {
   version,
 } from "@timmo001/kestrel-core";
 import { browse } from "@timmo001/kestrel-core/discovery";
-import { Device, Job, UsageReport } from "@timmo001/kestrel-server/api";
+import {
+  BackupFile,
+  Device,
+  Job,
+  UsageReport,
+} from "@timmo001/kestrel-server/api";
 import { Effect, Layer, Option, Schema } from "effect";
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
 import {
@@ -151,6 +156,14 @@ const UsageTool = Tool.make("usage", {
   failureMode: "return",
 }).annotate(Tool.Readonly, true);
 
+const BackupsTool = Tool.make("backups", {
+  description:
+    "The backups kept in the server's backups folder: each one's name, size, when it was made and whether it's locked with a passphrase",
+  success: Schema.Struct({ backups: Schema.Array(BackupFile) }),
+  failure: ClientError,
+  failureMode: "return",
+}).annotate(Tool.Readonly, true);
+
 const Tools = Toolkit.make(
   Status,
   DetailsTool,
@@ -163,6 +176,7 @@ const Tools = Toolkit.make(
   JobsTool,
   UsageTool,
   ServersTool,
+  BackupsTool,
 );
 
 const handlers = Effect.gen(function* () {
@@ -238,6 +252,10 @@ const handlers = Effect.gen(function* () {
     usage: () => client.call((api) => api.activity.usage()),
     servers: () =>
       browse("3 seconds").pipe(Effect.map((found) => ({ servers: found }))),
+    backups: () =>
+      client
+        .call((api) => api.backups.list())
+        .pipe(Effect.map((list) => ({ backups: list }))),
   });
 });
 

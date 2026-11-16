@@ -5,8 +5,9 @@
  * `agent call` for Code Mode and `mcp` to serve the same operations over
  * MCP. `pair` pairs
  * it with a server, or shows a code for another device, `devices`
- * lists or removes the paired ones, and `jobs` and `usage` say what the
- * server does by itself and how much of the machine it uses.
+ * lists or removes the paired ones, `jobs` and `usage` say what the
+ * server does by itself and how much of the machine it uses, and `backups`
+ * makes, lists and restores backups.
  *
  * @module
  */
@@ -14,6 +15,7 @@ import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   cameraParts,
   hoursText,
+  LocalDate,
   LocalTime,
   type Attention,
   type Camera,
@@ -27,26 +29,39 @@ import {
   type SourceInfo,
   version,
 } from "@timmo001/kestrel-core";
-import type {
-  Device,
-  Job,
-  PairingCode,
-  ServerInfo,
-  UsageReport,
+import {
+  type BackupFile,
+  type BackupRequest,
+  type Device,
+  type Job,
+  lockedMark,
+  type PairingCode,
+  passphraseHeader,
+  type RestoreMode,
+  type ServerInfo,
+  type UsageReport,
 } from "@timmo001/kestrel-server/api";
 import { browse, type FoundServer } from "@timmo001/kestrel-core/discovery";
 import { hostname } from "node:os";
 import {
+  Config,
   Console,
   Effect,
   FileSystem,
   Layer,
   Option,
+  Redacted,
   Schema,
   Stdio,
   Stream,
 } from "effect";
-import { Argument, Command, Flag } from "effect/cli";
+import {
+  Argument,
+  Command,
+  Flag,
+  Prompt,
+  TerminalCapabilities,
+} from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 import { renderUnicodeCompact } from "uqr";
 import { callArgs, manifest, type Manifest } from "./agent.ts";
@@ -117,6 +132,19 @@ type Output =
       readonly camera: CameraId;
       readonly begin: string;
       readonly end: string;
+    }
+  | { readonly backups: ReadonlyArray<BackupFile> }
+  | {
+      readonly backup:
+        | { readonly name: string }
+        | { readonly file: string; readonly bytes: number };
+    }
+  | { readonly removed: string }
+  | {
+      readonly restoring: {
+        readonly backup: string;
+        readonly recordings: RestoreMode;
+      };
     }
   | Manifest;
 
@@ -401,6 +429,8 @@ const events = Command.make(
 );
 
 const decodeTime = Schema.decodeUnknownEffect(LocalTime);
+
+const decodeDay = Schema.decodeUnknownEffect(LocalDate);
 
 /**
  * A source's time from a flag: a full one such as `2026-11-11T21:46:00`, or
@@ -706,14 +736,362 @@ const devices = devicesList.pipe(
 
 const megabyte = 1024 * 1024;
 
-/** Bytes in MB, or GB from a gigabyte. */
+/** Bytes in KB below a megabyte, MB, or GB from a gigabyte. */
 const bytesText = (bytes: number) =>
   bytes >= 1024 * megabyte
     ? `${(bytes / (1024 * megabyte)).toFixed(1)} GB`
-    : `${Math.round(bytes / megabyte)} MB`;
+    : bytes < megabyte
+      ? `${Math.ceil(bytes / 1024)} KB`
+      : `${Math.round(bytes / megabyte)} MB`;
 
 /** An ISO time as `2026-11-13 19:20`. */
 const shortTime = (iso: string) => iso.replace("T", " ").slice(0, 16);
+
+/**
+ * The passphrase a backup locks or opens with: `KESTREL_BACKUP_PASSPHRASE`,
+ * else typed at the terminal, so it's never on a command line. `twice` asks
+ * again to catch a typo, for one that locks.
+ */
+const passphraseFor = Effect.fn("passphraseFor")(function* (
+  why: string,
+  twice: boolean,
+) {
+  const set = yield* Config.option(
+    Config.Redacted("KESTREL_BACKUP_PASSPHRASE"),
+  ).pipe(
+    Effect.mapError(
+      (error) => new ClientError({ message: `${why}: ${error.message}` }),
+    ),
+  );
+
+  if (Option.isSome(set)) return Redacted.value(set.value);
+
+  const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities;
+
+  if (!canPrompt) {
+    return yield* new ClientError({
+      message: `${why}: set KESTREL_BACKUP_PASSPHRASE, or run this in a terminal to type it`,
+    });
+  }
+
+  const ask = (message: string) =>
+    Prompt.run(Prompt.Password({ message })).pipe(
+      Effect.map(Redacted.value),
+      Effect.mapError(
+        () => new ClientError({ message: "No passphrase was typed" }),
+      ),
+    );
+
+  const typed = yield* ask("Passphrase");
+
+  if (typed === "") {
+    return yield* new ClientError({ message: "The passphrase can't be empty" });
+  }
+
+  if (twice && (yield* ask("The passphrase again")) !== typed) {
+    return yield* new ClientError({
+      message: "The passphrases didn't match, so nothing was made",
+    });
+  }
+
+  return typed;
+});
+
+const backupsList = Command.make(
+  "backups",
+  { json },
+  Effect.fn("backups")(function* ({ json }) {
+    const list = yield* (yield* ServerClient).call((api) => api.backups.list());
+
+    if (json) return yield* printJson({ backups: list });
+
+    if (list.length === 0) {
+      return yield* Console.log(
+        "No backups are kept on the server: `kestrel backups make --keep` makes one",
+      );
+    }
+
+    for (const backup of list) {
+      yield* Console.log(
+        `${backup.name}  ${bytesText(backup.bytes)}  ${shortTime(backup.modified)}${backup.locked ? "  locked" : ""}`,
+      );
+    }
+  }),
+);
+
+/** Saves a backup the server streams to `file`, or the name it gives, and says how big it came out. */
+const saveBackup = Effect.fn("saveBackup")(function* (
+  response: {
+    readonly body: Stream.Stream<Uint8Array, Error>;
+    readonly headers: { readonly "content-disposition": string };
+  },
+  output: Option.Option<string>,
+) {
+  const named = /filename="([^"]+)"/.exec(
+    response.headers["content-disposition"],
+  )?.[1];
+
+  const file = Option.getOrElse(
+    output,
+    () => named ?? "kestrel.kestrel-backup",
+  );
+
+  const fs = yield* FileSystem.FileSystem;
+
+  yield* response.body.pipe(
+    Stream.run(fs.sink(file)),
+    Effect.mapError(
+      (error) =>
+        new ClientError({ message: `The backup stopped: ${error.message}` }),
+    ),
+  );
+
+  const bytes = Number((yield* fs.stat(file)).size);
+
+  return { file, bytes };
+});
+
+const output = Flag.String("output").pipe(
+  Flag.withAlias("o"),
+  Flag.withDescription(
+    "The file to write; the name the server gives, such as kestrel-2026-11-15T23-40-12.kestrel-backup, by default",
+  ),
+  Flag.optional,
+);
+
+const backupsMake = Command.make(
+  "make",
+  {
+    json,
+    keep: Flag.Boolean("keep").pipe(
+      Flag.withDescription(
+        "Keep it in the server's backups folder instead of downloading it here",
+      ),
+      Flag.withDefault(false),
+    ),
+    noRecordings: Flag.Boolean("no-recordings").pipe(
+      Flag.withDescription("Leave the recordings out"),
+      Flag.withDefault(false),
+    ),
+    cameras: Flag.String("camera").pipe(
+      Flag.withDescription(
+        "Only this camera's recordings, such as swann/3; give it again for more. Every camera's by default",
+      ),
+      Flag.atLeast(0),
+    ),
+    from: Flag.String("from").pipe(
+      Flag.withDescription(
+        "Only recordings from this day on, such as 2026-11-01",
+      ),
+      Flag.optional,
+    ),
+    to: Flag.String("to").pipe(
+      Flag.withDescription(
+        "Only recordings up to and including this day, such as 2026-11-15",
+      ),
+      Flag.optional,
+    ),
+    lock: Flag.Boolean("lock").pipe(
+      Flag.withDescription(
+        "Lock it with a passphrase, from KESTREL_BACKUP_PASSPHRASE or typed in, which restoring it then needs",
+      ),
+      Flag.withDefault(false),
+    ),
+    output,
+  },
+  Effect.fn("backupsMake")(function* (options) {
+    const day = (value: string, flag: string) =>
+      decodeDay(value).pipe(
+        Effect.mapError(
+          () =>
+            new ClientError({
+              message: `--${flag} "${value}" isn't a day: use 2026-11-15`,
+            }),
+        ),
+      );
+
+    const from = Option.isSome(options.from)
+      ? yield* day(options.from.value, "from")
+      : undefined;
+
+    const to = Option.isSome(options.to)
+      ? yield* day(options.to.value, "to")
+      : undefined;
+
+    if (from !== undefined && to !== undefined && from > to) {
+      return yield* new ClientError({
+        message: "--from needs to come before --to",
+      });
+    }
+
+    const cameras = yield* Effect.forEach(options.cameras, resolveCamera);
+
+    const passphrase = options.lock
+      ? yield* passphraseFor("Locking the backup needs a passphrase", true)
+      : undefined;
+
+    const request: BackupRequest = {
+      recordings: options.noRecordings ? false : undefined,
+      cameras: cameras.length > 0 ? cameras : undefined,
+      from,
+      to,
+      passphrase,
+    };
+
+    const client = yield* ServerClient;
+
+    if (options.keep) {
+      const { name } = yield* client.call((api) =>
+        api.backups.create({ payload: request }),
+      );
+
+      if (options.json) return yield* printJson({ backup: { name } });
+
+      return yield* Console.log(
+        `Making ${name} in the server's backups folder; \`kestrel jobs\` shows the backup job, and \`kestrel backups\` lists it once it's made`,
+      );
+    }
+
+    const { path } = yield* client.call((api) =>
+      api.backups.link({ payload: request }),
+    );
+
+    const code = path.split("/").at(-1) ?? "";
+
+    const response = yield* client.call((api) =>
+      api.backups.download({ params: { code } }),
+    );
+
+    const saved = yield* saveBackup(response, options.output);
+
+    if (options.json) return yield* printJson({ backup: saved });
+
+    yield* Console.log(`Saved ${saved.file} (${bytesText(saved.bytes)})`);
+  }),
+).pipe(
+  Command.withDescription(
+    "Back up the settings, the sources' logins, the server's id, its paired devices and the recordings, all or some, and download it or keep it on the server",
+  ),
+);
+
+const backupName = Argument.String("name").pipe(
+  Argument.withDescription(
+    "The backup's name on the server, from `kestrel backups`",
+  ),
+);
+
+const backupsGet = Command.make(
+  "get",
+  { json, name: backupName, output },
+  Effect.fn("backupsGet")(function* ({ json, name, output }) {
+    const response = yield* (yield* ServerClient).call((api) =>
+      api.backups.file({ params: { name } }),
+    );
+
+    const saved = yield* saveBackup(response, output);
+
+    if (json) return yield* printJson({ backup: saved });
+
+    yield* Console.log(`Saved ${saved.file} (${bytesText(saved.bytes)})`);
+  }),
+).pipe(Command.withDescription("Download a backup kept on the server"));
+
+const backupsRemove = Command.make(
+  "remove",
+  { json, name: backupName },
+  Effect.fn("backupsRemove")(function* ({ json, name }) {
+    yield* (yield* ServerClient).call((api) =>
+      api.backups.remove({ params: { name } }),
+    );
+
+    if (json) return yield* printJson({ removed: name });
+
+    yield* Console.log(`Deleted ${name}`);
+  }),
+).pipe(Command.withDescription("Delete a backup kept on the server"));
+
+const backupsRestore = Command.make(
+  "restore",
+  {
+    json,
+    backup: Argument.String("backup").pipe(
+      Argument.withDescription(
+        "A backup file here, or the name of one kept on the server, from `kestrel backups`",
+      ),
+    ),
+    replace: Flag.Boolean("replace").pipe(
+      Flag.withDescription(
+        "Delete Kestrel's recordings on the server before putting the backup's in, instead of keeping them beside it",
+      ),
+      Flag.withDefault(false),
+    ),
+  },
+  Effect.fn("backupsRestore")(function* ({ json, backup, replace }) {
+    const recordings: RestoreMode = replace ? "replace" : "merge";
+    const fs = yield* FileSystem.FileSystem;
+    const client = yield* ServerClient;
+    const here = yield* fs.exists(backup);
+
+    const locked = here
+      ? (yield* fs
+          .stream(backup, { bytesToRead: lockedMark.length })
+          .pipe(Stream.decodeText(), Stream.mkString)) === lockedMark
+      : (yield* client.call((api) => api.backups.list())).some(
+          (each) => each.name === backup && each.locked,
+        );
+
+    const passphrase = locked
+      ? yield* passphraseFor(
+          "This backup is locked, so restoring it needs its passphrase",
+          false,
+        )
+      : undefined;
+
+    if (here) {
+      yield* client.call((api) =>
+        api.backups.upload({
+          query: { recordings },
+          headers: {
+            [passphraseHeader]:
+              passphrase === undefined
+                ? undefined
+                : encodeURIComponent(passphrase),
+          },
+          payload: fs.stream(backup),
+        }),
+      );
+    } else {
+      yield* client.call((api) =>
+        api.backups.restore({
+          params: { name: backup },
+          payload: { recordings, passphrase },
+        }),
+      );
+    }
+
+    if (json) return yield* printJson({ restoring: { backup, recordings } });
+
+    yield* Console.log(
+      `Restoring ${backup}, ${replace ? "replacing" : "keeping"} the recordings already there. The server starts again once it's read it; \`kestrel jobs\` shows the restore until then`,
+    );
+  }),
+).pipe(
+  Command.withDescription(
+    "Restore a backup, from a file here or one kept on the server: the settings, the server's id and its paired devices become the backup's, and the server starts again",
+  ),
+);
+
+const backups = backupsList.pipe(
+  Command.withDescription(
+    "The backups kept on the server, and making, downloading, deleting and restoring them",
+  ),
+  Command.withSubcommands([
+    backupsMake,
+    backupsGet,
+    backupsRemove,
+    backupsRestore,
+  ]),
+);
 
 const jobs = Command.make(
   "jobs",
@@ -828,9 +1206,7 @@ const usage = Command.make(
 // as quickly as before
 const serve = Command.make("serve", {}, () =>
   Effect.promise(() => import("@timmo001/kestrel-server")).pipe(
-    Effect.flatMap(({ Server }) =>
-      Layer.launch(Layer.unwrap(Server.fromEnvironment)),
-    ),
+    Effect.flatMap(({ Server }) => Server.fromEnvironment),
   ),
 ).pipe(
   Command.withDescription(
@@ -977,6 +1353,7 @@ const callable = Command.make("kestrel").pipe(
     devices,
     jobs,
     usage,
+    backups,
     pair,
     servers,
     config,
@@ -1031,6 +1408,7 @@ const cli = Command.make("kestrel").pipe(
     devices,
     jobs,
     usage,
+    backups,
     pair,
     servers,
     serve,

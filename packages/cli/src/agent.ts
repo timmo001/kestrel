@@ -137,6 +137,11 @@ const Day = Schema.String.annotate({
   description: "The day, such as 2026-11-11; today by default",
 });
 
+const BackupName = Schema.String.annotate({
+  description:
+    "The backup's name on the server, such as kestrel-2026-11-15T23-40-12.kestrel-backup, from backups",
+});
+
 /** Every Code Mode tool, in the order the catalogue lists them. */
 export const agentTools: ReadonlyArray<AgentTool> = [
   tool({
@@ -280,6 +285,121 @@ export const agentTools: ReadonlyArray<AgentTool> = [
     access: "read",
     input: NoInput,
     args: none,
+  }),
+  tool({
+    name: "backups",
+    description:
+      "The backups kept in the server's backups folder: each one's name, size, when it was made and whether it's locked with a passphrase",
+    access: "read",
+    input: NoInput,
+    args: none,
+  }),
+  tool({
+    name: "backup_make",
+    command: ["backups", "make"],
+    description:
+      "Back up the settings, the sources' logins, the server's id, its paired devices and the recordings, all or some: kept on the server, or downloaded to the session's folder. A locked one takes its passphrase from KESTREL_BACKUP_PASSPHRASE. Only when the person asks for it",
+    access: "write",
+    alwaysAsk: true,
+    timeout: "1 hour",
+    input: Schema.Struct({
+      keep: Schema.optionalKey(
+        Schema.Boolean.annotate({
+          description:
+            "Keep it in the server's backups folder, as the backup job, instead of downloading it",
+        }),
+      ),
+      recordings: Schema.optionalKey(
+        Schema.Boolean.annotate({
+          description: "Whether recordings go in; they do by default",
+        }),
+      ),
+      cameras: Schema.optionalKey(
+        Schema.Array(Camera).annotate({
+          description:
+            "Only these cameras' recordings; every camera's by default",
+        }),
+      ),
+      from: Schema.optionalKey(
+        Schema.String.annotate({
+          description: "Only recordings from this day on, such as 2026-11-01",
+        }),
+      ),
+      to: Schema.optionalKey(
+        Schema.String.annotate({
+          description: "Only recordings up to and including this day",
+        }),
+      ),
+      lock: Schema.optionalKey(
+        Schema.Boolean.annotate({
+          description:
+            "Lock it with the passphrase in KESTREL_BACKUP_PASSPHRASE",
+        }),
+      ),
+      output: Schema.optionalKey(
+        Schema.String.annotate({
+          description:
+            "The file to write when downloading; the server's name for it by default",
+        }),
+      ),
+    }),
+    args: (input) => [
+      ...toggle("keep", input.keep),
+      ...toggle("no-recordings", input.recordings === false),
+      ...(input.cameras ?? []).flatMap((each) => ["--camera", each]),
+      ...flag("from", input.from),
+      ...flag("to", input.to),
+      ...toggle("lock", input.lock),
+      ...flag("output", input.output),
+    ],
+  }),
+  tool({
+    name: "backup_get",
+    command: ["backups", "get"],
+    description: "Download a backup kept on the server to the session's folder",
+    access: "write",
+    timeout: "1 hour",
+    input: Schema.Struct({
+      name: BackupName,
+      output: Schema.optionalKey(
+        Schema.String.annotate({
+          description: "The file to write; the backup's name by default",
+        }),
+      ),
+    }),
+    args: (input) => [...flag("output", input.output), input.name],
+  }),
+  tool({
+    name: "backup_remove",
+    command: ["backups", "remove"],
+    description:
+      "Delete a backup kept on the server. Only when the person asks for it",
+    access: "write",
+    alwaysAsk: true,
+    input: Schema.Struct({ name: BackupName }),
+    args: (input) => [input.name],
+  }),
+  tool({
+    name: "backup_restore",
+    command: ["backups", "restore"],
+    description:
+      "Restore a backup, a file here or one kept on the server: the settings, logins, the server's id and its paired devices become the backup's, its recordings are put back, and the server starts again. A locked one takes its passphrase from KESTREL_BACKUP_PASSPHRASE. Only when the person asks for it",
+    access: "write",
+    alwaysAsk: true,
+    timeout: "1 hour",
+    input: Schema.Struct({
+      backup: Schema.String.annotate({
+        description:
+          "A backup file here, or the name of one kept on the server, from backups",
+      }),
+      replace: Schema.optionalKey(
+        Schema.Boolean.annotate({
+          description:
+            "Delete Kestrel's recordings on the server first, instead of keeping them beside the backup's",
+        }),
+      ),
+    }),
+    args: (input) => [...toggle("replace", input.replace), input.backup],
   }),
   tool({
     name: "config_copy",
