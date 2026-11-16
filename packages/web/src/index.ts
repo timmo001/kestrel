@@ -41,6 +41,7 @@ import { Equal, Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 import config from "../pwa.config.ts";
 import { aboutPanel } from "./about.ts";
+import { backupsPanel } from "./backups.ts";
 import { call, onMismatched, onUnpaired } from "./api.ts";
 import {
   forgetCameras,
@@ -273,6 +274,8 @@ void settings.start();
 const devices = devicesPanel();
 
 void devices.start();
+
+void backupsPanel().start();
 
 void aboutPanel().start();
 

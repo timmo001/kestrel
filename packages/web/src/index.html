@@ -731,8 +731,8 @@
           </gw-stack>
         </section>
 
-        <!-- Settings: camera order, recording, devices, and each source's
-             settings and cameras, saved to the server's sources file -->
+        <!-- Settings: camera order, recording, devices, backups, and each
+             source's settings and cameras, saved to the server's sources file -->
         <section class="page" data-page="settings" hidden>
           <gw-page-header
             heading="Settings"
@@ -784,6 +784,13 @@
               <gw-table class="devices-list"></gw-table>
             </gw-stack>
           </gw-expansion>
+          <!-- Backups of the settings, devices and recordings, and restoring
+               one here -->
+          <gw-expansion
+            class="settings-backups"
+            heading="Backups"
+            description="Save the settings, paired devices and recordings, and restore them here or on another server"
+          ></gw-expansion>
           <!-- Installing Kestrel as an app, while this browser can -->
           <gw-card class="settings-install" hidden>
             <gw-setting-row

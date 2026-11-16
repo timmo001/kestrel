@@ -171,8 +171,8 @@ const fieldGrid = (fields: ReadonlyArray<HTMLElement>) => {
   return grid;
 };
 
-/** A part of a source's card: a heading, a line on what it's for, and its fields. */
-const group = (
+/** A part of a panel: a heading, a line on what it's for, and its fields. */
+export const group = (
   heading: string,
   description: string,
   ...content: ReadonlyArray<HTMLElement>

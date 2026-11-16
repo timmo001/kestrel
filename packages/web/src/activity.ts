@@ -316,6 +316,8 @@ const kindNames = {
   copy: "Copying",
   record: "Recording",
   "clear-out": "Clearing out",
+  backup: "Backing up",
+  restore: "Restoring",
 } satisfies Record<Job["kind"], string>;
 
 /** A job's name, with a recording job's camera by its own name. */
