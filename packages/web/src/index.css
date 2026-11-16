@@ -258,6 +258,15 @@ gw-table gw-sheet {
   --live-rows: 1;
 }
 
+/* An embed's one camera, in all the room there is, whatever its shape */
+.camera-grid[data-layout="whole"] {
+  --live-columns: 1;
+  --live-rows: 1;
+
+  width: 100cqw;
+  height: 100cqh;
+}
+
 .camera-grid[data-layout="2"] {
   --live-columns: 2;
   --live-rows: 1;

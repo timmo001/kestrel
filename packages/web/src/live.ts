@@ -499,12 +499,17 @@ export const livePage = (): LivePage => {
    * Lays the grid out for the cameras in it. Smart tiling sizes them to the
    * space around the grid, every camera on the page filling as much of it
    * as they can; fixed layouts keep the page's own shape, however many are
-   * on it.
+   * on it. An embed's one camera takes all the room there is, its picture
+   * fitted whole in it, rather than a 16:9 tile that boxes in a picture of
+   * another shape.
    */
   const arrangeGrid = (target: HTMLElement) => {
-    stage?.setAttribute("data-tiling", tiling);
+    const whole = embedded && target.childElementCount <= 1;
+
+    // Never a phone's stack of fixed layouts, for one camera on its own
+    stage?.setAttribute("data-tiling", whole ? "smart" : tiling);
     fitFree();
-    arrangeIn(target);
+    arrangeIn(target, whole);
     fitToGrid(target);
   };
 
@@ -556,9 +561,14 @@ export const livePage = (): LivePage => {
     stage.style.setProperty("--live-dock-size", "minmax(min-content, 1fr)");
   };
 
-  const arrangeIn = (target: HTMLElement) => {
-    const smart = tiling === "smart";
-    const arrangement = smart ? undefined : gridFor(size());
+  const arrangeIn = (target: HTMLElement, whole: boolean) => {
+    const smart = tiling === "smart" && !whole;
+
+    const arrangement = whole
+      ? { layout: "whole", columns: null, rows: null }
+      : smart
+        ? undefined
+        : gridFor(size());
 
     target.dataset.layout = arrangement?.layout ?? "smart";
 
