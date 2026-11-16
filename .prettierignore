@@ -12,6 +12,7 @@ AGENTS.md
 .blume/
 .blume-verify/
 .wrangler/
+.alchemy/
 # The desktop app's build output and what Hutch prepares
 packages/desktop/.hutch/
 packages/desktop/.cottontail-tmp/
