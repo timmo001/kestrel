@@ -10,4 +10,14 @@ export default defineConfig({
     maxWarnings: 0,
   },
   ignorePatterns: [".agents/**", ".opencode/**", "dist/**"],
+  overrides: [
+    {
+      // The router's one cast: a matched route's name and both codecs come
+      // from the same entry of `routes`, which TypeScript can't correlate.
+      files: ["src/router.ts"],
+      rules: {
+        "timmo/prefer-types-over-assertions": "off",
+      },
+    },
+  ],
 });

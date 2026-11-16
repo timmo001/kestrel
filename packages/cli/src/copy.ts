@@ -77,9 +77,10 @@ export const localSettings = Effect.fn("localSettings")(function* (
 
   const text = yield* fs.readFileString(file).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new ClientError({
           message: `There's no ${file} to copy: set the sources up on this machine's Settings page first`,
+          cause,
         }),
     ),
   );

@@ -446,9 +446,10 @@ const timeOn = (day: string, value: string) => {
 
   return decodeTime(full).pipe(
     Effect.mapError(
-      () =>
+      (cause) =>
         new ClientError({
           message: `"${value}" isn't a time: use 21:46, 21:46:30 or 2026-11-11T21:46:30`,
+          cause,
         }),
     ),
   );
@@ -778,7 +779,8 @@ const passphraseFor = Effect.fn("passphraseFor")(function* (
     Prompt.run(Prompt.Password({ message })).pipe(
       Effect.map(Redacted.value),
       Effect.mapError(
-        () => new ClientError({ message: "No passphrase was typed" }),
+        (cause) =>
+          new ClientError({ message: "No passphrase was typed", cause }),
       ),
     );
 
@@ -903,9 +905,10 @@ const backupsMake = Command.make(
     const day = (value: string, flag: string) =>
       decodeDay(value).pipe(
         Effect.mapError(
-          () =>
+          (cause) =>
             new ClientError({
               message: `--${flag} "${value}" isn't a day: use 2026-11-15`,
+              cause,
             }),
         ),
       );

@@ -38,7 +38,7 @@ import { connection, writeSaved, type SavedConnection } from "./connection.ts";
 /** The server couldn't be reached or couldn't reach a source, or the input doesn't read. */
 export class ClientError extends Schema.TaggedError<ClientError>()(
   "ClientError",
-  { message: Schema.String },
+  { message: Schema.String, cause: Schema.optionalKey(Schema.Defect()) },
 ) {}
 
 /** Nothing answered at the server's address, such as after it moved. */

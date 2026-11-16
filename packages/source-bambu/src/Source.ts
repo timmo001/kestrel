@@ -53,7 +53,7 @@ const BambuSettings = Schema.Struct({
   accessCode: Schema.String,
 });
 
-const decodeSettings = Schema.decodeUnknownEffect(BambuSettings);
+const decodeSettings = Schema.decodeUnknownOption(BambuSettings);
 
 /** The feed stopped, and why. */
 class FeedStopped extends Schema.TaggedError<FeedStopped>()("FeedStopped", {
@@ -92,17 +92,21 @@ export const make = Effect.fnUntraced(function* (saved: SourceSettings) {
   const camera = cameraId(id, "camera");
   const timelapse = cameraId(id, "timelapse");
 
-  const settings = yield* decodeSettings(
-    Object.fromEntries(
-      Object.entries(saved.settings).filter(([, value]) => value !== ""),
+  const settings = yield* Option.match(
+    decodeSettings(
+      Object.fromEntries(
+        Object.entries(saved.settings).filter(([, value]) => value !== ""),
+      ),
     ),
-  ).pipe(
-    Effect.mapError(
-      () =>
-        new InvalidSettings({
-          message: `${name}: it needs an address and an access code`,
-        }),
-    ),
+    {
+      onNone: () =>
+        Effect.fail(
+          new InvalidSettings({
+            message: `${name}: it needs an address and an access code`,
+          }),
+        ),
+      onSome: Effect.succeed,
+    },
   );
 
   const accessCode = Redacted.make(settings.accessCode);

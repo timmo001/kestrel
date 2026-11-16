@@ -35,7 +35,7 @@ const decodePlan = Schema.decodeUnknownEffect(Plan);
 
 const encodePlan = Schema.encodeSync(Plan);
 
-const decodeManifest = Schema.decodeUnknownEffect(manifestJson);
+const decodeManifest = Schema.decodeUnknownOption(manifestJson);
 
 /** Keeps what's here for files that are in both. */
 const Lengths = Schema.fromJsonString(
@@ -70,14 +70,15 @@ const readManifest = <E>(entry: Tar.ReadEntry<E>) =>
       join(yield* Stream.runCollect(entry.data)),
     );
 
-    return yield* decodeManifest(text).pipe(
-      Effect.mapError(
-        () =>
+    return yield* Option.match(decodeManifest(text), {
+      onNone: () =>
+        Effect.fail(
           new BackupError({
             message: "This backup was made by a newer Kestrel, or it's damaged",
           }),
-      ),
-    );
+        ),
+      onSome: Effect.succeed,
+    });
   });
 
 /** Stops reading a backup once its manifest is found. */
