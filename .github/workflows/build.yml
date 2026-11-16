@@ -87,7 +87,7 @@ jobs:
         run: .scripts/set-version.sh "$VERSION"
 
       - name: Set up mise
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install build dependencies
         run: |
@@ -149,7 +149,7 @@ jobs:
         run: .scripts/set-version.sh "$VERSION"
 
       - name: Set up mise
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -196,7 +196,7 @@ jobs:
 
       # Only nFPM is needed, which mise x installs
       - name: Set up mise
-        uses: jdx/mise-action@d5574b52816a478f9d4e6529a3f6ff17a8a36785 # v5.2.8
+        uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
           install: false
 
@@ -254,7 +254,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: timmo001/workflows/.github/workflows/build-container-image.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       image: ghcr.io/timmo001/kestrel
       version: ${{ github.event_name == 'release' && needs.version.outputs.version || '' }}
@@ -288,7 +288,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    uses: timmo001/workflows/.github/workflows/build-container-image.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/build-container-image.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       image: ghcr.io/timmo001/kestrel-app
       version: ${{ github.event_name == 'release' && needs.version.outputs.version || '' }}
@@ -317,7 +317,7 @@ jobs:
   app-changelog:
     name: Home Assistant app changelog
     if: github.event_name == 'release'
-    uses: timmo001/workflows/.github/workflows/home-assistant-app-changelog.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-changelog.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       changelog-path: home-assistant/app/CHANGELOG.md
     secrets:
@@ -329,7 +329,7 @@ jobs:
     name: Home Assistant apps repository
     if: github.event_name == 'release'
     needs: image-app
-    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/home-assistant-app-dispatch.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       repository: timmo001/home-assistant-apps
     secrets:
@@ -390,7 +390,7 @@ jobs:
 
       # Verify with: gh attestation verify <file> -R timmo001/kestrel
       - name: Attest and attach to the release
-        uses: timmo001/workflows/.github/actions/publish-release-assets@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+        uses: timmo001/workflows/.github/actions/publish-release-assets@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
         with:
           release-tag: ${{ github.event.release.tag_name }}
           # One file each, as the action needs
@@ -426,7 +426,7 @@ jobs:
           ref: ${{ env.RELEASE_VERSION }}
 
       - name: Render PKGBUILD
-        uses: timmo001/workflows/.github/actions/prepare-arch-bin@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+        uses: timmo001/workflows/.github/actions/prepare-arch-bin@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
         with:
           releaseVersion: ${{ env.RELEASE_VERSION }}
           packageName: kestrel-nvr
@@ -453,7 +453,7 @@ jobs:
   arch-bin:
     name: Arch package (kestrel-nvr-bin)
     needs: prepare-arch-bin
-    uses: timmo001/workflows/.github/workflows/build-arch-package.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/build-arch-package.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       package-name: kestrel-nvr-bin
       package-files-artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
@@ -468,7 +468,7 @@ jobs:
       contents: write
       id-token: write
       attestations: write
-    uses: timmo001/workflows/.github/workflows/attach-release-arch-package.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/attach-release-arch-package.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       artifact-name: ${{ needs.arch-bin.outputs.artifact-name }}
       release-tag: ${{ github.event.release.tag_name }}
@@ -479,7 +479,7 @@ jobs:
     needs: prepare-arch-bin
     permissions:
       contents: read
-    uses: timmo001/workflows/.github/workflows/publish-aur.yml@5451f6867a5cb2b9b6318a82e00f7dd9f9fc279a # 20261116.0
+    uses: timmo001/workflows/.github/workflows/publish-aur.yml@db6f3692a31de24d2bee17e505dfd2bf3fd5a076 # 20261116.1
     with:
       package-name: kestrel-nvr-bin
       artifact-name: arch-kestrel-nvr-bin-${{ github.run_id }}
