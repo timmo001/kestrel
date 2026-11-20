@@ -287,18 +287,20 @@ export class Devices extends Context.Service<
       const code = Effect.gen(function* () {
         const { code: made, expires } = yield* open(Option.none());
 
+        // Groundwork's pairing link, the code in the fragment so it never
+        // reaches a request log
+        const linkAt = (url: string) =>
+          pairingUrl(
+            { service: `${url}/pair`, code: showCode(made) },
+            "fragment",
+          );
+
         return {
           code: showCode(made),
           expires: new Date(expires).toISOString(),
-          // Groundwork's pairing link, the code in the fragment so it never
-          // reaches a request log
-          link: Option.getOrUndefined(
-            Option.map(identity.url, (url) =>
-              pairingUrl(
-                { service: `${url}/pair`, code: showCode(made) },
-                "fragment",
-              ),
-            ),
+          link: Option.getOrUndefined(Option.map(identity.url, linkAt)),
+          remoteLink: Option.getOrUndefined(
+            Option.map(identity.remoteUrl, linkAt),
           ),
         };
       }).pipe(Effect.withSpan("Devices.code"));

@@ -27,6 +27,7 @@ The `kestrel` CLI in `packages/cli` reads your cameras through the server's
 | `kestrel backups remove <name>`                        | Deletes a backup kept on the server                         |
 | `kestrel backups restore <file or name>`               | Restores a backup, and the server starts again              |
 | `kestrel pair`                                         | A one-time code and QR code for another device              |
+| `kestrel pair --remote`                                | The same, at the server's outside address                   |
 | `kestrel pair <code> --server <address>`               | Pairs this CLI with a server                                |
 | `kestrel config copy --server <address>`               | Copies this machine's sources to another server             |
 | `kestrel servers`                                      | The Kestrel servers on this network, found over mDNS        |

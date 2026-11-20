@@ -119,7 +119,8 @@ with `PairingRefused`. The code's `link` is the page that pairs with it,
 `<server>/pair#pair=…`, Groundwork's pairing link with the code in the
 fragment, for a QR code; it's missing when the
 server has no address other devices can reach (set `KESTREL_URL` to name
-one).
+one). `remoteLink` is the same page at `KESTREL_REMOTE_URL`, the address
+devices outside the network reach, and is missing without one.
 
 The server keeps only a SHA-256 hash of each token, in `devices.json` in
 the state folder, and an owner token in `owner.token` beside it: whoever can

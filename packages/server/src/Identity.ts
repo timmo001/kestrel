@@ -3,7 +3,8 @@
  * the state folder, so a device still knows its server when the address
  * changes; a name, `KESTREL_NAME` or the machine's; and the address other
  * devices reach it on, `KESTREL_URL` or the machine's first network address,
- * or none while it only listens on this machine.
+ * or none while it only listens on this machine; and the address devices
+ * outside the network reach it on, `KESTREL_REMOTE_URL`, if it has one.
  *
  * @module
  */
@@ -46,6 +47,8 @@ export class Identity extends Context.Service<
     readonly name: string;
     /** Where other devices reach the server, without a trailing slash. */
     readonly url: Option.Option<string>;
+    /** Where devices outside the network reach it, without a trailing slash. */
+    readonly remoteUrl: Option.Option<string>;
   }
 >()("@timmo001/kestrel-server/Identity") {
   static readonly layer = (options: {
@@ -94,7 +97,12 @@ export class Identity extends Context.Service<
                 ),
         );
 
-        return Identity.of({ id, name, url });
+        const remoteUrl = Option.map(
+          yield* Config.option(Config.String("KESTREL_REMOTE_URL")),
+          (address) => address.replace(/\/+$/, ""),
+        );
+
+        return Identity.of({ id, name, url, remoteUrl });
       }),
     );
 }

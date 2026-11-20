@@ -580,8 +580,14 @@ const pair = Command.make(
       ),
       Flag.optional,
     ),
+    remote: Flag.Boolean("remote").pipe(
+      Flag.withDescription(
+        "Without a code, show the link and QR code at the server's outside address (KESTREL_REMOTE_URL), for a device away from its network",
+      ),
+      Flag.withDefault(false),
+    ),
   },
-  Effect.fn("pair")(function* ({ json, code, server }) {
+  Effect.fn("pair")(function* ({ json, code, server, remote }) {
     if (Option.isNone(code)) {
       const local = yield* connection;
 
@@ -600,20 +606,36 @@ const pair = Command.make(
 
       if (json) return yield* printJson({ pairing: made });
 
+      if (remote && made.remoteLink === undefined) {
+        return yield* new ClientError({
+          message:
+            "This server has no outside address: set KESTREL_REMOTE_URL where it runs, such as https://kestrel.example.com, and restart it",
+        });
+      }
+
       yield* Console.log(
         `Pairing code ${made.code}, for one device, until ${new Date(made.expires).toLocaleTimeString()}`,
       );
 
-      if (made.link === undefined) {
+      const link = remote ? made.remoteLink : made.link;
+
+      if (link === undefined) {
         return yield* Console.log(
           "This server only listens on this machine, so no other device can reach it yet",
         );
       }
 
-      yield* Console.log(`\nScan it, or open ${made.link}\n`);
-      yield* Console.log(renderUnicodeCompact(made.link));
+      yield* Console.log(`\nScan it, or open ${link}\n`);
+      yield* Console.log(renderUnicodeCompact(link));
 
       return;
+    }
+
+    if (remote) {
+      return yield* new ClientError({
+        message:
+          "--remote is for showing a code to another device, so leave the code out",
+      });
     }
 
     const { server: current } = yield* connection;

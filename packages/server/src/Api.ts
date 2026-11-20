@@ -505,6 +505,11 @@ export const PairingCode = Schema.Struct({
    * has no address other devices can reach.
    */
   link: Schema.optional(Schema.String),
+  /**
+   * The same page at the address devices outside the network reach, or
+   * nothing when the server has none (`KESTREL_REMOTE_URL`).
+   */
+  remoteLink: Schema.optional(Schema.String),
 });
 
 export interface PairingCode extends Schema.Schema.Type<typeof PairingCode> {}

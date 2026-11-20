@@ -82,7 +82,9 @@ listens on `127.0.0.1` alone trusts this computer, so it needs no pairing
 from it.
 
 Everything travels over plain HTTP, so keep the server on your own network.
-To reach it from outside, put it behind a reverse proxy with HTTPS.
+To reach it from outside, put it behind a reverse proxy with HTTPS, and set
+`KESTREL_REMOTE_URL` to that address. Then `kestrel pair --remote` shows the
+link and QR code at that address instead, for a device away from home.
 
 ## Installing the app
 
@@ -513,6 +515,7 @@ Assistant's backups of the app, as they're copies already.
 | `KESTREL_RECORDINGS`       | `recordings` in the state folder | Where the server's own recordings go                                |
 | `KESTREL_NAME`             | The machine's name               | The name devices see the server by                                  |
 | `KESTREL_URL`              | Its address on the network       | The address other devices reach it at, for pairing links            |
+| `KESTREL_REMOTE_URL`       | None                             | Its address from outside, for `kestrel pair --remote`               |
 | `KESTREL_ANNOUNCE`         | `true`                           | Whether it announces itself over mDNS; `false` keeps it quiet       |
 | `KESTREL_INGRESS_PORT`     | None                             | A port for Home Assistant's ingress, which the app sets             |
 | `KESTREL_INGRESS_FROM`     | The Supervisor's address         | The only address the ingress port answers                           |
