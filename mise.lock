@@ -194,101 +194,101 @@ url = "https://github.com/AlexxIT/go2rtc/releases/download/v1.9.15/go2rtc_win32.
 url_api = "https://api.github.com/repos/AlexxIT/go2rtc/releases/assets/674997089"
 
 [[tools."github:yt-dlp/yt-dlp"]]
-version = "2026.10.26"
+version = "2026.11.23"
 backend = "github:yt-dlp/yt-dlp"
-specifiers = ["2026.10.26"]
+specifiers = ["2026.11.23"]
 
 [tools."github:yt-dlp/yt-dlp".options]
 asset_pattern = "yt-dlp_linux_aarch64.zip"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-arm64"]
-checksum = "sha256:74708e707e8fa8177c8347e58152337edf320149cd7b225defd453f7cde47822"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux_aarch64.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669850"
+checksum = "sha256:e80b05e7e7ae5e2b7ff480937b51699c733563bfa5c185a19dfceadc4e6191bf"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux_aarch64.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995131"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-arm64-musl"]
-checksum = "sha256:74708e707e8fa8177c8347e58152337edf320149cd7b225defd453f7cde47822"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux_aarch64.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669850"
+checksum = "sha256:e80b05e7e7ae5e2b7ff480937b51699c733563bfa5c185a19dfceadc4e6191bf"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux_aarch64.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995131"
 provenance = "github-attestations"
 
 [[tools."github:yt-dlp/yt-dlp"]]
-version = "2026.10.26"
+version = "2026.11.23"
 backend = "github:yt-dlp/yt-dlp"
-specifiers = ["2026.10.26"]
+specifiers = ["2026.11.23"]
 
 [tools."github:yt-dlp/yt-dlp".options]
 asset_pattern = "yt-dlp_linux.zip"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-x64"]
-checksum = "sha256:f34053415136e55073dd64ba5326d161ecc23ce0e98c081d8752867b37809450"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669848"
+checksum = "sha256:cc4a3aa98fb438a1dac04a6fb006fe57acbeed00fc12db9ec84e3036dbbe6ccb"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995104"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-x64-baseline"]
-checksum = "sha256:f34053415136e55073dd64ba5326d161ecc23ce0e98c081d8752867b37809450"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669848"
+checksum = "sha256:cc4a3aa98fb438a1dac04a6fb006fe57acbeed00fc12db9ec84e3036dbbe6ccb"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995104"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-x64-musl"]
-checksum = "sha256:f34053415136e55073dd64ba5326d161ecc23ce0e98c081d8752867b37809450"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669848"
+checksum = "sha256:cc4a3aa98fb438a1dac04a6fb006fe57acbeed00fc12db9ec84e3036dbbe6ccb"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995104"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.linux-x64-musl-baseline"]
-checksum = "sha256:f34053415136e55073dd64ba5326d161ecc23ce0e98c081d8752867b37809450"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_linux.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669848"
+checksum = "sha256:cc4a3aa98fb438a1dac04a6fb006fe57acbeed00fc12db9ec84e3036dbbe6ccb"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995104"
 provenance = "github-attestations"
 
 [[tools."github:yt-dlp/yt-dlp"]]
-version = "2026.10.26"
+version = "2026.11.23"
 backend = "github:yt-dlp/yt-dlp"
-specifiers = ["2026.10.26"]
+specifiers = ["2026.11.23"]
 
 [tools."github:yt-dlp/yt-dlp".options]
 asset_pattern = "yt-dlp_macos.zip"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.macos-arm64"]
-checksum = "sha256:20d98fa608998eff87d1d35a6e9fb65e4b874639a6cc89addc19da3becde3ef1"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_macos.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669940"
+checksum = "sha256:43fc87fc581f64b48c366ce20b9cacb9c2949cc1ac4b9eca56fe25ac52dbb63b"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_macos.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995181"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.macos-x64"]
-checksum = "sha256:20d98fa608998eff87d1d35a6e9fb65e4b874639a6cc89addc19da3becde3ef1"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_macos.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669940"
+checksum = "sha256:43fc87fc581f64b48c366ce20b9cacb9c2949cc1ac4b9eca56fe25ac52dbb63b"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_macos.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995181"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.macos-x64-baseline"]
-checksum = "sha256:20d98fa608998eff87d1d35a6e9fb65e4b874639a6cc89addc19da3becde3ef1"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_macos.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679669940"
+checksum = "sha256:43fc87fc581f64b48c366ce20b9cacb9c2949cc1ac4b9eca56fe25ac52dbb63b"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_macos.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995181"
 provenance = "github-attestations"
 
 [[tools."github:yt-dlp/yt-dlp"]]
-version = "2026.10.26"
+version = "2026.11.23"
 backend = "github:yt-dlp/yt-dlp"
-specifiers = ["2026.10.26"]
+specifiers = ["2026.11.23"]
 
 [tools."github:yt-dlp/yt-dlp".options]
 asset_pattern = "yt-dlp_win.zip"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.windows-x64"]
-checksum = "sha256:fd51b212cf8380c7a52ee08c0d6be7f3c59b2f2c832eaf7b45acfae6eab57419"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_win.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679670014"
+checksum = "sha256:824860984b96ca01de09f98f7bfd74ed7bbdce72a3340b51af8b9dc5ee037a5f"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_win.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995279"
 provenance = "github-attestations"
 
 [tools."github:yt-dlp/yt-dlp"."platforms.windows-x64-baseline"]
-checksum = "sha256:fd51b212cf8380c7a52ee08c0d6be7f3c59b2f2c832eaf7b45acfae6eab57419"
-url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp_win.zip"
-url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/679670014"
+checksum = "sha256:824860984b96ca01de09f98f7bfd74ed7bbdce72a3340b51af8b9dc5ee037a5f"
+url = "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_win.zip"
+url_api = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/assets/784995279"
 provenance = "github-attestations"
 
 [[tools.node]]

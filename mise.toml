@@ -25,7 +25,7 @@ shellcheck = "0.11.0"
 # program beside an _internal folder, since the single-file builds unpack
 # themselves on every run, which takes seconds on a small box.
 [tools."github:yt-dlp/yt-dlp"]
-version = "2026.10.26"
+version = "2026.11.23"
 
 [tools."github:yt-dlp/yt-dlp".platforms]
 linux-x64 = { asset_pattern = "yt-dlp_linux.zip", rename_exe = "yt-dlp" }
