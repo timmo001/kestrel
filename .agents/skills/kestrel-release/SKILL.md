@@ -1,8 +1,8 @@
 ---
 name: kestrel-release
-description: Release Kestrel and roll it out, from the release notes and tag to installing the Home Assistant app through the ha-bridge Code Mode tools. Use when a change needs to reach the server, web app, desktop app or CLI, when picking the next version, publishing a release, debugging the release jobs in the Build and package application workflow, or updating the installed app.
+description: Release Kestrel and roll it out, from the release notes and tag to restarting the installed server on its new package. Use when a change needs to reach the server, web app, desktop app or CLI, when picking the next version, publishing a release, debugging the release jobs in the Build and package application workflow, or updating the installed app.
 license: Apache-2.0
-compatibility: Needs mise, Bun and the gh and ha-bridge Code Mode tools, from the kestrel repository root.
+compatibility: Needs mise, Bun and the gh and kestrel Code Mode tools and SSH to the server machine, from the kestrel repository root.
 ---
 
 # Releasing Kestrel
@@ -38,22 +38,20 @@ the version in code.
    for the other packages. Once the .deb, .rpm and Windows builds are done
    it attaches the archives, installers and their attestation, then
    publishes the Arch package and the AUR package. It also commits the app's
-   changelog. Check timmo001/home-assistant-apps' Update app run succeeded
-   before installing; that can be before the whole run has finished.
+   changelog. Wait for the whole run to pass before installing.
 
 ## Install
 
-Install through the `ha-bridge` Code Mode namespace, not the CLI or SSH:
+The installation in use is the `kestrel-nvr-bin` Arch package on the
+always-on server machine, run by the `kestrel-nvr.service` system unit. The
+`dot-machines` skill says which machine that is and how to reach it. The
+Home Assistant app is installed but dormant: leave it alone, and never
+install or start it.
 
-1. `check_updates` with `target: { entity_id: "update.kestrel_update" }`, so
-   the Supervisor reloads the app store.
-2. `get_update` on `update.kestrel_update`: the latest version is the new one
-   and the release notes are yours.
-3. `call_action` with `action: "update.install"` on the same target.
-4. `get_updates` on it: installed and latest match, nothing in progress.
-5. `kestrel.status` against the app's server shows it healthy with its
-   sources connected.
-
-Only `update.kestrel_update` is installed this way. Any other Home Assistant
-update still needs the user's go-ahead. The `kestrel-nvr-bin` Arch package
-reaches this machine through pacman with the next system update.
+1. Wait for the machine to upgrade the package by itself, which takes a few
+   minutes after the run publishes it: over SSH, `pacman -Q kestrel-nvr-bin`
+   shows the new version.
+2. The upgrade doesn't restart the server, so restart it over SSH with
+   `sudo -n systemctl restart kestrel-nvr`, then check
+   `systemctl is-active kestrel-nvr`.
+3. `kestrel.status` shows it healthy, with its sources connected.

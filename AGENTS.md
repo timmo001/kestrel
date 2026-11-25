@@ -90,8 +90,9 @@ Changes made here are pushed as they land, with no go-ahead needed. Once
    sessions' work alone, and push.
 2. When the change has an issue or a step in the plan, tick it off there, with
    a link to the commit.
-3. When the change is in what Kestrel ships, release it and install the Home
-   Assistant app, without asking, through the `kestrel-release` skill.
+3. When the change is in what Kestrel ships, release it and restart the
+   installed server on the new package, without asking, through the
+   `kestrel-release` skill.
 4. Report what landed and anything flagged.
 
 ## Notifications
