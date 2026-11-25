@@ -19,6 +19,7 @@ import {
   Schema,
 } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
+import { fileOptions, versionMismatch } from "@timmo001/groundwork-pwa/server";
 import {
   mismatchMessage,
   version,
@@ -128,11 +129,14 @@ const webClient = (
         ).pipe(HttpServerResponse.setHeader("cache-control", "no-cache"));
       }
 
-      // Checked with the browser each time, by ETag, so a new build reaches
-      // the page and its service worker at once rather than when the
-      // browser's own guess at freshness runs out
-      return yield* HttpServerResponse.file(isFile ? file : page).pipe(
-        Effect.map(HttpServerResponse.setHeader("cache-control", "no-cache")),
+      // Groundwork's cache headers: a file with a content hash in its name is
+      // kept, and every other one is checked with the browser each time, by
+      // ETag, so a new build reaches the page and its service worker at once
+      const served = isFile ? file : page;
+      const { headers } = fileOptions(path.relative(directory, served));
+
+      return yield* HttpServerResponse.file(served).pipe(
+        Effect.map(HttpServerResponse.setHeaders(headers)),
       );
     }).pipe(
       Effect.catch(() =>
@@ -217,8 +221,10 @@ const unpaired = HttpServerResponse.jsonUnsafe(
 );
 
 /** The paths open to any version, so a client can always learn the server's. */
-const anyVersion = new Set(["/api/health", "/api/devices/server"]);
+const anyVersion = ["/api/health", "/api/devices/server"];
 
+// Groundwork decides, and the body keeps Kestrel's own message, which says
+// which side to update and how
 const mismatched = (client: string) =>
   HttpServerResponse.jsonUnsafe(
     Schema.encodeSync(VersionMismatch)(
@@ -262,9 +268,11 @@ const signIn =
 
       if (
         client !== undefined &&
-        client !== version &&
-        guarded(path) &&
-        !anyVersion.has(path)
+        versionMismatch(
+          { app: "kestrel", version, anyVersion, guards: guarded },
+          path,
+          client,
+        ) !== undefined
       ) {
         return mismatched(client);
       }
