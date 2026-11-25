@@ -15,7 +15,7 @@
   "dependencies": {
     "@timmo001/kestrel-core": "workspace:*",
     "effect": "4.1.5",
-    "mediabunny": "1.66.2"
+    "mediabunny": "1.66.3"
   },
   "devDependencies": {
     "@effect/tsgo": "0.73.4",
