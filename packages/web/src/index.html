@@ -29,20 +29,11 @@
     </gw-banner>
     <!-- The offer to install Kestrel as an app, until it's turned down once;
          then only Settings offers it -->
-    <gw-banner class="install">
-      <p>Install Kestrel to open it in its own window, like any other app.</p>
-      <gw-button slot="actions" class="install-accept" size="small"
-        >Install</gw-button
-      >
-      <gw-button
-        slot="actions"
-        class="install-dismiss"
-        size="small"
-        appearance="plain"
-        variant="neutral"
-        >Not now</gw-button
-      >
-    </gw-banner>
+    <gw-install-banner
+      class="install"
+      storage-key="kestrel:install-dismissed"
+      message="Install Kestrel to open it in its own window, like any other app."
+    ></gw-install-banner>
     <gw-app-bar size="wide">
       <a slot="brand" class="brand" href="./">
         <img src="icons/icon-192.png" alt="" width="24" height="24" />

@@ -29,6 +29,7 @@ import {
   subscribePush,
   type PushState,
 } from "@timmo001/groundwork-pwa/view";
+import { watchVersion } from "@timmo001/groundwork-pwa/update";
 import { pageTheme } from "@timmo001/groundwork-tokens/page";
 import {
   createIcon,
@@ -79,7 +80,6 @@ import {
   themeSettings,
   themes,
 } from "./theme.ts";
-import { reloadForUpdate } from "./update.ts";
 
 // The theme picker in the app bar: Kestrel's own theme, then every Groundwork
 // theme and mode, with nothing to import, so it's always one of those listed
@@ -300,29 +300,22 @@ const pair = pairPage({
 });
 
 // Another version: the server was updated since the browser kept this page.
-// It moves onto the new release once by itself, and says so where that
-// didn't help. Every call refused meanwhile waits on the same move
+// Groundwork moves it onto the new release once by itself, and the banner
+// says so where that didn't help
 const versionBanner = find("gw-banner", "version");
-const reloadedKey = "kestrel:reloaded-for-version";
-let updating = false;
 
-find("gw-button", "version-reload")?.addEventListener("click", () =>
-  location.reload(),
-);
-
-onMismatched(() => {
-  if (updating || versionBanner === null || versionBanner.open) return;
-
-  if (sessionStorage.getItem(reloadedKey) !== version) {
-    sessionStorage.setItem(reloadedKey, version);
-    updating = true;
-    void reloadForUpdate(pwa);
-
-    return;
-  }
-
-  versionBanner.open = true;
+const update = watchVersion({
+  app: "kestrel",
+  version,
+  worker: pwa.worker,
+  onStale: () => {
+    if (versionBanner !== null) versionBanner.open = true;
+  },
 });
+
+find("gw-button", "version-reload")?.addEventListener("click", update.reload);
+
+onMismatched(update.mismatched);
 
 onUnpaired(() => {
   unpaired = true;

@@ -1,8 +1,8 @@
 /**
- * The service worker, bundled to `sw.js`: keeps the app shell so the app
- * starts offline, and shows the server's pushes as notifications. The build
- * sets `GROUNDWORK_PWA_VERSION`, so each build's worker differs from the
- * last, replaces it and its cache, and takes over open pages by itself.
+ * The service worker, bundled to `sw.js` by `buildPwa`: keeps the app shell
+ * so the app starts offline, and shows the server's pushes as notifications.
+ * Each build's worker carries its own version, so it replaces the last one
+ * and its cache, and takes over open pages by itself.
  */
 import {
   networkFirst,
@@ -27,7 +27,6 @@ const live = ["api/", "go2rtc/", "push/"].map(resolve);
 const bundle = ["index.js", "index.css"].map(resolve);
 
 serveShell(self, config, {
-  version: process.env.GROUNDWORK_PWA_VERSION ?? "dev",
   routes: [
     ({ request }) =>
       live.some((prefix) => request.url.startsWith(prefix))
