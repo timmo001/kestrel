@@ -22,7 +22,7 @@
     "@timmo001/groundwork-ui": "0.51.1",
     "@timmo001/kestrel-core": "workspace:*",
     "@timmo001/kestrel-server": "workspace:*",
-    "effect": "4.1.6"
+    "effect": "4.1.7"
   },
   "devDependencies": {
     "@effect/tsgo": "0.73.7",

@@ -13,10 +13,10 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "effect": "4.1.6"
+    "effect": "4.1.7"
   },
   "devDependencies": {
-    "@effect/platform-bun": "4.1.6",
+    "@effect/platform-bun": "4.1.7",
     "@effect/tsgo": "0.73.7",
     "@oxlint/plugins": "1.95.0",
     "@timmo001/oxlint-rules": "0.7.1",

@@ -13,9 +13,9 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@effect/platform-node-shared": "4.1.6",
+    "@effect/platform-node-shared": "4.1.7",
     "@timmo001/kestrel-core": "workspace:*",
-    "effect": "4.1.6"
+    "effect": "4.1.7"
   },
   "devDependencies": {
     "@effect/tsgo": "0.73.7",
