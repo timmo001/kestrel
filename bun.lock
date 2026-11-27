@@ -101,7 +101,7 @@
       "dependencies": {
         "@timmo001/kestrel-core": "workspace:*",
         "effect": "4.1.7",
-        "mediabunny": "1.66.4",
+        "mediabunny": "1.66.5",
       },
       "devDependencies": {
         "@effect/tsgo": "0.73.7",
@@ -1876,7 +1876,7 @@
 
     "media-typer": ["media-typer@1.1.1", "", {}, "sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ=="],
 
-    "mediabunny": ["mediabunny@1.66.4", "", { "dependencies": { "@types/dom-mediacapture-transform": "^0.1.11", "@types/dom-webcodecs": "0.1.13" } }, "sha512-VIPwwaVpY5mUnf9mAOJlBii4P1nHK05X8//veRjJrddn514BSOuYaMrUy1UReLMVVsm85id6eMu0z5K71Kkf+g=="],
+    "mediabunny": ["mediabunny@1.66.5", "", { "dependencies": { "@types/dom-mediacapture-transform": "^0.1.11", "@types/dom-webcodecs": "0.1.13" } }, "sha512-g2H+TdA0cKszM4ZKae9JszxWKLUpmte1Je/F9TY5Et0uO9a6k82V7HGrI3X9RT6ILFOK3Vi2nB9SjifWn5yyPw=="],
 
     "medium-zoom": ["medium-zoom@1.1.2", "", {}, "sha512-0wTqeCQ4NGzjPghi7i2lMI6RyGj9N60fGvzY9HiNcxDTcvOw7S+ri7K3xVkrIZ+2uzUg4w/KSVMDdZXYMtHkdw=="],
 
